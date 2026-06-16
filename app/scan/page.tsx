@@ -1,24 +1,28 @@
 "use client";
 
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 
 export default function ScanPage() {
-  const scanner = new Html5QrcodeScanner(
-    "reader",
-    { fps: 10 },
-    { 
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0
-    }
+  const startScan = () => {
+    const scanner = new Html5Qrcode("reader");
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => {
+        alert(`QR scansionato: ${decodedText}`);
+        scanner.stop();
+        scanner.clear();
+      },
+      (error) => {
+        console.error(error);
+      }
+    );
+  };
+
+  return (
+    <div>
+      <button onClick={startScan}>Avvia Scanner</button>
+      <div id="reader" style={{ width: "100%", maxWidth: "400px", marginTop: "16px" }}></div>
+    </div>
   );
-  scanner.render(
-    (decodedText) => {
-      alert(`QR scansionato: ${decodedText}`);
-      scanner.clear();
-    },
-    (error) => {
-      console.error(error);
-    }
-  );
-  return <div id="reader"></div>;
 }
