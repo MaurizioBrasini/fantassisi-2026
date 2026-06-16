@@ -4,17 +4,17 @@
 
 ## 🚀 Funzionalità principali
 
-- **Voto tra partecipanti**: ogni utente può votare un altro partecipante scansionando il QR sul suo badge. Il punteggio varia in base alla squadra e alla sede.
-- **Voto per eventi**: durante le presentazioni o le canzoni del karaoke, i partecipanti possono votare fisicamente (QR in sala) per contribuire al punteggio della propria squadra.
+- **Voto tra partecipanti**: ogni utente può votare un altro partecipante scansionando il QR sul suo badge.
+- **Voto per eventi**: durante le presentazioni o le canzoni, i partecipanti possono votare fisicamente (QR in sala).
 - **Ricarica con QR bonus**: QR sparsi nelle sedi che aggiungono CBTcoin extra.
 - **Classifiche in tempo reale**: punteggi di squadra, individuali, per classe e per sede.
-- **Pannello di amministrazione**: per gestire utenti, importare CSV, creare eventi e monitorare l'attività.
+- **Pannello di amministrazione**: per gestire utenti, importare CSV, creare eventi.
 
 ## 🛠️ Tecnologie utilizzate
 
-- **Frontend**: [Next.js](https://nextjs.org/) 14 (React) con PWA
-- **Backend e Database**: [Supabase](https://supabase.com/) (PostgreSQL)
-- **Hosting**: [Vercel](https://vercel.com/)
+- **Frontend**: Next.js 14 (React) con PWA
+- **Backend e Database**: Supabase (PostgreSQL)
+- **Hosting**: [Render](https://render.com/)
 - **Librerie**: `html5-qrcode` per lo scanner, `@supabase/supabase-js` per il client
 
 ## 📦 Struttura del progetto
