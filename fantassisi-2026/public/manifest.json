@@ -1,0 +1,6 @@
+{ 
+  "name": "FantAssisi 2026", 
+  "short_name": "FantAssisi", 
+  "start_url": "/", 
+  "display": "standalone" 
+} 
