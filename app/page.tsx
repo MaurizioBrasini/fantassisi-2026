@@ -41,7 +41,6 @@ export default function Dashboard() {
       const total = received?.reduce((sum, v) => sum + v.points, 0) || 0;
       setMyPoints(total);
 
-      // Calcolo punteggi squadre (semplificato)
       const { data: matricoleIds } = await supabase
         .from("users")
         .select("id")
