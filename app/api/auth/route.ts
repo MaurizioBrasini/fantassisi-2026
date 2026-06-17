@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -9,15 +8,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // Crea client Supabase direttamente con le variabili d'ambiente
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables");
-    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
-  }
-
+  // Simula un login di successo (senza database)
+  return NextResponse.redirect(new URL("/?test=success", request.url));
+}
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
   // Cerca l'utente con il token
