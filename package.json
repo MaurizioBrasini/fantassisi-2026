@@ -1,0 +1,29 @@
+{
+  "name": "fantassisi-2026",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/auth-helpers-nextjs": "^0.9.0",
+    "html5-qrcode": "^2.3.8",
+    "qrcode": "^1.5.3",
+    "papaparse": "^5.4.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/qrcode": "^1.5.5",
+    "@types/papaparse": "^5.3.14",
+    "typescript": "^5.3.3"
+  }
+}
