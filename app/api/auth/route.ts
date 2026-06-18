@@ -37,45 +37,22 @@ export async function GET(request: Request) {
 
   const response = NextResponse.redirect(new URL("/", baseUrl));
   const maxAge = 60 * 60 * 24 * 14;
+  const cookieOptions = {
+    maxAge,
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+  };
 
-  response.cookies.set("user_id", user.id, {
-    maxAge,
-    path: "/",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
-  response.cookies.set("user_team", user.team || "", {
-    maxAge,
-    path: "/",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
-  response.cookies.set("user_role", user.role || "student", {
-    maxAge,
-    path: "/",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-  });
+  response.cookies.set("user_id", user.id, cookieOptions);
+  response.cookies.set("user_team", user.team || "", cookieOptions);
+  response.cookies.set("user_role", user.role || "student", cookieOptions);
+
   if (user.year) {
-    response.cookies.set("user_class", user.year, {
-      maxAge,
-      path: "/",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+    response.cookies.set("user_class", user.year, cookieOptions);
   }
   if (user.site) {
-    response.cookies.set("user_site", user.site, {
-      maxAge,
-      path: "/",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+    response.cookies.set("user_site", user.site, cookieOptions);
   }
 
   return response;
