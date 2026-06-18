@@ -17,25 +17,21 @@ export async function GET(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Cerca l'utente con il token
   const { data: user, error } = await supabase
     .from("users")
-    .select("id, first_name, last_name, team, role, class, site")
+    .select("id, first_name, last_name, team, role, year, school, site")
     .eq("auth_token", token)
     .single();
 
   if (error || !user) {
+    console.error("Token error:", error?.message);
     return NextResponse.json(
       { error: "Token non valido" },
       { status: 401 }
     );
   }
 
-  // Crea la risposta con redirect alla dashboard
   const response = NextResponse.redirect(new URL("/", request.url));
-
-  // Imposta i cookie con scadenza 14 giorni (maxAge in secondi)
-  // 60 secondi * 60 minuti * 24 ore * 14 giorni = 1.209.600 secondi
   const maxAge = 60 * 60 * 24 * 14;
 
   response.cookies.set("user_id", user.id, {
@@ -45,7 +41,6 @@ export async function GET(request: Request) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
   });
-
   response.cookies.set("user_team", user.team || "", {
     maxAge,
     path: "/",
@@ -53,7 +48,6 @@ export async function GET(request: Request) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
   });
-
   response.cookies.set("user_role", user.role || "student", {
     maxAge,
     path: "/",
@@ -61,10 +55,8 @@ export async function GET(request: Request) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
   });
-
-  // Opzionale: cookie aggiuntivi per informazioni utili
-  if (user.class) {
-    response.cookies.set("user_class", user.class, {
+  if (user.year) {
+    response.cookies.set("user_class", user.year, {
       maxAge,
       path: "/",
       httpOnly: true,
@@ -72,7 +64,6 @@ export async function GET(request: Request) {
       sameSite: "lax",
     });
   }
-
   if (user.site) {
     response.cookies.set("user_site", user.site, {
       maxAge,
