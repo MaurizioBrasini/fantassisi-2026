@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [userName, setUserName] = useState("");
   const [myTeam, setMyTeam] = useState("");
   const [myClass, setMyClass] = useState("");
+  const [userRole, setUserRole] = useState("");
   const [remainingCoins, setRemainingCoins] = useState(20);
   const [myPoints, setMyPoints] = useState(0);
   const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
@@ -24,6 +25,7 @@ export default function Dashboard() {
     const fetchData = async () => {
       const id = getCookie("user_id");
       const team = getCookie("user_team");
+      const role = getCookie("user_role");
 
       if (!id) {
         setNoAccess(true);
@@ -33,21 +35,20 @@ export default function Dashboard() {
 
       setUserId(id);
       setMyTeam(team || "");
+      setUserRole(role || "");
 
-      // Recupera nome e classe dell'utente
       const { data: userRow } = await supabase
         .from("users")
-        .select("first_name, last_name, class, team")
+        .select("first_name, last_name, year, team")
         .eq("id", id)
         .single();
 
       if (userRow) {
         setUserName(`${userRow.first_name || ""} ${userRow.last_name || ""}`.trim());
-        setMyClass(userRow.class || "");
+        setMyClass(userRow.year || "");
         if (userRow.team) setMyTeam(userRow.team);
       }
 
-      // Voti fatti oggi (crediti rimanenti)
       const today = new Date().toISOString().split("T")[0];
       const { data: todayVotes, error: votesError } = await supabase
         .from("votes")
@@ -59,7 +60,6 @@ export default function Dashboard() {
         setRemainingCoins(20 - (todayVotes?.length || 0));
       }
 
-      // Punti ricevuti
       const { data: received, error: receivedError } = await supabase
         .from("votes")
         .select("points")
@@ -69,7 +69,6 @@ export default function Dashboard() {
         setMyPoints(received?.reduce((sum, v) => sum + (v.points || 0), 0) || 0);
       }
 
-      // Punteggi squadre
       const { data: allVotes, error: allVotesError } = await supabase
         .from("votes")
         .select("points, recipient_id");
@@ -116,6 +115,8 @@ export default function Dashboard() {
     );
   }
 
+  const isAdmin = userRole === "admin" || userRole === "staff";
+
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20 }}>
       <h1 style={{ color: "#1E3A5F", fontSize: "1.5rem", marginBottom: 4 }}>
@@ -123,133 +124,61 @@ export default function Dashboard() {
       </h1>
       <p style={{ color: "#666", marginBottom: 20 }}>
         Team: <strong>{myTeam || "Non assegnato"}</strong>
-        {myClass && ` • Classe: ${myClass}`}
+        {myClass && ` • Anno: ${myClass}`}
       </p>
 
-      {/* Punti e crediti */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 12,
-          marginBottom: 24,
-        }}
-      >
-        <div
-          style={{
-            background: "#f0f4f8",
-            borderRadius: 12,
-            padding: 16,
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: "#1E3A5F" }}>
-            {myPoints}
-          </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
+        <div style={{ background: "#f0f4f8", borderRadius: 12, padding: 16, textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "#1E3A5F" }}>{myPoints}</div>
           <div style={{ fontSize: "0.8rem", color: "#666" }}>Punti ricevuti</div>
         </div>
-        <div
-          style={{
-            background: "#f0f4f8",
-            borderRadius: 12,
-            padding: 16,
-            textAlign: "center",
-          }}
-        >
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: "#FF6B35" }}>
-            {remainingCoins}
-          </div>
+        <div style={{ background: "#f0f4f8", borderRadius: 12, padding: 16, textAlign: "center" }}>
+          <div style={{ fontSize: "2rem", fontWeight: 700, color: "#FF6B35" }}>{remainingCoins}</div>
           <div style={{ fontSize: "0.8rem", color: "#666" }}>CBTcoin oggi</div>
         </div>
       </div>
 
-      {/* Classifica squadre */}
-      <div
-        style={{
-          background: "#1E3A5F",
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 24,
-          color: "white",
-        }}
-      >
-        <h3 style={{ margin: "0 0 12px 0", fontSize: "1rem" }}>
-          🏆 Classifica squadre
-        </h3>
+      <div style={{ background: "#1E3A5F", borderRadius: 12, padding: 16, marginBottom: 24, color: "white" }}>
+        <h3 style={{ margin: "0 0 12px 0", fontSize: "1rem" }}>🏆 Classifica squadre</h3>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Matricole: <strong>{teamScores.Matricole}</strong></span>
           <span>Veterani: <strong>{teamScores.Veterani}</strong></span>
         </div>
       </div>
 
-      {/* Pulsanti azioni */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <Link
           href="/scan"
-          style={{
-            display: "block",
-            padding: 14,
-            borderRadius: 60,
-            textAlign: "center",
-            fontWeight: 600,
-            background: "#FF6B35",
-            color: "white",
-            textDecoration: "none",
-          }}
+          style={{ display: "block", padding: 14, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#FF6B35", color: "white", textDecoration: "none" }}
         >
           📷 Scansiona QR
         </Link>
         <Link
           href="/myqr"
-          style={{
-            display: "block",
-            padding: 14,
-            borderRadius: 60,
-            textAlign: "center",
-            fontWeight: 600,
-            background: "#1E3A5F",
-            color: "white",
-            textDecoration: "none",
-          }}
+          style={{ display: "block", padding: 14, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#1E3A5F", color: "white", textDecoration: "none" }}
         >
           📱 Il mio QR
         </Link>
-        <Link
-          href="/admin"
-          style={{
-            display: "block",
-            padding: 14,
-            borderRadius: 60,
-            textAlign: "center",
-            fontWeight: 600,
-            background: "#4a5568",
-            color: "white",
-            textDecoration: "none",
-            fontSize: "0.9rem",
-          }}
-        >
-          ⚙️ Admin
-        </Link>
+        {isAdmin && (
+          <Link
+            href="/admin"
+            style={{ display: "block", padding: 14, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.9rem" }}
+          >
+            ⚙️ Admin
+          </Link>
+        )}
       </div>
 
-      {/* Logout */}
       <button
         onClick={() => {
           document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           document.cookie = "user_team=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "user_class=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "user_site=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           window.location.href = "/";
         }}
-        style={{
-          marginTop: 24,
-          background: "none",
-          border: "none",
-          color: "#999",
-          fontSize: "0.8rem",
-          cursor: "pointer",
-          textDecoration: "underline",
-          width: "100%",
-        }}
+        style={{ marginTop: 24, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline", width: "100%" }}
       >
         Esci
       </button>
