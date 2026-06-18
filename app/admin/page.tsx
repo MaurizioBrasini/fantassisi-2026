@@ -23,7 +23,6 @@ export default function AdminPage() {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Stato per i moduli
   const [eventForm, setEventForm] = useState({
     title: "",
     event_type: "presentation",
@@ -43,27 +42,16 @@ export default function AdminPage() {
   useEffect(() => {
     const checkAdmin = async () => {
       const userId = getCookie("user_id");
+      const role = getCookie("user_role");
 
-      if (!userId) {
-        setIsAdmin(false);
-        setLoading(false);
-        return;
-      }
-
-      const { data: admin } = await supabase
-        .from("admins")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-
-      if (!admin) {
+      if (!userId || (role !== "admin" && role !== "staff")) {
         setIsAdmin(false);
         setLoading(false);
         return;
       }
 
       setIsAdmin(true);
-      setIsSuper(admin.is_super || false);
+      setIsSuper(role === "admin");
       await loadData();
       setLoading(false);
     };
@@ -107,15 +95,14 @@ export default function AdminPage() {
   };
 
   const handleCreateEvent = async () => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("votable_events")
       .insert({
         ...eventForm,
         qr_code: `EVENT:${crypto.randomUUID()}`,
         start_time: new Date(eventForm.start_time).toISOString(),
         end_time: new Date(eventForm.end_time).toISOString(),
-      })
-      .select();
+      });
 
     if (error) {
       setMessage("Errore creazione evento: " + error.message);
@@ -178,8 +165,9 @@ export default function AdminPage() {
     }
 
     const { error } = await supabase
-      .from("admins")
-      .insert({ user_id: user.id, is_super: false });
+      .from("users")
+      .update({ role: "staff" })
+      .eq("id", user.id);
 
     if (error) {
       setMessage("Errore nomina admin: " + error.message);
@@ -208,99 +196,48 @@ export default function AdminPage() {
         <h1>🛠️ Pannello Admin</h1>
         <button
           onClick={() => router.push("/")}
-          style={{
-            color: "#FF6B35",
-            background: "none",
-            border: "none",
-            fontSize: "1rem",
-          }}
+          style={{ color: "#FF6B35", background: "none", border: "none", fontSize: "1rem", cursor: "pointer" }}
         >
           ← Torna alla dashboard
         </button>
       </div>
 
       {message && (
-        <div
-          style={{
-            padding: 12,
-            background: "#f0f0f0",
-            borderRadius: 8,
-            marginBottom: 16,
-          }}
-        >
+        <div style={{ padding: 12, background: "#f0f0f0", borderRadius: 8, marginBottom: 16 }}>
           {message}
         </div>
       )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 12,
-          marginTop: 20,
-        }}
-      >
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 20 }}>
         <button
           onClick={() => setShowEventModal(true)}
-          style={{
-            padding: 12,
-            background: "#1E3A5F",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-          }}
+          style={{ padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
         >
           🎤 Crea Evento
         </button>
         <button
           onClick={() => setShowBonusModal(true)}
-          style={{
-            padding: 12,
-            background: "#FF6B35",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-          }}
+          style={{ padding: 12, background: "#FF6B35", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
         >
           🎁 Crea QR Bonus
         </button>
         <button
           onClick={() => setShowResetModal(true)}
-          style={{
-            padding: 12,
-            background: "#dc3545",
-            color: "white",
-            border: "none",
-            borderRadius: 8,
-          }}
+          style={{ padding: 12, background: "#dc3545", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
         >
           🔄 Reset
         </button>
         {isSuper && (
           <button
             onClick={() => setShowAdminModal(true)}
-            style={{
-              padding: 12,
-              background: "#28a745",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-            }}
+            style={{ padding: 12, background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
           >
             👑 Nomina Admin
           </button>
         )}
       </div>
 
-      {/* Import CSV */}
-      <div
-        style={{
-          marginTop: 20,
-          padding: 16,
-          background: "#f8f9fa",
-          borderRadius: 8,
-        }}
-      >
+      <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
         <h2>📁 Importa CSV / Excel</h2>
         <input
           type="file"
@@ -309,20 +246,12 @@ export default function AdminPage() {
         />
         <button
           onClick={handleImportCSV}
-          style={{
-            marginLeft: 8,
-            padding: "8px 16px",
-            background: "#1E3A5F",
-            color: "white",
-            border: "none",
-            borderRadius: 4,
-          }}
+          style={{ marginLeft: 8, padding: "8px 16px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}
         >
           Importa
         </button>
       </div>
 
-      {/* Lista eventi */}
       <div style={{ marginTop: 20 }}>
         <h2>🎤 Eventi ({events.length})</h2>
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
@@ -345,7 +274,6 @@ export default function AdminPage() {
         </table>
       </div>
 
-      {/* Lista bonus */}
       <div style={{ marginTop: 20 }}>
         <h2>🎁 QR Bonus ({bonuses.length})</h2>
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
@@ -368,7 +296,6 @@ export default function AdminPage() {
         </table>
       </div>
 
-      {/* Lista utenti */}
       <div style={{ marginTop: 20 }}>
         <h2>👥 Utenti ({users.length})</h2>
         <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
@@ -377,314 +304,84 @@ export default function AdminPage() {
               <th style={{ textAlign: "left", padding: 8 }}>Nome</th>
               <th style={{ textAlign: "left", padding: 8 }}>Email</th>
               <th style={{ textAlign: "left", padding: 8 }}>Team</th>
+              <th style={{ textAlign: "left", padding: 8 }}>Ruolo</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: 8 }}>
-                  {u.first_name} {u.last_name}
-                </td>
+                <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
                 <td style={{ padding: 8 }}>{u.email}</td>
                 <td style={{ padding: 8 }}>{u.team || "-"}</td>
+                <td style={{ padding: 8 }}>{u.role}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* Modale Evento */}
       {showEventModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: 24,
-              borderRadius: 16,
-              maxWidth: 500,
-              width: "100%",
-            }}
-          >
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
             <h2>🎤 Nuovo Evento</h2>
-            <input
-              type="text"
-              placeholder="Titolo"
-              value={eventForm.title}
-              onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            />
-            <select
-              value={eventForm.event_type}
-              onChange={(e) =>
-                setEventForm({ ...eventForm, event_type: e.target.value })
-              }
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            >
+            <input type="text" placeholder="Titolo" value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            <select value={eventForm.event_type} onChange={(e) => setEventForm({ ...eventForm, event_type: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
               <option value="presentation">Presentazione</option>
               <option value="song">Canzone</option>
             </select>
-            <select
-              value={eventForm.team_target}
-              onChange={(e) =>
-                setEventForm({ ...eventForm, team_target: e.target.value })
-              }
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            >
+            <select value={eventForm.team_target} onChange={(e) => setEventForm({ ...eventForm, team_target: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
               <option value="Matricole">Matricole</option>
               <option value="Veterani">Veterani</option>
             </select>
-            <input
-              type="text"
-              placeholder="Luogo"
-              value={eventForm.location}
-              onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            />
-            <input
-              type="datetime-local"
-              value={eventForm.start_time}
-              onChange={(e) =>
-                setEventForm({ ...eventForm, start_time: e.target.value })
-              }
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            />
-            <input
-              type="datetime-local"
-              value={eventForm.end_time}
-              onChange={(e) =>
-                setEventForm({ ...eventForm, end_time: e.target.value })
-              }
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            />
+            <input type="text" placeholder="Luogo" value={eventForm.location} onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            <input type="datetime-local" value={eventForm.start_time} onChange={(e) => setEventForm({ ...eventForm, start_time: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            <input type="datetime-local" value={eventForm.end_time} onChange={(e) => setEventForm({ ...eventForm, end_time: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button
-                onClick={handleCreateEvent}
-                style={{
-                  padding: "8px 16px",
-                  background: "#1E3A5F",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Crea
-              </button>
-              <button
-                onClick={() => setShowEventModal(false)}
-                style={{
-                  padding: "8px 16px",
-                  background: "#ccc",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Annulla
-              </button>
+              <button onClick={handleCreateEvent} style={{ padding: "8px 16px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Crea</button>
+              <button onClick={() => setShowEventModal(false)} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modale Bonus */}
       {showBonusModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: 24,
-              borderRadius: 16,
-              maxWidth: 500,
-              width: "100%",
-            }}
-          >
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
             <h2>🎁 Nuovo QR Bonus</h2>
-            <input
-              type="text"
-              placeholder="Titolo"
-              value={bonusForm.title}
-              onChange={(e) => setBonusForm({ ...bonusForm, title: e.target.value })}
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            />
-            <input
-              type="number"
-              placeholder="Importo"
-              value={bonusForm.amount}
-              onChange={(e) =>
-                setBonusForm({ ...bonusForm, amount: parseInt(e.target.value) || 0 })
-              }
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            />
+            <input type="text" placeholder="Titolo" value={bonusForm.title} onChange={(e) => setBonusForm({ ...bonusForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            <input type="number" placeholder="Importo" value={bonusForm.amount} onChange={(e) => setBonusForm({ ...bonusForm, amount: parseInt(e.target.value) || 0 })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button
-                onClick={handleCreateBonus}
-                style={{
-                  padding: "8px 16px",
-                  background: "#FF6B35",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Crea
-              </button>
-              <button
-                onClick={() => setShowBonusModal(false)}
-                style={{
-                  padding: "8px 16px",
-                  background: "#ccc",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Annulla
-              </button>
+              <button onClick={handleCreateBonus} style={{ padding: "8px 16px", background: "#FF6B35", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Crea</button>
+              <button onClick={() => setShowBonusModal(false)} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modale Reset */}
       {showResetModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: 24,
-              borderRadius: 16,
-              maxWidth: 500,
-              width: "100%",
-            }}
-          >
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
             <h2>🔄 Reset</h2>
-            <select
-              value={resetType}
-              onChange={(e) => setResetType(e.target.value)}
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            >
+            <select value={resetType} onChange={(e) => setResetType(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 8 }}>
               <option value="scores">Reset punteggi</option>
               <option value="full">Reset completo</option>
             </select>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button
-                onClick={handleReset}
-                style={{
-                  padding: "8px 16px",
-                  background: "#dc3545",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Conferma
-              </button>
-              <button
-                onClick={() => setShowResetModal(false)}
-                style={{
-                  padding: "8px 16px",
-                  background: "#ccc",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Annulla
-              </button>
+              <button onClick={handleReset} style={{ padding: "8px 16px", background: "#dc3545", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Conferma</button>
+              <button onClick={() => setShowResetModal(false)} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modale Admin */}
       {showAdminModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: 24,
-              borderRadius: 16,
-              maxWidth: 500,
-              width: "100%",
-            }}
-          >
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
             <h2>👑 Nomina Admin</h2>
-            <input
-              type="email"
-              placeholder="Email utente"
-              value={adminEmail}
-              onChange={(e) => setAdminEmail(e.target.value)}
-              style={{ width: "100%", padding: 8, marginTop: 8 }}
-            />
+            <input type="email" placeholder="Email utente" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button
-                onClick={handleAddAdmin}
-                style={{
-                  padding: "8px 16px",
-                  background: "#28a745",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Nomina
-              </button>
-              <button
-                onClick={() => setShowAdminModal(false)}
-                style={{
-                  padding: "8px 16px",
-                  background: "#ccc",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                Annulla
-              </button>
+              <button onClick={handleAddAdmin} style={{ padding: "8px 16px", background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Nomina</button>
+              <button onClick={() => setShowAdminModal(false)} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
             </div>
           </div>
         </div>
