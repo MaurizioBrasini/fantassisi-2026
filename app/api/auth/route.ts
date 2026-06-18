@@ -5,6 +5,10 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "fantassisi-2026.onrender.com";
+  const proto = request.headers.get("x-forwarded-proto") || "https";
+  const baseUrl = `${proto}://${host}`;
+
   if (!token) {
     return NextResponse.json(
       { error: "Token mancante" },
@@ -31,7 +35,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const response = NextResponse.redirect(new URL("/", request.url));
+  const response = NextResponse.redirect(new URL("/", baseUrl));
   const maxAge = 60 * 60 * 24 * 14;
 
   response.cookies.set("user_id", user.id, {
