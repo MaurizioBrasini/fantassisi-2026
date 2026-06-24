@@ -1,0 +1,187 @@
+// app/api/admin/users/route.ts
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { randomUUID } from "crypto";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// GET: Lista utenti (con paginazione e ricerca)
+export async function GET(request: Request) {
+  const role = cookies().get("user_role")?.value;
+  if (role !== "admin" && role !== "staff") {
+    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "50");
+  const search = searchParams.get("search") || "";
+  const offset = (page - 1) * limit;
+
+  let query = supabase
+    .from("users")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (search) {
+    query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
+  }
+
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
+
+  if (error) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    users: data || [],
+    total: count || 0,
+    page,
+    limit,
+    totalPages: Math.ceil((count || 0) / limit),
+  });
+}
+
+// POST: Crea un nuovo utente
+export async function POST(request: Request) {
+  const role = cookies().get("user_role")?.value;
+  if (role !== "admin" && role !== "staff") {
+    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const { email, first_name, last_name, team, role: userRole } = body;
+
+  if (!email) {
+    return NextResponse.json({ message: "Email obbligatoria" }, { status: 400 });
+  }
+
+  // Verifica se esiste già
+  const { data: existing } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json({ message: "Email già registrata" }, { status: 400 });
+  }
+
+  const authToken = randomUUID();
+
+  const { data, error } = await supabase
+    .from("users")
+    .insert({
+      id: randomUUID(),
+      email,
+      first_name: first_name || "",
+      last_name: last_name || "",
+      team: team || null,
+      role: userRole || "student",
+      auth_token: authToken,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    message: "✅ Utente creato!",
+    user: data,
+    link: `https://fantassisi-2026.onrender.com/?token=${authToken}`,
+  });
+}
+
+// PUT: Aggiorna un utente
+export async function PUT(request: Request) {
+  const role = cookies().get("user_role")?.value;
+  if (role !== "admin" && role !== "staff") {
+    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const { id, email, first_name, last_name, team, role: userRole } = body;
+
+  if (!id) {
+    return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
+  }
+
+  // Non permettere di modificare l'admin principale (protezione)
+  const { data: userToUpdate } = await supabase
+    .from("users")
+    .select("email")
+    .eq("id", id)
+    .single();
+
+  if (userToUpdate?.email === "mabras69@gmail.com" && role === "admin") {
+    return NextResponse.json({ message: "Non puoi modificare l'admin principale" }, { status: 403 });
+  }
+
+  const updateData: any = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (email) updateData.email = email;
+  if (first_name !== undefined) updateData.first_name = first_name;
+  if (last_name !== undefined) updateData.last_name = last_name;
+  if (team !== undefined) updateData.team = team;
+  if (userRole !== undefined) updateData.role = userRole;
+
+  const { data, error } = await supabase
+    .from("users")
+    .update(updateData)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ message: "✅ Utente aggiornato!", user: data });
+}
+
+// DELETE: Elimina un utente
+export async function DELETE(request: Request) {
+  const role = cookies().get("user_role")?.value;
+  if (role !== "admin" && role !== "staff") {
+    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
+  }
+
+  // Non permettere di eliminare l'admin principale
+  const { data: userToDelete } = await supabase
+    .from("users")
+    .select("email")
+    .eq("id", id)
+    .single();
+
+  if (userToDelete?.email === "mabras69@gmail.com") {
+    return NextResponse.json({ message: "Non puoi eliminare l'admin principale" }, { status: 403 });
+  }
+
+  // Elimina anche i voti associati
+  await supabase.from("votes").delete().eq("voter_id", id);
+  await supabase.from("votes").delete().eq("recipient_id", id);
+
+  const { error } = await supabase.from("users").delete().eq("id", id);
+
+  if (error) {
+    return NextResponse.json({ message: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ message: "✅ Utente eliminato!" });
+}
