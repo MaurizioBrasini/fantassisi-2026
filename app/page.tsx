@@ -10,13 +10,14 @@ function getCookie(name: string): string | null {
 }
 
 export default function Dashboard() {
-  const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState("");
   const [myTeam, setMyTeam] = useState("");
   const [myClass, setMyClass] = useState("");
   const [userRole, setUserRole] = useState("");
   const [remainingCoins, setRemainingCoins] = useState(20);
   const [myPoints, setMyPoints] = useState(0);
+  const [myVotesReceived, setMyVotesReceived] = useState(0);
+  const [myRank, setMyRank] = useState<number | null>(null);
   const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
@@ -24,7 +25,6 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       const id = getCookie("user_id");
-      const team = getCookie("user_team");
       const role = getCookie("user_role");
 
       if (!id) {
@@ -32,63 +32,52 @@ export default function Dashboard() {
         setLoading(false);
         return;
       }
-
-      setUserId(id);
-      setMyTeam(team || "");
       setUserRole(role || "");
 
-      const { data: userRow } = await supabase
-        .from("users")
-        .select("first_name, last_name, year, team")
-        .eq("id", id)
-        .single();
+      const [{ data: allUsers }, { data: allVotes }] = await Promise.all([
+        supabase.from("users").select("id, first_name, last_name, team, site, year"),
+        supabase.from("votes").select("voter_id, recipient_id, points, voted_at"),
+      ]);
 
-      if (userRow) {
-        setUserName(`${userRow.first_name || ""} ${userRow.last_name || ""}`.trim());
-        setMyClass(userRow.year || "");
-        if (userRow.team) setMyTeam(userRow.team);
+      const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
+      const me = usersById.get(id);
+
+      if (me) {
+        setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
+        setMyTeam(me.team || "");
+        setMyClass(me.year || "");
       }
+
+      const votes = allVotes || [];
 
       const today = new Date().toISOString().split("T")[0];
-      const { data: todayVotes, error: votesError } = await supabase
-        .from("votes")
-        .select("id", { count: "exact" })
-        .eq("voter_id", id)
-        .gte("voted_at", today);
+      const votesToday = votes.filter(
+        (v) => v.voter_id === id && v.voted_at?.startsWith(today)
+      ).length;
+      setRemainingCoins(Math.max(0, 20 - votesToday));
 
-      if (!votesError) {
-        setRemainingCoins(20 - (todayVotes?.length || 0));
-      }
+      const pointsByUser = new Map<string, number>();
+      const pointsByTeam = { Matricole: 0, Veterani: 0 };
 
-      const { data: received, error: receivedError } = await supabase
-        .from("votes")
-        .select("points")
-        .eq("recipient_id", id);
+      for (const v of votes) {
+        const recipient = usersById.get(v.recipient_id);
+        const pts = v.points || 0;
+        if (!recipient) continue;
 
-      if (!receivedError) {
-        setMyPoints(received?.reduce((sum, v) => sum + (v.points || 0), 0) || 0);
-      }
+        pointsByUser.set(v.recipient_id, (pointsByUser.get(v.recipient_id) || 0) + pts);
 
-      const { data: allVotes, error: allVotesError } = await supabase
-        .from("votes")
-        .select("points, recipient_id");
-
-      if (!allVotesError && allVotes) {
-        const teams = { Matricole: 0, Veterani: 0 };
-        for (const vote of allVotes) {
-          const { data: recipient } = await supabase
-            .from("users")
-            .select("team")
-            .eq("id", vote.recipient_id)
-            .single();
-          if (recipient?.team === "Matricole") {
-            teams.Matricole += vote.points || 0;
-          } else if (recipient?.team === "Veterani") {
-            teams.Veterani += vote.points || 0;
-          }
+        if (recipient.team === "Matricole" || recipient.team === "Veterani") {
+          pointsByTeam[recipient.team] += pts;
         }
-        setTeamScores(teams);
       }
+
+      setTeamScores(pointsByTeam);
+      setMyPoints(pointsByUser.get(id) || 0);
+      setMyVotesReceived(votes.filter((v) => v.recipient_id === id).length);
+
+      const individualRanking = Array.from(pointsByUser.entries()).sort((a, b) => b[1] - a[1]);
+      const myIndex = individualRanking.findIndex(([uid]) => uid === id);
+      setMyRank(myIndex >= 0 ? myIndex + 1 : null);
 
       setLoading(false);
     };
@@ -108,66 +97,168 @@ export default function Dashboard() {
   }
 
   if (loading) {
-    return (
-      <div style={{ textAlign: "center", padding: 40 }}>
-        Caricamento...
-      </div>
-    );
+    return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
   }
 
   const isAdmin = userRole === "admin" || userRole === "staff";
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: 20 }}>
-      <h1 style={{ color: "#1E3A5F", fontSize: "1.5rem", marginBottom: 4 }}>
-        Ciao {userName || "Partecipante"} 👋
-      </h1>
-      <p style={{ color: "#666", marginBottom: 20 }}>
-        Team: <strong>{myTeam || "Non assegnato"}</strong>
-        {myClass && ` • Anno: ${myClass}`}
+    <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <span style={{ fontSize: "2.2rem" }}>🐓</span>
+        <h1 style={{ textAlign: "center", color: "#1E3A5F", fontSize: "1.6rem", margin: 0, lineHeight: 1.2 }}>
+          FantAssisi<br />2026
+        </h1>
+        <span style={{ fontSize: "2.2rem" }}>🐄</span>
+      </div>
+
+      {/* Classifica squadre */}
+      <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ flex: 1, background: "#FF6B35", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Matricole</div>
+          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Matricole}</div>
+        </div>
+        <div style={{ width: 2, height: 50, background: "#1E3A5F" }} />
+        <div style={{ flex: 1, background: "#1E3A5F", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Veterani</div>
+          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Veterani}</div>
+        </div>
+      </div>
+
+      <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24 }}>
+        Ciao <strong>{userName || "Partecipante"}</strong> · {myTeam || "Team non assegnato"}
+        {myClass && ` · ${myClass}`}
       </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-        <div style={{ background: "#f0f4f8", borderRadius: 12, padding: 16, textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: "#1E3A5F" }}>{myPoints}</div>
-          <div style={{ fontSize: "0.8rem", color: "#666" }}>Punti ricevuti</div>
+      {/* Classifiche */}
+      <h2 style={{ fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 10 }}>Classifiche</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
+        <Link
+          href="/ranking/individuali"
+          style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "12px 16px", borderRadius: 10, background: "#FFF3B0",
+            color: "#1E1E1E", fontWeight: 700, textDecoration: "none",
+          }}
+        >
+          <span>🏅 Classifica Individuale</span>
+          <span>›</span>
+        </Link>
+        <Link
+          href="/ranking/classi"
+          style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "12px 16px", borderRadius: 10, background: "#FFF3B0",
+            color: "#1E1E1E", fontWeight: 700, textDecoration: "none",
+          }}
+        >
+          <span>🏫 Classifica per Classe</span>
+          <span>›</span>
+        </Link>
+        <Link
+          href="/ranking/sedi"
+          style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "12px 16px", borderRadius: 10, background: "#FFF3B0",
+            color: "#1E1E1E", fontWeight: 700, textDecoration: "none",
+          }}
+        >
+          <span>🏛️ Classifica per Sede</span>
+          <span>›</span>
+        </Link>
+      </div>
+
+      {/* Il mio punteggio + Il mio QR */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
+          <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
+            <div style={{ fontWeight: 700 }}>{userName || "—"}</div>
+            <div style={{ fontSize: "0.85rem" }}>{myVotesReceived} voti</div>
+            <div style={{ fontSize: "0.85rem" }}>
+              {myPoints} punti{myRank && ` · ${myRank}° posto`}
+            </div>
+          </div>
         </div>
-        <div style={{ background: "#f0f4f8", borderRadius: 12, padding: 16, textAlign: "center" }}>
-          <div style={{ fontSize: "2rem", fontWeight: 700, color: "#FF6B35" }}>{remainingCoins}</div>
-          <div style={{ fontSize: "0.8rem", color: "#666" }}>CBTcoin oggi</div>
+        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+            Mostra il QR per ricevere voti
+          </div>
+          <Link
+            href="/myqr"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              height: 70, borderRadius: "50%", background: "#A8D8A8",
+              border: "2px solid #2E7D32", color: "#1E1E1E", fontWeight: 700,
+              textDecoration: "none", textAlign: "center", fontSize: "0.9rem",
+            }}
+          >
+            Il mio QR
+          </Link>
         </div>
       </div>
 
-      <div style={{ background: "#1E3A5F", borderRadius: 12, padding: 16, marginBottom: 24, color: "white" }}>
-        <h3 style={{ margin: "0 0 12px 0", fontSize: "1rem" }}>🏆 Classifica squadre</h3>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>Matricole: <strong>{teamScores.Matricole}</strong></span>
-          <span>Veterani: <strong>{teamScores.Veterani}</strong></span>
+      {/* CBT coins + Ricarica */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>I miei CBT coins</div>
+          <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{remainingCoins}</div>
+            <div style={{ fontSize: "0.7rem" }}>si ricaricano ogni giorno a mezzanotte</div>
+          </div>
+        </div>
+        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+            Ricarica i CBT Coins
+          </div>
+          <Link
+            href="/scan"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              height: 70, borderRadius: "50%", background: "#E0B8E8",
+              border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700,
+              textDecoration: "none", textAlign: "center", fontSize: "0.9rem",
+            }}
+          >
+            Scan QR
+          </Link>
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Vota i colleghi */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+          Vota i colleghi
+        </div>
         <Link
           href="/scan"
-          style={{ display: "block", padding: 14, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#FF6B35", color: "white", textDecoration: "none" }}
+          style={{
+            display: "block", padding: 16, borderRadius: 60, textAlign: "center",
+            fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2",
+            color: "#1E1E1E", textDecoration: "none",
+          }}
         >
-          📷 Scansiona QR
+          📷 Scan QR
         </Link>
-        <Link
-          href="/myqr"
-          style={{ display: "block", padding: 14, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#1E3A5F", color: "white", textDecoration: "none" }}
-        >
-          📱 Il mio QR
-        </Link>
-        {isAdmin && (
-          <Link
-            href="/admin"
-            style={{ display: "block", padding: 14, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.9rem" }}
-          >
-            ⚙️ Admin
-          </Link>
-        )}
       </div>
+
+      {isAdmin && (
+        <Link
+          href="/admin"
+          style={{
+            display: "block", marginTop: 16, padding: 12, borderRadius: 60,
+            textAlign: "center", fontWeight: 600, background: "#4a5568",
+            color: "white", textDecoration: "none", fontSize: "0.85rem",
+          }}
+        >
+          ⚙️ Admin
+        </Link>
+      )}
 
       <button
         onClick={() => {
