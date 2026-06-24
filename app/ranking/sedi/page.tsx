@@ -54,17 +54,19 @@ export default function SiteRanking() {
         pointsBySite.set(recipient.site, (pointsBySite.get(recipient.site) || 0) + (v.points || 0));
       }
 
-      // --- FIX: evita lo spread sugli iteratori ---
-      // Raccogli tutte le chiavi manualmente
+      // --- FIX: converte gli iteratori in array prima di iterare ---
+      const schoolKeys = Array.from(schoolsBySite.keys());
+      const pointKeys = Array.from(pointsBySite.keys());
+      
       const siteSet = new Set<string>();
-      for (const key of schoolsBySite.keys()) {
+      for (const key of schoolKeys) {
         siteSet.add(key);
       }
-      for (const key of pointsBySite.keys()) {
+      for (const key of pointKeys) {
         siteSet.add(key);
       }
       const sites = Array.from(siteSet);
-      // -----------------------------------------
+      // ---------------------------------------------------------
 
       const ranking: Row[] = sites.map((site) => {
         const schoolsCount = schoolsBySite.get(site)?.size || 0;
