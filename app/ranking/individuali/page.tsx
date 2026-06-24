@@ -38,7 +38,7 @@ export default function IndividualRanking() {
         pointsByUser.set(v.recipient_id, (pointsByUser.get(v.recipient_id) || 0) + (v.points || 0));
       }
 
-      const ranking: Row[] = [...pointsByUser.entries()]
+      const ranking: Row[] = Array.from(pointsByUser.entries())
         .map(([uid, points]) => {
           const u = usersById.get(uid);
           return {
