@@ -15,6 +15,7 @@ export default function AdminPage() {
   const [isSuper, setIsSuper] = useState(false);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
+  const [userSearch, setUserSearch] = useState("");
   const [events, setEvents] = useState<any[]>([]);
   const [bonuses, setBonuses] = useState<any[]>([]);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -60,8 +61,23 @@ export default function AdminPage() {
   }, [router]);
 
   const loadData = async () => {
-    const { data: usersList } = await supabase.from("users").select("*").limit(100);
-    setUsers(usersList || []);
+    // Supabase limita ogni richiesta a 1000 righe: per scaricare tutti gli
+    // utenti (potenzialmente migliaia) si richiede a blocchi di 1000 finché
+    // un blocco torna incompleto.
+    const allUsersData: any[] = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const { data: page } = await supabase
+        .from("users")
+        .select("*")
+        .range(from, from + pageSize - 1);
+      if (!page || page.length === 0) break;
+      allUsersData.push(...page);
+      if (page.length < pageSize) break;
+      from += pageSize;
+    }
+    setUsers(allUsersData);
 
     const { data: eventsList } = await supabase
       .from("votable_events")
@@ -75,6 +91,14 @@ export default function AdminPage() {
       .order("created_at", { ascending: false });
     setBonuses(bonusesList || []);
   };
+
+  const filteredUsers = users.filter((u) => {
+    if (!userSearch.trim()) return true;
+    const q = userSearch.trim().toLowerCase();
+    const name = `${u.first_name || ""} ${u.last_name || ""}`.toLowerCase();
+    const email = (u.email || "").toLowerCase();
+    return name.includes(q) || email.includes(q);
+  });
 
   const handleImportCSV = async () => {
     if (!importFile) {
@@ -140,7 +164,6 @@ export default function AdminPage() {
   };
 
   const handleReset = async () => {
-    // Messaggio di conferma personalizzato
     let confirmMsg = "";
     if (resetType === "today") {
       confirmMsg = "🗑️ Vuoi cancellare SOLO i voti di oggi? (I voti storici rimarranno)";
@@ -309,27 +332,36 @@ export default function AdminPage() {
       </div>
 
       <div style={{ marginTop: 20 }}>
-        <h2>👥 Utenti ({users.length})</h2>
-        <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #ddd" }}>
-              <th style={{ textAlign: "left", padding: 8 }}>Nome</th>
-              <th style={{ textAlign: "left", padding: 8 }}>Email</th>
-              <th style={{ textAlign: "left", padding: 8 }}>Team</th>
-              <th style={{ textAlign: "left", padding: 8 }}>Ruolo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
-                <td style={{ padding: 8 }}>{u.email}</td>
-                <td style={{ padding: 8 }}>{u.team || "-"}</td>
-                <td style={{ padding: 8 }}>{u.role}</td>
+        <h2>👥 Utenti ({filteredUsers.length} di {users.length})</h2>
+        <input
+          type="text"
+          placeholder="Cerca per nome o email..."
+          value={userSearch}
+          onChange={(e) => setUserSearch(e.target.value)}
+          style={{ width: "100%", padding: 10, marginTop: 8, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }}
+        />
+        <div style={{ maxHeight: 500, overflowY: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #ddd" }}>
+                <th style={{ textAlign: "left", padding: 8 }}>Nome</th>
+                <th style={{ textAlign: "left", padding: 8 }}>Email</th>
+                <th style={{ textAlign: "left", padding: 8 }}>Team</th>
+                <th style={{ textAlign: "left", padding: 8 }}>Ruolo</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredUsers.map((u) => (
+                <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
+                  <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
+                  <td style={{ padding: 8 }}>{u.email}</td>
+                  <td style={{ padding: 8 }}>{u.team || "-"}</td>
+                  <td style={{ padding: 8 }}>{u.role}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {showEventModal && (
