@@ -140,13 +140,14 @@ export default function AdminPage() {
   };
 
   const handleReset = async () => {
-    const { error } = await supabase.rpc(
-      resetType === "full" ? "reset_full" : "reset_scores"
-    );
-    if (error) {
-      setMessage("Errore reset: " + error.message);
-    } else {
-      setMessage("✅ Reset completato!");
+    const res = await fetch("/api/admin/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: resetType }),
+    });
+    const data = await res.json();
+    setMessage(data.message);
+    if (res.ok) {
       setShowResetModal(false);
       loadData();
     }
