@@ -140,6 +140,17 @@ export default function AdminPage() {
   };
 
   const handleReset = async () => {
+    // Messaggio di conferma personalizzato
+    let confirmMsg = "";
+    if (resetType === "today") {
+      confirmMsg = "🗑️ Vuoi cancellare SOLO i voti di oggi? (I voti storici rimarranno)";
+    } else if (resetType === "scores") {
+      confirmMsg = "⚠️ Vuoi cancellare TUTTI i voti (storici + oggi)? Questa operazione è irreversibile!";
+    } else if (resetType === "full") {
+      confirmMsg = "🚨 RESET COMPLETO: Cancellerai TUTTO (voti, eventi, bonus). Sei ASSOLUTAMENTE sicuro?";
+    }
+    if (!confirm(confirmMsg)) return;
+
     const res = await fetch("/api/admin/reset", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -364,8 +375,9 @@ export default function AdminPage() {
           <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
             <h2>🔄 Reset</h2>
             <select value={resetType} onChange={(e) => setResetType(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 8 }}>
-              <option value="scores">Reset punteggi</option>
-              <option value="full">Reset completo</option>
+              <option value="today">🗑️ Reset voti di oggi</option>
+              <option value="scores">🔄 Reset punteggi (tutti i voti)</option>
+              <option value="full">⚠️ Reset completo (tutto)</option>
             </select>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleReset} style={{ padding: "8px 16px", background: "#dc3545", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Conferma</button>
