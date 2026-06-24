@@ -71,7 +71,7 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
     seen.set(email, row);
   }
 
-  return [...seen.values()].map((row) => {
+  return Array.from(seen.values()).map((row) => {
     const iscrizione = String(row["ISCRIZIONE"] || "").trim();
     const anno = String(row["ANNO DI FREQUENZA"] || "").trim();
     let { school, site } = splitSchoolSite(String(row["Scuola in cui sei iscritto"] || ""));
