@@ -76,3 +76,43 @@ export async function POST(request: Request) {
     .filter((r) => r.email)
     .map((r) => {
       const email = r.email.trim().toLowerCase();
+      const team = validTeams.has(r.team) ? r.team : null;
+      const role = validRoles.has(r.role) ? r.role : "student";
+      const token =
+        existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+      return {
+        email,
+        first_name: r.first_name || null,
+        last_name: r.last_name || null,
+        school: r.school || null,
+        site: r.site || null,
+        year: r.year || null,
+        role,
+        team,
+        auth_token: token,
+      };
+    });
+
+  const BATCH_SIZE = 200;
+  let imported = 0;
+  const errors: string[] = [];
+
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const batch = records.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase.from("users").upsert(batch, { onConflict: "email" });
+    if (error) {
+      errors.push(error.message);
+    } else {
+      imported += batch.length;
+    }
+  }
+
+  if (errors.length > 0) {
+    return NextResponse.json(
+      { message: `Importati ${imported} su ${records.length}. Errori: ${errors.join(" | ")}` },
+      { status: 207 }
+    );
+  }
+
+  return NextResponse.json({ message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe.` });
+}
