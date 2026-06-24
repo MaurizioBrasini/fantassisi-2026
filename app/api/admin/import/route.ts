@@ -1,6 +1,98 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import * as XLSX from "xlsx";
+
+const BRANDS = ["CCMA Marco Aurelio", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
+
+function splitSchoolSite(raw: string | undefined): { school: string | null; site: string | null } {
+  if (!raw || !raw.trim()) return { school: null, site: null };
+  const value = raw.trim();
+  for (const brand of BRANDS) {
+    if (value.toUpperCase().startsWith(brand.toUpperCase())) {
+      const site = value.slice(brand.length).trim();
+      return { school: brand, site: site || null };
+    }
+  }
+  return { school: null, site: value };
+}
+
+function assignTeam(iscrizione: string, anno: string): string | null {
+  const staffOnly = ["Didatta", "Cotrainer e/o conduttore di project", "Docente", "Esterno"];
+  const alwaysVeterani = ["Ex allievo", "Allievo altre scuole"];
+  if (staffOnly.includes(iscrizione)) return null;
+  if (alwaysVeterani.includes(iscrizione)) return "Veterani";
+  if (anno) {
+    if (["PRE-ISCRITTI 2027 E 2028", "1° ANNO 2026", "2° ANNO 2026"].includes(anno)) return "Matricole";
+    if (["3° ANNO 2026", "4° ANNO 2026"].includes(anno)) return "Veterani";
+  }
+  return null;
+}
+
+// Legge il file Excel grezzo esportato dal modulo Google (con tutte le
+// colonne italiane del form), unisce tutti i fogli, rimuove i duplicati per
+// email e applica le regole di squadra/sede.
+async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: "array" });
+
+  let headers: string[] | null = null;
+  const sheetsData: any[][][] = [];
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const raw: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    if (raw.length === 0) continue;
+    if (!headers && raw[0].some((cell) => String(cell).trim() === "ISCRIZIONE")) {
+      headers = raw[0].map((h) => String(h).trim());
+    }
+    sheetsData.push(raw);
+  }
+
+  if (!headers) {
+    throw new Error("Formato del file non riconosciuto: non trovo la colonna 'ISCRIZIONE'.");
+  }
+
+  const allRows: Record<string, any>[] = [];
+  for (const raw of sheetsData) {
+    const isHeaderRow = raw[0].some((cell) => String(cell).trim() === "ISCRIZIONE");
+    const dataRows = isHeaderRow ? raw.slice(1) : raw;
+    for (const r of dataRows) {
+      const obj: Record<string, any> = {};
+      headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
+      allRows.push(obj);
+    }
+  }
+
+  const seen = new Map<string, Record<string, any>>();
+  for (const row of allRows) {
+    const email = String(row["Indirizzo email"] || "").trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.set(email, row);
+  }
+
+  return [...seen.values()].map((row) => {
+    const iscrizione = String(row["ISCRIZIONE"] || "").trim();
+    const anno = String(row["ANNO DI FREQUENZA"] || "").trim();
+    let { school, site } = splitSchoolSite(String(row["Scuola in cui sei iscritto"] || ""));
+    if (!site) {
+      const fallback = splitSchoolSite(String(row["SCUOLA DI APPARTENENZA"] || ""));
+      school = school || fallback.school;
+      site = site || fallback.site;
+    }
+    return {
+      first_name: String(row["NOME"] || "").trim() || null,
+      last_name: String(row["COGNOME"] || "").trim() || null,
+      email: String(row["Indirizzo email"] || "").trim().toLowerCase(),
+      school,
+      site,
+      year: anno || null,
+      role: "student",
+      team: assignTeam(iscrizione, anno),
+      auth_token: "",
+    };
+  });
+}
 
 function parseCSV(text: string): Record<string, string>[] {
   const lines = text.replace(/\r\n/g, "\n").split("\n").filter((l) => l.trim().length > 0);
@@ -55,9 +147,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Nessun file ricevuto" }, { status: 400 });
   }
 
-  const text = await file.text();
-  const rows = parseCSV(text);
-  if (rows.length === 0) {
+  const isExcel = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls");
+
+  let rawRecords: Record<string, any>[];
+  try {
+    if (isExcel) {
+      rawRecords = await parseRawExcel(file);
+    } else {
+      const text = await file.text();
+      rawRecords = parseCSV(text);
+    }
+  } catch (e: any) {
+    return NextResponse.json({ message: "Errore lettura file: " + e.message }, { status: 400 });
+  }
+
+  if (rawRecords.length === 0) {
     return NextResponse.json({ message: "Il file è vuoto o non valido" }, { status: 400 });
   }
 
@@ -72,12 +176,12 @@ export async function POST(request: Request) {
   const validTeams = new Set(["Matricole", "Veterani"]);
   const validRoles = new Set(["student", "staff", "admin"]);
 
-  const records = rows
+  const records = rawRecords
     .filter((r) => r.email)
     .map((r) => {
-      const email = r.email.trim().toLowerCase();
+      const email = String(r.email).trim().toLowerCase();
       const team = validTeams.has(r.team) ? r.team : null;
-      const role = validRoles.has(r.role) ? r.role : "student";
+      const userRole = validRoles.has(r.role) ? r.role : "student";
       const token =
         existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
       return {
@@ -87,7 +191,7 @@ export async function POST(request: Request) {
         school: r.school || null,
         site: r.site || null,
         year: r.year || null,
-        role,
+        role: userRole,
         team,
         auth_token: token,
       };
