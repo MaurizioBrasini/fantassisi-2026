@@ -16,7 +16,6 @@ export default function Dashboard() {
   const [userRole, setUserRole] = useState("");
   const [remainingCoins, setRemainingCoins] = useState(20);
   const [myPoints, setMyPoints] = useState(0);
-  const [myVotesReceived, setMyVotesReceived] = useState(0);
   const [myRank, setMyRank] = useState<number | null>(null);
   const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
   const [loading, setLoading] = useState(true);
@@ -73,7 +72,6 @@ export default function Dashboard() {
 
       setTeamScores(pointsByTeam);
       setMyPoints(pointsByUser.get(id) || 0);
-      setMyVotesReceived(votes.filter((v) => v.recipient_id === id).length);
 
       const individualRanking = Array.from(pointsByUser.entries()).sort((a, b) => b[1] - a[1]);
       const myIndex = individualRanking.findIndex(([uid]) => uid === id);
@@ -177,9 +175,9 @@ export default function Dashboard() {
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
           <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
             <div style={{ fontWeight: 700 }}>{userName || "—"}</div>
-            <div style={{ fontSize: "0.85rem" }}>{myVotesReceived} voti</div>
+            <div style={{ fontSize: "0.85rem" }}>{myPoints} punti</div>
             <div style={{ fontSize: "0.85rem" }}>
-              {myPoints} punti{myRank && ` · ${myRank}° posto`}
+              {myRank ? `${myRank}° posto in classifica` : "Nessun voto ancora"}
             </div>
           </div>
         </div>
