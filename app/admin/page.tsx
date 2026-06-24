@@ -22,7 +22,10 @@ export default function AdminPage() {
   const [showBonusModal, setShowBonusModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [message, setMessage] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const [eventForm, setEventForm] = useState({
     title: "",
@@ -39,6 +42,15 @@ export default function AdminPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [resetType, setResetType] = useState("scores");
   const [importFile, setImportFile] = useState<File | null>(null);
+
+  // Form per aggiungere/modificare utente
+  const [userForm, setUserForm] = useState({
+    email: "",
+    first_name: "",
+    last_name: "",
+    team: "",
+    role: "student",
+  });
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -99,6 +111,86 @@ export default function AdminPage() {
     const email = (u.email || "").toLowerCase();
     return name.includes(q) || email.includes(q);
   });
+
+  // ---- GESTIONE UTENTI (CRUD via API) ----
+
+  // Aggiungi utente
+  const handleAddUser = async () => {
+    if (!userForm.email) {
+      setMessage("❌ Email obbligatoria");
+      return;
+    }
+
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userForm),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      setMessage(`✅ ${data.message} Link: ${data.link}`);
+      setShowAddUserModal(false);
+      setUserForm({ email: "", first_name: "", last_name: "", team: "", role: "student" });
+      loadData();
+    } else {
+      setMessage("❌ " + data.message);
+    }
+  };
+
+  // Apri modale modifica
+  const openEditModal = (user: any) => {
+    setSelectedUser(user);
+    setUserForm({
+      email: user.email || "",
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      team: user.team || "",
+      role: user.role || "student",
+    });
+    setShowEditUserModal(true);
+  };
+
+  // Modifica utente
+  const handleEditUser = async () => {
+    const res = await fetch("/api/admin/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: selectedUser.id,
+        ...userForm,
+      }),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      setMessage("✅ " + data.message);
+      setShowEditUserModal(false);
+      setSelectedUser(null);
+      loadData();
+    } else {
+      setMessage("❌ " + data.message);
+    }
+  };
+
+  // Elimina utente
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`Sei sicuro di voler eliminare ${userName}?`)) return;
+
+    const res = await fetch(`/api/admin/users?id=${userId}`, {
+      method: "DELETE",
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      setMessage("✅ " + data.message);
+      loadData();
+    } else {
+      setMessage("❌ " + data.message);
+    }
+  };
+
+  // ---- FINE GESTIONE UTENTI ----
 
   const handleImportCSV = async () => {
     if (!importFile) {
@@ -210,6 +302,7 @@ export default function AdminPage() {
       setMessage("✅ Admin nominato!");
       setShowAdminModal(false);
       setAdminEmail("");
+      loadData();
     }
   };
 
@@ -243,7 +336,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginTop: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 20 }}>
         <button
           onClick={() => setShowEventModal(true)}
           style={{ padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
@@ -262,12 +355,19 @@ export default function AdminPage() {
         >
           🔄 Reset
         </button>
+        {/* 🔥 NUOVO PULSANTE: Aggiungi Utente */}
+        <button
+          onClick={() => setShowAddUserModal(true)}
+          style={{ padding: 12, background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
+        >
+          ➕ Aggiungi Utente
+        </button>
         {isSuper && (
           <button
             onClick={() => setShowAdminModal(true)}
-            style={{ padding: 12, background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
+            style={{ padding: 12, background: "#6f42c1", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
           >
-            👑 Nomina Admin
+            👑 Nomina Staff
           </button>
         )}
       </div>
@@ -331,6 +431,7 @@ export default function AdminPage() {
         </table>
       </div>
 
+      {/* 🔥 TABELLA UTENTI CON AZIONI */}
       <div style={{ marginTop: 20 }}>
         <h2>👥 Utenti ({filteredUsers.length} di {users.length})</h2>
         <input
@@ -348,21 +449,199 @@ export default function AdminPage() {
                 <th style={{ textAlign: "left", padding: 8 }}>Email</th>
                 <th style={{ textAlign: "left", padding: 8 }}>Team</th>
                 <th style={{ textAlign: "left", padding: 8 }}>Ruolo</th>
+                <th style={{ textAlign: "center", padding: 8, minWidth: 80 }}>Azioni</th>
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((u) => (
-                <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
-                  <td style={{ padding: 8 }}>{u.email}</td>
-                  <td style={{ padding: 8 }}>{u.team || "-"}</td>
-                  <td style={{ padding: 8 }}>{u.role}</td>
-                </tr>
-              ))}
+              {filteredUsers.map((u) => {
+                const isProtected = u.email === "mabras69@gmail.com";
+                return (
+                  <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
+                    <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
+                    <td style={{ padding: 8 }}>{u.email}</td>
+                    <td style={{ padding: 8 }}>{u.team || "-"}</td>
+                    <td style={{ padding: 8 }}>
+                      <span style={{
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        background: u.role === "admin" ? "#dc3545" : u.role === "staff" ? "#6f42c1" : "#28a745",
+                        color: "white",
+                        fontSize: "0.7rem",
+                        fontWeight: "bold"
+                      }}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "center", padding: 8 }}>
+                      {/* 🔥 Pulsante MODIFICA */}
+                      <button
+                        onClick={() => openEditModal(u)}
+                        style={{
+                          padding: "4px 8px",
+                          marginRight: 4,
+                          background: "#ffc107",
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          fontSize: "0.8rem"
+                        }}
+                        title="Modifica utente"
+                      >
+                        ✏️
+                      </button>
+                      {/* 🔥 Pulsante ELIMINA */}
+                      <button
+                        onClick={() => handleDeleteUser(u.id, `${u.first_name} ${u.last_name}`)}
+                        style={{
+                          padding: "4px 8px",
+                          background: isProtected ? "#ccc" : "#dc3545",
+                          color: "white",
+                          border: "none",
+                          borderRadius: 4,
+                          cursor: isProtected ? "not-allowed" : "pointer",
+                          fontSize: "0.8rem",
+                          opacity: isProtected ? 0.5 : 1
+                        }}
+                        disabled={isProtected}
+                        title={isProtected ? "Non puoi eliminare l'admin principale" : "Elimina utente"}
+                      >
+                        🗑️
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* ===== MODAL: Aggiungi Utente ===== */}
+      {showAddUserModal && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
+            <h2>➕ Aggiungi Utente</h2>
+            <input
+              type="email"
+              placeholder="Email *"
+              value={userForm.email}
+              onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            />
+            <input
+              type="text"
+              placeholder="Nome"
+              value={userForm.first_name}
+              onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            />
+            <input
+              type="text"
+              placeholder="Cognome"
+              value={userForm.last_name}
+              onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            />
+            <select
+              value={userForm.team}
+              onChange={(e) => setUserForm({ ...userForm, team: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            >
+              <option value="">Nessun team</option>
+              <option value="Matricole">Matricole</option>
+              <option value="Veterani">Veterani</option>
+            </select>
+            <select
+              value={userForm.role}
+              onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            >
+              <option value="student">Studente</option>
+              <option value="staff">Staff</option>
+              {isSuper && <option value="admin">Admin</option>}
+            </select>
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button
+                onClick={handleAddUser}
+                style={{ padding: "8px 16px", background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}
+              >
+                Crea
+              </button>
+              <button
+                onClick={() => { setShowAddUserModal(false); setUserForm({ email: "", first_name: "", last_name: "", team: "", role: "student" }); }}
+                style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== MODAL: Modifica Utente ===== */}
+      {showEditUserModal && selectedUser && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
+            <h2>✏️ Modifica Utente</h2>
+            <p style={{ color: "#999", fontSize: "0.8rem", marginBottom: 8 }}>
+              Modifica i dati di {selectedUser.first_name} {selectedUser.last_name}
+            </p>
+            <input
+              type="email"
+              placeholder="Email"
+              value={userForm.email}
+              onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            />
+            <input
+              type="text"
+              placeholder="Nome"
+              value={userForm.first_name}
+              onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            />
+            <input
+              type="text"
+              placeholder="Cognome"
+              value={userForm.last_name}
+              onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            />
+            <select
+              value={userForm.team}
+              onChange={(e) => setUserForm({ ...userForm, team: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            >
+              <option value="">Nessun team</option>
+              <option value="Matricole">Matricole</option>
+              <option value="Veterani">Veterani</option>
+            </select>
+            <select
+              value={userForm.role}
+              onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8 }}
+            >
+              <option value="student">Studente</option>
+              <option value="staff">Staff</option>
+              {isSuper && <option value="admin">Admin</option>}
+            </select>
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button
+                onClick={handleEditUser}
+                style={{ padding: "8px 16px", background: "#ffc107", color: "black", border: "none", borderRadius: 8, cursor: "pointer" }}
+              >
+                Salva
+              </button>
+              <button
+                onClick={() => { setShowEditUserModal(false); setSelectedUser(null); }}
+                style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showEventModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -422,10 +701,11 @@ export default function AdminPage() {
       {showAdminModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
-            <h2>👑 Nomina Admin</h2>
+            <h2>👑 Nomina Staff</h2>
+            <p style={{ fontSize: "0.8rem", color: "#666" }}>Inserisci l'email dell'utente da nominare staff</p>
             <input type="email" placeholder="Email utente" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={handleAddAdmin} style={{ padding: "8px 16px", background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Nomina</button>
+              <button onClick={handleAddAdmin} style={{ padding: "8px 16px", background: "#6f42c1", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Nomina</button>
               <button onClick={() => setShowAdminModal(false)} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
             </div>
           </div>
