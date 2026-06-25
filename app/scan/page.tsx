@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -10,34 +10,136 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
+type CameraInfo = { id: string; label: string };
+
 export default function ScanPage() {
   const router = useRouter();
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+  const [cameras, setCameras] = useState<CameraInfo[] | null>(null);
+  const [loadingCameras, setLoadingCameras] = useState(false);
 
-  const startScan = async () => {
+  // --- SOLO TEMPORANEO PER DEBUG: console visibile sul telefono, da
+  // togliere una volta risolto il problema dello scanner su Android ---
+  useEffect(() => {
+    if (typeof window !== "undefined" && !(window as any).eruda) {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/eruda";
+      script.onload = () => {
+        (window as any).eruda.init();
+      };
+      document.body.appendChild(script);
+    }
+  }, []);
+  // --- FINE BLOCCO TEMPORANEO ---
+
+  const handleScanResult = async (decodedText: string, userId: string) => {
+    // ----- EVENTO -----
+    if (decodedText.startsWith("EVENT:")) {
+      const { data: event } = await supabase
+        .from("votable_events")
+        .select("*")
+        .eq("qr_code", decodedText)
+        .single();
+      if (!event) {
+        alert("Evento non trovato");
+        router.push("/");
+        return;
+      }
+
+      const now = new Date();
+      const start = new Date(event.start_time);
+      const end = new Date(event.end_time);
+      if (now < start || now > end) {
+        alert("Evento non attivo in questo momento");
+        router.push("/");
+        return;
+      }
+
+      const res = await fetch("/api/event-vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Errore nel voto evento");
+        router.push("/");
+        return;
+      }
+
+      alert(`✅ Votato! +1 punto per i ${event.team_target}`);
+      router.push("/");
+      return;
+    }
+
+    // ----- BONUS -----
+    if (decodedText.startsWith("BONUS:")) {
+      const { data: bonus } = await supabase
+        .from("bonus_qr")
+        .select("*")
+        .eq("code", decodedText)
+        .single();
+      if (!bonus) {
+        alert("Bonus non valido");
+        router.push("/");
+        return;
+      }
+
+      const res = await fetch("/api/bonus-redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bonusId: bonus.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Errore nel riscatto bonus");
+        router.push("/");
+        return;
+      }
+
+      alert(`⚡ +${bonus.amount} CBTcoin extra!`);
+      router.push("/");
+      return;
+    }
+
+    // ----- UTENTE (voto tra partecipanti) -----
+    if (decodedText === userId) {
+      alert("Non puoi votare te stesso");
+      router.push("/");
+      return;
+    }
+
+    const res = await fetch("/api/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientId: decodedText }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || "Errore nel voto");
+      router.push("/");
+      return;
+    }
+
+    alert(`✅ +${data.points} punti!`);
+    router.push("/");
+  };
+
+  const startScanWithCamera = async (cameraId: string) => {
     const userId = getCookie("user_id");
-
     if (!userId) {
       alert("Accesso non valido. Usa il link personale.");
       router.push("/");
       return;
     }
 
+    setCameras(null);
     setScanning(true);
     setError("");
     const scanner = new Html5Qrcode("reader");
 
     try {
-      const cameras = await Html5Qrcode.getCameras();
-      if (!cameras || cameras.length === 0) {
-        throw new Error("Nessuna fotocamera trovata sul dispositivo");
-      }
-      // Sceglie la fotocamera posteriore se riconoscibile dal nome,
-      // altrimenti usa l'ultima della lista (di solito è quella posteriore).
-      const backCamera = cameras.find((c) => /back|rear|environment/i.test(c.label));
-      const cameraId = backCamera ? backCamera.id : cameras[cameras.length - 1].id;
-
       await scanner.start(
         cameraId,
         { fps: 10, qrbox: { width: 250, height: 250 } },
@@ -45,108 +147,41 @@ export default function ScanPage() {
           scanner.stop();
           scanner.clear();
           setScanning(false);
-
-          // ----- EVENTO -----
-          if (decodedText.startsWith("EVENT:")) {
-            const { data: event } = await supabase
-              .from("votable_events")
-              .select("*")
-              .eq("qr_code", decodedText)
-              .single();
-            if (!event) {
-              alert("Evento non trovato");
-              router.push("/");
-              return;
-            }
-
-            const now = new Date();
-            const start = new Date(event.start_time);
-            const end = new Date(event.end_time);
-            if (now < start || now > end) {
-              alert("Evento non attivo in questo momento");
-              router.push("/");
-              return;
-            }
-
-            const res = await fetch("/api/event-vote", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ eventId: event.id }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-              alert(data.error || "Errore nel voto evento");
-              router.push("/");
-              return;
-            }
-
-            alert(`✅ Votato! +1 punto per i ${event.team_target}`);
-            router.push("/");
-            return;
-          }
-
-          // ----- BONUS -----
-          if (decodedText.startsWith("BONUS:")) {
-            const { data: bonus } = await supabase
-              .from("bonus_qr")
-              .select("*")
-              .eq("code", decodedText)
-              .single();
-            if (!bonus) {
-              alert("Bonus non valido");
-              router.push("/");
-              return;
-            }
-
-            const res = await fetch("/api/bonus-redeem", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ bonusId: bonus.id }),
-            });
-            const data = await res.json();
-            if (!res.ok) {
-              alert(data.error || "Errore nel riscatto bonus");
-              router.push("/");
-              return;
-            }
-
-            alert(`⚡ +${bonus.amount} CBTcoin extra!`);
-            router.push("/");
-            return;
-          }
-
-          // ----- UTENTE (voto tra partecipanti) -----
-          if (decodedText === userId) {
-            alert("Non puoi votare te stesso");
-            router.push("/");
-            return;
-          }
-
-          // Punti calcolati e verificati lato server, qui non si calcola nulla
-          const res = await fetch("/api/vote", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ recipientId: decodedText }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            alert(data.error || "Errore nel voto");
-            router.push("/");
-            return;
-          }
-
-          alert(`✅ +${data.points} punti!`);
-          router.push("/");
+          await handleScanResult(decodedText, userId);
         },
         () => {
-          // Chiamato a ogni fotogramma in cui non viene trovato un QR:
-          // è normale, non è un errore — va ignorato silenziosamente.
+          // Chiamato a ogni fotogramma senza QR rilevato: normale, si ignora.
         }
       );
     } catch (err: any) {
       console.error(err);
       setError("Impossibile avviare la fotocamera: " + (err?.message || String(err)));
       setScanning(false);
+    }
+  };
+
+  const handleAvviaScanner = async () => {
+    setError("");
+    setLoadingCameras(true);
+    try {
+      const found = await Html5Qrcode.getCameras();
+      setLoadingCameras(false);
+      if (!found || found.length === 0) {
+        setError("Nessuna fotocamera trovata sul dispositivo");
+        return;
+      }
+      if (found.length === 1) {
+        await startScanWithCamera(found[0].id);
+        return;
+      }
+      // Più fotocamere disponibili: lascia scegliere all'utente invece di
+      // indovinare, per evitare di selezionare una fotocamera virtuale o
+      // sbagliata.
+      setCameras(found);
+    } catch (err: any) {
+      setLoadingCameras(false);
+      console.error(err);
+      setError("Impossibile accedere alla fotocamera: " + (err?.message || String(err)));
     }
   };
 
@@ -165,9 +200,10 @@ export default function ScanPage() {
         ← Torna alla dashboard
       </button>
 
-      {!scanning ? (
+      {!scanning && !cameras && (
         <button
-          onClick={startScan}
+          onClick={handleAvviaScanner}
+          disabled={loadingCameras}
           style={{
             width: "100%",
             padding: 14,
@@ -178,9 +214,51 @@ export default function ScanPage() {
             border: "none",
           }}
         >
-          📷 Avvia Scanner
+          {loadingCameras ? "Ricerca fotocamere..." : "📷 Avvia Scanner"}
         </button>
-      ) : (
+      )}
+
+      {cameras && !scanning && (
+        <div>
+          <p style={{ textAlign: "center", color: "#1E3A5F", fontWeight: 600 }}>
+            Scegli la fotocamera da usare:
+          </p>
+          {cameras.map((cam) => (
+            <button
+              key={cam.id}
+              onClick={() => startScanWithCamera(cam.id)}
+              style={{
+                width: "100%",
+                padding: 12,
+                marginBottom: 8,
+                borderRadius: 10,
+                fontWeight: 600,
+                background: "#f0f0f0",
+                color: "#1E3A5F",
+                border: "1px solid #ccc",
+              }}
+            >
+              {cam.label || "Fotocamera senza nome"}
+            </button>
+          ))}
+          <button
+            onClick={() => setCameras(null)}
+            style={{
+              width: "100%",
+              padding: 10,
+              marginTop: 4,
+              background: "none",
+              color: "#999",
+              border: "none",
+              textDecoration: "underline",
+            }}
+          >
+            Annulla
+          </button>
+        </div>
+      )}
+
+      {scanning && (
         <p style={{ textAlign: "center", color: "#1E3A5F" }}>
           Scanner attivo... Inquadra un QR
         </p>
