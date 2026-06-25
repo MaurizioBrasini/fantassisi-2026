@@ -8,6 +8,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+const PROTECTED_EMAIL = "mabras69@gmail.com";
+
 // GET: Lista utenti (con paginazione e ricerca)
 export async function GET(request: Request) {
   const role = cookies().get("user_role")?.value;
@@ -47,19 +49,25 @@ export async function GET(request: Request) {
 
 // POST: Crea un nuovo utente
 export async function POST(request: Request) {
-  const role = cookies().get("user_role")?.value;
-  if (role !== "admin" && role !== "staff") {
+  const requesterRole = cookies().get("user_role")?.value;
+  if (requesterRole !== "admin" && requesterRole !== "staff") {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
   const body = await request.json();
-  const { email, first_name, last_name, team, role: userRole } = body;
+  const { email, first_name, last_name, team } = body;
+  let userRole = body.role;
 
   if (!email) {
     return NextResponse.json({ message: "Email obbligatoria" }, { status: 400 });
   }
 
-  // Verifica se esiste già
+  // Solo un admin può creare un altro admin: un account staff che richiede
+  // role "admin" viene declassato a "staff", non si fida del client.
+  if (userRole === "admin" && requesterRole !== "admin") {
+    userRole = "staff";
+  }
+
   const { data: existing } = await supabase
     .from("users")
     .select("id")
@@ -82,8 +90,6 @@ export async function POST(request: Request) {
       team: team || null,
       role: userRole || "student",
       auth_token: authToken,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
     })
     .select()
     .single();
@@ -95,44 +101,51 @@ export async function POST(request: Request) {
   return NextResponse.json({
     message: "✅ Utente creato!",
     user: data,
-    link: `https://fantassisi-2026.onrender.com/?token=${authToken}`,
+    link: `https://fantassisi-2026.onrender.com/api/auth?token=${authToken}`,
   });
 }
 
 // PUT: Aggiorna un utente
 export async function PUT(request: Request) {
-  const role = cookies().get("user_role")?.value;
-  if (role !== "admin" && role !== "staff") {
+  const requesterRole = cookies().get("user_role")?.value;
+  if (requesterRole !== "admin" && requesterRole !== "staff") {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
   const body = await request.json();
-  const { id, email, first_name, last_name, team, role: userRole } = body;
+  const { id, email, first_name, last_name, team } = body;
+  let userRole = body.role;
 
   if (!id) {
     return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
   }
 
-  // Non permettere di modificare l'admin principale (protezione)
   const { data: userToUpdate } = await supabase
     .from("users")
     .select("email")
     .eq("id", id)
     .single();
 
-  if (userToUpdate?.email === "mabras69@gmail.com" && role === "admin") {
-    return NextResponse.json({ message: "Non puoi modificare l'admin principale" }, { status: 403 });
+  const isProtectedAccount = userToUpdate?.email === PROTECTED_EMAIL;
+
+  // Solo un admin può promuovere qualcuno ad admin.
+  if (userRole === "admin" && requesterRole !== "admin") {
+    userRole = "staff";
   }
 
-  const updateData: any = {
-    updated_at: new Date().toISOString(),
-  };
+  const updateData: any = {};
 
-  if (email) updateData.email = email;
+  // Sull'account protetto si può correggere nome/cognome, ma non si può
+  // mai cambiare email o ruolo, da nessuno — evita che un account staff
+  // possa "retrocedere" l'admin principale o rubarne l'identità.
   if (first_name !== undefined) updateData.first_name = first_name;
   if (last_name !== undefined) updateData.last_name = last_name;
   if (team !== undefined) updateData.team = team;
-  if (userRole !== undefined) updateData.role = userRole;
+
+  if (!isProtectedAccount) {
+    if (email) updateData.email = email;
+    if (userRole !== undefined) updateData.role = userRole;
+  }
 
   const { data, error } = await supabase
     .from("users")
@@ -162,18 +175,16 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
   }
 
-  // Non permettere di eliminare l'admin principale
   const { data: userToDelete } = await supabase
     .from("users")
     .select("email")
     .eq("id", id)
     .single();
 
-  if (userToDelete?.email === "mabras69@gmail.com") {
+  if (userToDelete?.email === PROTECTED_EMAIL) {
     return NextResponse.json({ message: "Non puoi eliminare l'admin principale" }, { status: 403 });
   }
 
-  // Elimina anche i voti associati
   await supabase.from("votes").delete().eq("voter_id", id);
   await supabase.from("votes").delete().eq("recipient_id", id);
 
