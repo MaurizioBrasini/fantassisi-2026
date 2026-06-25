@@ -15,10 +15,8 @@ export default function ScanPage() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
 
-  const startScan = () => {
+  const startScan = async () => {
     const userId = getCookie("user_id");
-    const userTeam = getCookie("user_team");
-    const userSite = getCookie("user_site") || "";
 
     if (!userId) {
       alert("Accesso non valido. Usa il link personale.");
@@ -30,133 +28,126 @@ export default function ScanPage() {
     setError("");
     const scanner = new Html5Qrcode("reader");
 
-    scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      async (decodedText) => {
-        scanner.stop();
-        scanner.clear();
-        setScanning(false);
-
-        // ----- EVENTO -----
-        if (decodedText.startsWith("EVENT:")) {
-          const { data: event } = await supabase
-            .from("votable_events")
-            .select("*")
-            .eq("qr_code", decodedText)
-            .single();
-          if (!event) {
-            alert("Evento non trovato");
-            router.push("/");
-            return;
-          }
-
-          const now = new Date();
-          const start = new Date(event.start_time);
-          const end = new Date(event.end_time);
-          if (now < start || now > end) {
-            alert("Evento non attivo in questo momento");
-            router.push("/");
-            return;
-          }
-
-          // Chiamata all'endpoint server per il voto evento
-          const res = await fetch("/api/event-vote", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ eventId: event.id }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            alert(data.error || "Errore nel voto evento");
-            router.push("/");
-            return;
-          }
-
-          alert(`✅ Votato! +1 punto per i ${event.team_target}`);
-          router.push("/");
-          return;
-        }
-
-        // ----- BONUS -----
-        if (decodedText.startsWith("BONUS:")) {
-          const { data: bonus } = await supabase
-            .from("bonus_qr")
-            .select("*")
-            .eq("code", decodedText)
-            .single();
-          if (!bonus) {
-            alert("Bonus non valido");
-            router.push("/");
-            return;
-          }
-
-          // Chiamata all'endpoint server per il riscatto bonus
-          const res = await fetch("/api/bonus-redeem", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bonusId: bonus.id }),
-          });
-          const data = await res.json();
-          if (!res.ok) {
-            alert(data.error || "Errore nel riscatto bonus");
-            router.push("/");
-            return;
-          }
-
-          alert(`⚡ +${bonus.amount} CBTcoin extra!`);
-          router.push("/");
-          return;
-        }
-
-        // ----- UTENTE (voto tra partecipanti) -----
-        if (decodedText === userId) {
-          alert("Non puoi votare te stesso");
-          router.push("/");
-          return;
-        }
-
-        // Calcolo punti (fatto lato client per semplicità, ma l'endpoint lo riceve)
-        const { data: recipient } = await supabase
-          .from("users")
-          .select("team, site")
-          .eq("id", decodedText)
-          .single();
-        if (!recipient) {
-          alert("Utente non trovato");
-          router.push("/");
-          return;
-        }
-
-        let points = 0;
-        if (userTeam === recipient.team) {
-          points = userSite === recipient.site ? 1 : 2;
-        } else {
-          points = 3;
-        }
-
-        // Chiamata all'endpoint server per il voto
-        const res = await fetch("/api/vote", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ recipientId: decodedText, points }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data.error || "Errore nel voto");
-          router.push("/");
-          return;
-        }
-
-        alert(`✅ +${points} punti!`);
-        router.push("/");
-      },
-      (error) => {
-        console.error(error);
-        setError("Errore durante la scansione. Riprova.");
-        setScanning(false);
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      if (!cameras || cameras.length === 0) {
+        throw new Error("Nessuna fotocamera trovata sul dispositivo");
       }
-    );
+      // Sceglie la fotocamera posteriore se riconoscibile dal nome,
+      // altrimenti usa l'ultima della lista (di solito è quella posteriore).
+      const backCamera = cameras.find((c) => /back|rear|environment/i.test(c.label));
+      const cameraId = backCamera ? backCamera.id : cameras[cameras.length - 1].id;
+
+      await scanner.start(
+        cameraId,
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
+          scanner.stop();
+          scanner.clear();
+          setScanning(false);
+
+          // ----- EVENTO -----
+          if (decodedText.startsWith("EVENT:")) {
+            const { data: event } = await supabase
+              .from("votable_events")
+              .select("*")
+              .eq("qr_code", decodedText)
+              .single();
+            if (!event) {
+              alert("Evento non trovato");
+              router.push("/");
+              return;
+            }
+
+            const now = new Date();
+            const start = new Date(event.start_time);
+            const end = new Date(event.end_time);
+            if (now < start || now > end) {
+              alert("Evento non attivo in questo momento");
+              router.push("/");
+              return;
+            }
+
+            const res = await fetch("/api/event-vote", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ eventId: event.id }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              alert(data.error || "Errore nel voto evento");
+              router.push("/");
+              return;
+            }
+
+            alert(`✅ Votato! +1 punto per i ${event.team_target}`);
+            router.push("/");
+            return;
+          }
+
+          // ----- BONUS -----
+          if (decodedText.startsWith("BONUS:")) {
+            const { data: bonus } = await supabase
+              .from("bonus_qr")
+              .select("*")
+              .eq("code", decodedText)
+              .single();
+            if (!bonus) {
+              alert("Bonus non valido");
+              router.push("/");
+              return;
+            }
+
+            const res = await fetch("/api/bonus-redeem", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ bonusId: bonus.id }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+              alert(data.error || "Errore nel riscatto bonus");
+              router.push("/");
+              return;
+            }
+
+            alert(`⚡ +${bonus.amount} CBTcoin extra!`);
+            router.push("/");
+            return;
+          }
+
+          // ----- UTENTE (voto tra partecipanti) -----
+          if (decodedText === userId) {
+            alert("Non puoi votare te stesso");
+            router.push("/");
+            return;
+          }
+
+          // Punti calcolati e verificati lato server, qui non si calcola nulla
+          const res = await fetch("/api/vote", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ recipientId: decodedText }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            alert(data.error || "Errore nel voto");
+            router.push("/");
+            return;
+          }
+
+          alert(`✅ +${data.points} punti!`);
+          router.push("/");
+        },
+        () => {
+          // Chiamato a ogni fotogramma in cui non viene trovato un QR:
+          // è normale, non è un errore — va ignorato silenziosamente.
+        }
+      );
+    } catch (err: any) {
+      console.error(err);
+      setError("Impossibile avviare la fotocamera: " + (err?.message || String(err)));
+      setScanning(false);
+    }
   };
 
   return (
