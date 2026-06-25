@@ -8,8 +8,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { recipientId, points } = await request.json();
-  if (!recipientId || typeof points !== "number") {
+  const { recipientId } = await request.json();
+  if (!recipientId) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
   }
   if (recipientId === voterId) {
@@ -21,28 +21,26 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Controllo crediti giornalieri
+  // Il team e la sede si leggono qui, freschi dal database — non ci si fida
+  // di nessun valore mandato dal browser per calcolare i punti.
+  const [{ data: voter }, { data: recipient }] = await Promise.all([
+    supabase.from("users").select("team, site").eq("id", voterId).single(),
+    supabase.from("users").select("team, site").eq("id", recipientId).single(),
+  ]);
+
+  if (!voter) {
+    return NextResponse.json({ error: "Votante non trovato" }, { status: 404 });
+  }
+  if (!recipient) {
+    return NextResponse.json({ error: "Utente da votare non trovato" }, { status: 404 });
+  }
+
+  let points = 3;
+  if (voter.team && voter.team === recipient.team) {
+    points = voter.site && voter.site === recipient.site ? 1 : 2;
+  }
+
   const today = new Date().toISOString().split("T")[0];
   const { count: votesToday } = await supabase
     .from("votes")
-    .select("id", { count: "exact", head: true })
-    .eq("voter_id", voterId)
-    .gte("voted_at", today);
-
-  if ((votesToday || 0) >= 20) {
-    return NextResponse.json({ error: "Crediti giornalieri esauriti" }, { status: 400 });
-  }
-
-  const { error } = await supabase
-    .from("votes")
-    .insert({ voter_id: voterId, recipient_id: recipientId, points });
-
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json({ error: "Hai già votato questa persona oggi" }, { status: 409 });
-    }
-    return NextResponse.json({ error: "Errore nel salvataggio del voto" }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true });
-}
+    .select("id", { count: "exact", head:
