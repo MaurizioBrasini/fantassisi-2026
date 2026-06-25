@@ -126,7 +126,56 @@ export default function ScanPage() {
     router.push("/");
   };
 
+  // Prova ad avviare una specifica fotocamera. Ritorna true se ci riesce,
+  // false se quella fotocamera non è utilizzabile (es. NotReadableError su
+  // alcuni obiettivi secondari di telefoni con più fotocamere posteriori).
+  const tryStartCamera = async (cameraId: string): Promise<boolean> => {
+    const userId = getCookie("user_id");
+    if (!userId) return false;
+
+    const scanner = new Html5Qrcode("reader");
+    try {
+      await scanner.start(
+        cameraId,
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
+          try {
+            await scanner.stop();
+            scanner.clear();
+          } catch (stopErr) {
+            console.error("Errore fermando lo scanner:", stopErr);
+          }
+          setScanning(false);
+          try {
+            await handleScanResult(decodedText, userId);
+          } catch (err: any) {
+            console.error("Errore dopo la scansione:", err);
+            setError("Errore dopo la scansione: " + (err?.message || String(err)));
+          }
+        },
+        () => {
+          // Chiamato a ogni fotogramma senza QR rilevato: normale, si ignora.
+        }
+      );
+      return true;
+    } catch (err) {
+      console.error(`Fotocamera ${cameraId} non disponibile:`, err);
+      return false;
+    }
+  };
+
   const startScanWithCamera = async (cameraId: string) => {
+    setCameras(null);
+    setScanning(true);
+    setError("");
+    const ok = await tryStartCamera(cameraId);
+    if (!ok) {
+      setScanning(false);
+      setError("Impossibile avviare questa fotocamera. Riprova o scegline un'altra.");
+    }
+  };
+
+  const handleAvviaScanner = async () => {
     const userId = getCookie("user_id");
     if (!userId) {
       alert("Accesso non valido. Usa il link personale.");
@@ -134,54 +183,41 @@ export default function ScanPage() {
       return;
     }
 
-    setCameras(null);
-    setScanning(true);
-    setError("");
-    const scanner = new Html5Qrcode("reader");
-
-    try {
-      await scanner.start(
-        cameraId,
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText) => {
-          scanner.stop();
-          scanner.clear();
-          setScanning(false);
-          await handleScanResult(decodedText, userId);
-        },
-        () => {
-          // Chiamato a ogni fotogramma senza QR rilevato: normale, si ignora.
-        }
-      );
-    } catch (err: any) {
-      console.error(err);
-      setError("Impossibile avviare la fotocamera: " + (err?.message || String(err)));
-      setScanning(false);
-    }
-  };
-
-  const handleAvviaScanner = async () => {
     setError("");
     setLoadingCameras(true);
+    let found: CameraInfo[] = [];
     try {
-      const found = await Html5Qrcode.getCameras();
-      setLoadingCameras(false);
-      if (!found || found.length === 0) {
-        setError("Nessuna fotocamera trovata sul dispositivo");
-        return;
-      }
-      if (found.length === 1) {
-        await startScanWithCamera(found[0].id);
-        return;
-      }
-      // Più fotocamere disponibili: lascia scegliere all'utente invece di
-      // indovinare, per evitare di selezionare una fotocamera virtuale o
-      // sbagliata.
-      setCameras(found);
+      found = await Html5Qrcode.getCameras();
     } catch (err: any) {
       setLoadingCameras(false);
-      console.error(err);
       setError("Impossibile accedere alla fotocamera: " + (err?.message || String(err)));
+      return;
+    }
+    setLoadingCameras(false);
+
+    if (!found || found.length === 0) {
+      setError("Nessuna fotocamera trovata sul dispositivo");
+      return;
+    }
+
+    // Prova in automatico tutte le fotocamere posteriori, una dopo l'altra,
+    // saltando in silenzio quelle che danno errore (es. obiettivi secondari
+    // non accessibili). L'utente non deve mai vedere questo tentativo.
+    const backCameras = found.filter((c) => /back|rear|environment/i.test(c.label));
+    const candidates = backCameras.length > 0 ? backCameras : found;
+
+    setScanning(true);
+    for (const cam of candidates) {
+      const ok = await tryStartCamera(cam.id);
+      if (ok) return;
+    }
+
+    // Nessuna fotocamera automatica ha funzionato: lascia scegliere a mano.
+    setScanning(false);
+    if (found.length > 1) {
+      setCameras(found);
+    } else {
+      setError("Impossibile avviare la fotocamera disponibile sul dispositivo.");
     }
   };
 
