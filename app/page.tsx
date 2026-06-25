@@ -106,4 +106,171 @@ export default function Dashboard() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <span style={{ fontSize: "2.2rem" }}>🐓</span>
-        <h1 style={{ textAlign: "center", color: "#1E3A5F",
+        <h1 style={{ textAlign: "center", color: "#1E3A5F", fontSize: "1.6rem", margin: 0, lineHeight: 1.2 }}>
+          FantAssisi<br />2026
+        </h1>
+        <span style={{ fontSize: "2.2rem" }}>🐄</span>
+      </div>
+
+      {/* Classifica squadre */}
+      <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ flex: 1, background: "#FF6B35", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Matricole</div>
+          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Matricole}</div>
+        </div>
+        <div style={{ width: 2, height: 50, background: "#1E3A5F" }} />
+        <div style={{ flex: 1, background: "#1E3A5F", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Veterani</div>
+          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Veterani}</div>
+        </div>
+      </div>
+
+      <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24 }}>
+        Ciao <strong>{userName || "Partecipante"}</strong> · {myTeam || "Team non assegnato"}
+        {myClass && ` · ${myClass}`}
+      </p>
+
+      {/* Classifiche */}
+      <h2 style={{ fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 10 }}>Classifiche</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 28 }}>
+        <Link
+          href="/ranking/individuali"
+          style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "12px 16px", borderRadius: 10, background: "#FFF3B0",
+            color: "#1E1E1E", fontWeight: 700, textDecoration: "none",
+          }}
+        >
+          <span>🏅 Classifica Individuale</span>
+          <span>›</span>
+        </Link>
+        <Link
+          href="/ranking/classi"
+          style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "12px 16px", borderRadius: 10, background: "#FFF3B0",
+            color: "#1E1E1E", fontWeight: 700, textDecoration: "none",
+          }}
+        >
+          <span>🏫 Classifica per Classe</span>
+          <span>›</span>
+        </Link>
+        <Link
+          href="/ranking/sedi"
+          style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "12px 16px", borderRadius: 10, background: "#FFF3B0",
+            color: "#1E1E1E", fontWeight: 700, textDecoration: "none",
+          }}
+        >
+          <span>🏛️ Classifica per Sede</span>
+          <span>›</span>
+        </Link>
+      </div>
+
+      {/* Il mio punteggio + Il mio QR */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
+          <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
+            <div style={{ fontWeight: 700 }}>{userName || "—"}</div>
+            <div style={{ fontSize: "0.85rem" }}>{myPoints} punti</div>
+            <div style={{ fontSize: "0.85rem" }}>
+              {myRank ? `${myRank}° posto in classifica` : "Nessun voto ancora"}
+            </div>
+          </div>
+        </div>
+        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+            Mostra il QR per ricevere voti
+          </div>
+          <Link
+            href="/myqr"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              height: 70, borderRadius: "50%", background: "#A8D8A8",
+              border: "2px solid #2E7D32", color: "#1E1E1E", fontWeight: 700,
+              textDecoration: "none", textAlign: "center", fontSize: "0.9rem",
+            }}
+          >
+            Il mio QR
+          </Link>
+        </div>
+      </div>
+
+      {/* CBT coins + Ricarica */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>I miei CBT coins</div>
+          <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
+            <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{remainingCoins}</div>
+            <div style={{ fontSize: "0.7rem" }}>si ricaricano ogni giorno a mezzanotte</div>
+          </div>
+        </div>
+        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+            Ricarica i CBT Coins
+          </div>
+          <Link
+            href="/scan"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              height: 70, borderRadius: "50%", background: "#E0B8E8",
+              border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700,
+              textDecoration: "none", textAlign: "center", fontSize: "0.9rem",
+            }}
+          >
+            Scan QR
+          </Link>
+        </div>
+      </div>
+
+      {/* Vota i colleghi */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+          Vota i colleghi
+        </div>
+        <Link
+          href="/scan"
+          style={{
+            display: "block", padding: 16, borderRadius: 60, textAlign: "center",
+            fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2",
+            color: "#1E1E1E", textDecoration: "none",
+          }}
+        >
+          📷 Scan QR
+        </Link>
+      </div>
+
+      {isAdmin && (
+        <Link
+          href="/admin"
+          style={{
+            display: "block", marginTop: 16, padding: 12, borderRadius: 60,
+            textAlign: "center", fontWeight: 600, background: "#4a5568",
+            color: "white", textDecoration: "none", fontSize: "0.85rem",
+          }}
+        >
+          ⚙️ Admin
+        </Link>
+      )}
+
+      <button
+        onClick={() => {
+          document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "user_team=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "user_class=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          document.cookie = "user_site=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          window.location.href = "/";
+        }}
+        style={{ marginTop: 24, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline", width: "100%" }}
+      >
+        Esci
+      </button>
+    </div>
+  );
+}
