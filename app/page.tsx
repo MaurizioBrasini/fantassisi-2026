@@ -25,6 +25,7 @@ export default function Dashboard() {
     const fetchData = async () => {
       const id = getCookie("user_id");
       const role = getCookie("user_role");
+      const teamFromCookie = getCookie("user_team");
 
       if (!id) {
         setNoAccess(true);
@@ -43,7 +44,8 @@ export default function Dashboard() {
 
       if (me) {
         setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
-        setMyTeam(me.team || "");
+        // Se me.team è vuoto, usa il valore dal cookie come fallback
+        setMyTeam(me.team || teamFromCookie || "");
         setMyClass(me.year || "");
       }
 
