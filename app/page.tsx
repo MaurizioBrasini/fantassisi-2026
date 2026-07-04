@@ -25,7 +25,6 @@ export default function Dashboard() {
     const fetchData = async () => {
       const id = getCookie("user_id");
       const role = getCookie("user_role");
-      const teamFromCookie = getCookie("user_team");
 
       if (!id) {
         setNoAccess(true);
@@ -34,21 +33,27 @@ export default function Dashboard() {
       }
       setUserRole(role || "");
 
+      // Query diretta per l'utente corrente — non si fida di trovarlo
+      // dentro il blob di 1179 righe, che potrebbe arrivare incompleto.
+      const { data: me } = await supabase
+        .from("users")
+        .select("first_name, last_name, team, year")
+        .eq("id", id)
+        .single();
+
+      if (me) {
+        setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
+        setMyTeam(me.team || "");
+        setMyClass(me.year || "");
+      }
+
+      // Query separata per voti e utenti (serve per ranking e punteggi squadra)
       const [{ data: allUsers }, { data: allVotes }] = await Promise.all([
-        supabase.from("users").select("id, first_name, last_name, team, site, year"),
+        supabase.from("users").select("id, team"),
         supabase.from("votes").select("voter_id, recipient_id, points, voted_at"),
       ]);
 
       const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
-      const me = usersById.get(id);
-
-      if (me) {
-        setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
-        // Se me.team è vuoto, usa il valore dal cookie come fallback
-        setMyTeam(me.team || teamFromCookie || "");
-        setMyClass(me.year || "");
-      }
-
       const votes = allVotes || [];
 
       const today = new Date().toISOString().split("T")[0];
