@@ -48,14 +48,19 @@ export default function Dashboard() {
       }
 
       // Query separata per voti e utenti (serve per ranking e punteggi squadra)
-      const [{ data: allUsers }, { data: allVotes }] = await Promise.all([
-        supabase.from("users").select("id, team"),
-        supabase.from("votes").select("voter_id, recipient_id, points, voted_at"),
-      ]);
+const [usersRes, votesRes] = await Promise.all([
+  supabase.from("users").select("id, team"),
+  supabase.from("votes").select("voter_id, recipient_id, points, voted_at"),
+]);
 
-      const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
-      const votes = allVotes || [];
+console.log("allUsers count:", usersRes.data?.length, "error:", usersRes.error?.message);
+console.log("allVotes count:", votesRes.data?.length, "error:", votesRes.error?.message);
+console.log("votes data:", JSON.stringify(votesRes.data));
 
+const allUsers = usersRes.data;
+const allVotes = votesRes.data;
+const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
+const votes = allVotes || [];
       const today = new Date().toISOString().split("T")[0];
       const votesToday = votes.filter(
         (v) => v.voter_id === id && v.voted_at?.startsWith(today)
