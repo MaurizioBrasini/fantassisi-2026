@@ -33,8 +33,7 @@ export default function Dashboard() {
       }
       setUserRole(role || "");
 
-      // Query diretta per l'utente corrente — non si fida di trovarlo
-      // dentro il blob di 1179 righe, che potrebbe arrivare incompleto.
+      // Query diretta per l'utente corrente
       const { data: me } = await supabase
         .from("users")
         .select("first_name, last_name, team, year")
@@ -47,20 +46,28 @@ export default function Dashboard() {
         setMyClass(me.year || "");
       }
 
-      // Query separata per voti e utenti (serve per ranking e punteggi squadra)
-const [usersRes, votesRes] = await Promise.all([
-  supabase.from("users").select("id, team"),
-  supabase.from("votes").select("voter_id, recipient_id, points, voted_at"),
-]);
+      // Supabase limita ogni risposta a 1000 righe — scarica tutti gli utenti
+      // a blocchi per non perdere nessuno nel calcolo dei punteggi.
+      let allUsersRaw: { id: string; team: string | null }[] = [];
+      let from = 0;
+      while (true) {
+        const { data: page } = await supabase
+          .from("users")
+          .select("id, team")
+          .range(from, from + 999);
+        if (!page || page.length === 0) break;
+        allUsersRaw.push(...page);
+        if (page.length < 1000) break;
+        from += 1000;
+      }
 
-console.log("allUsers count:", usersRes.data?.length, "error:", usersRes.error?.message);
-console.log("allVotes count:", votesRes.data?.length, "error:", votesRes.error?.message);
-console.log("votes data:", JSON.stringify(votesRes.data));
+      const { data: allVotes } = await supabase
+        .from("votes")
+        .select("voter_id, recipient_id, points, voted_at");
 
-const allUsers = usersRes.data;
-const allVotes = votesRes.data;
-const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
-const votes = allVotes || [];
+      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
+      const votes = allVotes || [];
+
       const today = new Date().toISOString().split("T")[0];
       const votesToday = votes.filter(
         (v) => v.voter_id === id && v.voted_at?.startsWith(today)
@@ -115,7 +122,6 @@ const votes = allVotes || [];
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
 
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
         <span style={{ fontSize: "2.2rem" }}>🐓</span>
         <h1 style={{ textAlign: "center", color: "#1E3A5F", fontSize: "1.6rem", margin: 0, lineHeight: 1.2 }}>
@@ -124,7 +130,6 @@ const votes = allVotes || [];
         <span style={{ fontSize: "2.2rem" }}>🐄</span>
       </div>
 
-      {/* Classifica squadre */}
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1, background: "#FF6B35", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
@@ -143,42 +148,19 @@ const votes = allVotes || [];
         {myClass && ` · ${myClass}`}
       </p>
 
-      {/* Contributi */}
       <h2 style={{ fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 10 }}>Contributi</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        <Link
-          href="/ranking/individuali"
-          style={{
-            flex: 1, textAlign: "center",
-            padding: "12px 6px", borderRadius: 10, background: "#FFF3B0",
-            color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem",
-          }}
-        >
+        <Link href="/ranking/individuali" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>
           Individuali
         </Link>
-        <Link
-          href="/ranking/sedi"
-          style={{
-            flex: 1, textAlign: "center",
-            padding: "12px 6px", borderRadius: 10, background: "#FFF3B0",
-            color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem",
-          }}
-        >
+        <Link href="/ranking/sedi" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>
           Per sede
         </Link>
-        <Link
-          href="/ranking/classi"
-          style={{
-            flex: 1, textAlign: "center",
-            padding: "12px 6px", borderRadius: 10, background: "#FFF3B0",
-            color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem",
-          }}
-        >
+        <Link href="/ranking/classi" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>
           Per classe
         </Link>
       </div>
 
-      {/* Il mio punteggio + Il mio QR */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
@@ -195,21 +177,12 @@ const votes = allVotes || [];
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
             Mostra il QR per ricevere voti
           </div>
-          <Link
-            href="/myqr"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              height: 70, borderRadius: "50%", background: "#A8D8A8",
-              border: "2px solid #2E7D32", color: "#1E1E1E", fontWeight: 700,
-              textDecoration: "none", textAlign: "center", fontSize: "0.9rem",
-            }}
-          >
+          <Link href="/myqr" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#A8D8A8", border: "2px solid #2E7D32", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" }}>
             Il mio QR
           </Link>
         </div>
       </div>
 
-      {/* CBT coins + Ricarica */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>I miei CBT coins</div>
@@ -223,46 +196,23 @@ const votes = allVotes || [];
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
             Ricarica i CBT Coins
           </div>
-          <Link
-            href="/scan"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              height: 70, borderRadius: "50%", background: "#E0B8E8",
-              border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700,
-              textDecoration: "none", textAlign: "center", fontSize: "0.9rem",
-            }}
-          >
+          <Link href="/scan" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" }}>
             Scan QR
           </Link>
         </div>
       </div>
 
-      {/* Vota i colleghi */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
           Vota i colleghi
         </div>
-        <Link
-          href="/scan"
-          style={{
-            display: "block", padding: 16, borderRadius: 60, textAlign: "center",
-            fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2",
-            color: "#1E1E1E", textDecoration: "none",
-          }}
-        >
+        <Link href="/scan" style={{ display: "block", padding: 16, borderRadius: 60, textAlign: "center", fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", textDecoration: "none" }}>
           📷 Scan QR
         </Link>
       </div>
 
       {isAdmin && (
-        <Link
-          href="/admin"
-          style={{
-            display: "block", marginTop: 16, padding: 12, borderRadius: 60,
-            textAlign: "center", fontWeight: 600, background: "#4a5568",
-            color: "white", textDecoration: "none", fontSize: "0.85rem",
-          }}
-        >
+        <Link href="/admin" style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
           ⚙️ Admin
         </Link>
       )}
