@@ -28,20 +28,31 @@ export default function SiteRanking() {
         return;
       }
 
-      const [{ data: allUsers }, { data: allVotes }] = await Promise.all([
-        supabase.from("users").select("id, school, site, year"),
-        supabase.from("votes").select("recipient_id, points"),
-      ]);
+      // Scarica tutti gli utenti a blocchi da 1000
+      let allUsersRaw: { id: string; school: string; site: string; year: string }[] = [];
+      let from = 0;
+      while (true) {
+        const { data: page } = await supabase
+          .from("users")
+          .select("id, school, site, year")
+          .range(from, from + 999);
+        if (!page || page.length === 0) break;
+        allUsersRaw.push(...page);
+        if (page.length < 1000) break;
+        from += 1000;
+      }
 
-      const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
+      const { data: allVotes } = await supabase
+        .from("votes")
+        .select("recipient_id, points");
+
+      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
 
       const me = usersById.get(id);
       if (me?.site) setMySite(me.site);
 
-      // Scuole presenti in ogni sede: solo scuole con almeno uno studente
-      // di un anno numerato (1°-4°), che è anche la base del calcolo dei punti.
       const schoolsBySite = new Map<string, Set<string>>();
-      for (const u of allUsers || []) {
+      for (const u of allUsersRaw) {
         if (!u.school || !u.site || !u.year || !VALID_YEARS.includes(u.year)) continue;
         if (!schoolsBySite.has(u.site)) schoolsBySite.set(u.site, new Set());
         schoolsBySite.get(u.site)!.add(u.school);
@@ -54,21 +65,9 @@ export default function SiteRanking() {
         pointsBySite.set(recipient.site, (pointsBySite.get(recipient.site) || 0) + (v.points || 0));
       }
 
-      // --- FIX: converte gli iteratori in array prima di iterare ---
-      const schoolKeys = Array.from(schoolsBySite.keys());
-      const pointKeys = Array.from(pointsBySite.keys());
-      
-      const siteSet = new Set<string>();
-      for (const key of schoolKeys) {
-        siteSet.add(key);
-      }
-      for (const key of pointKeys) {
-        siteSet.add(key);
-      }
-      const sites = Array.from(siteSet);
-      // ---------------------------------------------------------
+      const sites = new Set([...schoolsBySite.keys(), ...pointsBySite.keys()]);
 
-      const ranking: Row[] = sites.map((site) => {
+      const ranking: Row[] = Array.from(sites).map((site) => {
         const schoolsCount = schoolsBySite.get(site)?.size || 0;
         const points = pointsBySite.get(site) || 0;
         const denominator = schoolsCount * 4;
