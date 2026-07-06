@@ -65,9 +65,13 @@ export default function SiteRanking() {
         pointsBySite.set(recipient.site, (pointsBySite.get(recipient.site) || 0) + (v.points || 0));
       }
 
-      const sites = new Set([...schoolsBySite.keys(), ...pointsBySite.keys()]);
+      // Unione delle chiavi senza spread su iteratori (incompatibile col target TS del progetto)
+      const siteSet = new Set<string>();
+      Array.from(schoolsBySite.keys()).forEach((k) => siteSet.add(k));
+      Array.from(pointsBySite.keys()).forEach((k) => siteSet.add(k));
+      const sites = Array.from(siteSet);
 
-      const ranking: Row[] = Array.from(sites).map((site) => {
+      const ranking: Row[] = sites.map((site) => {
         const schoolsCount = schoolsBySite.get(site)?.size || 0;
         const points = pointsBySite.get(site) || 0;
         const denominator = schoolsCount * 4;
