@@ -27,12 +27,25 @@ export default function IndividualRanking() {
       }
       setMyId(id);
 
-      const [{ data: allUsers }, { data: allVotes }] = await Promise.all([
-        supabase.from("users").select("id, first_name, last_name, team"),
-        supabase.from("votes").select("recipient_id, points"),
-      ]);
+      // Scarica tutti gli utenti a blocchi da 1000 per non perderne nessuno
+      let allUsersRaw: { id: string; first_name: string; last_name: string; team: string | null }[] = [];
+      let from = 0;
+      while (true) {
+        const { data: page } = await supabase
+          .from("users")
+          .select("id, first_name, last_name, team")
+          .range(from, from + 999);
+        if (!page || page.length === 0) break;
+        allUsersRaw.push(...page);
+        if (page.length < 1000) break;
+        from += 1000;
+      }
 
-      const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
+      const { data: allVotes } = await supabase
+        .from("votes")
+        .select("recipient_id, points");
+
+      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
       const pointsByUser = new Map<string, number>();
       for (const v of allVotes || []) {
         pointsByUser.set(v.recipient_id, (pointsByUser.get(v.recipient_id) || 0) + (v.points || 0));
