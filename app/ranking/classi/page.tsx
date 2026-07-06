@@ -33,20 +33,31 @@ export default function ClassRanking() {
         return;
       }
 
-      const [{ data: allUsers }, { data: allVotes }] = await Promise.all([
-        supabase.from("users").select("id, school, site, year, team"),
-        supabase.from("votes").select("recipient_id, points"),
-      ]);
+      // Scarica tutti gli utenti a blocchi da 1000
+      let allUsersRaw: { id: string; school: string; site: string; year: string; team: string }[] = [];
+      let from = 0;
+      while (true) {
+        const { data: page } = await supabase
+          .from("users")
+          .select("id, school, site, year, team")
+          .range(from, from + 999);
+        if (!page || page.length === 0) break;
+        allUsersRaw.push(...page);
+        if (page.length < 1000) break;
+        from += 1000;
+      }
 
-      const usersById = new Map((allUsers || []).map((u) => [u.id, u]));
+      const { data: allVotes } = await supabase
+        .from("votes")
+        .select("recipient_id, points");
+
+      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
 
       const me = usersById.get(id);
       if (me?.school && me?.site && me?.year) {
         setMyKey(`${me.school}||${me.site}||${me.year}`);
       }
 
-      // Solo chi ha una classe vera (scuola + sede + anno) entra nel calcolo:
-      // gli utenti senza anno (ex allievi, staff) non appartengono a nessuna classe.
       const pointsByClass = new Map<string, number>();
       const classInfo = new Map<string, { school: string; site: string; year: string }>();
 
@@ -92,7 +103,9 @@ export default function ClassRanking() {
 
   const teamColor = (year: string) => {
     const isVeterani = year.startsWith("3°") || year.startsWith("4°");
-    return isVeterani ? { background: "#E3EAF2", color: "#1E3A5F", border: "#1E3A5F" } : { background: "#FFEDE3", color: "#FF6B35", border: "#FF6B35" };
+    return isVeterani
+      ? { background: "#E3EAF2", color: "#1E3A5F", border: "#1E3A5F" }
+      : { background: "#FFEDE3", color: "#FF6B35", border: "#FF6B35" };
   };
 
   return (
