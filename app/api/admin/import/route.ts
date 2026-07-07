@@ -5,6 +5,20 @@ import * as XLSX from "xlsx";
 
 const BRANDS = ["CCMA Marco Aurelio", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
 
+const DIDATTI_DOCENTI = new Set([
+  "Didatta",
+  "Cotrainer e/o conduttore di project",
+  "Docente",
+]);
+const SEMPRE_MATRICOLE = new Set(["Tirocinante APC o SPC"]);
+const SEMPRE_VETERANI = new Set(["Ex allievo", "Allievo altre scuole", "Esterno"]);
+const ANNI_MATRICOLE = new Set([
+  "PRE-ISCRITTI 2027 E 2028",
+  "1° ANNO 2026",
+  "2° ANNO 2026",
+]);
+const ANNI_VETERANI = new Set(["3° ANNO 2026", "4° ANNO 2026"]);
+
 function splitSchoolSite(raw: string | undefined): { school: string | null; site: string | null } {
   if (!raw || !raw.trim()) return { school: null, site: null };
   const value = raw.trim();
@@ -18,20 +32,16 @@ function splitSchoolSite(raw: string | undefined): { school: string | null; site
 }
 
 function assignTeam(iscrizione: string, anno: string): string | null {
-  const staffOnly = ["Didatta", "Cotrainer e/o conduttore di project", "Docente", "Esterno"];
-  const alwaysVeterani = ["Ex allievo", "Allievo altre scuole"];
-  if (staffOnly.includes(iscrizione)) return null;
-  if (alwaysVeterani.includes(iscrizione)) return "Veterani";
-  if (anno) {
-    if (["PRE-ISCRITTI 2027 E 2028", "1° ANNO 2026", "2° ANNO 2026"].includes(anno)) return "Matricole";
-    if (["3° ANNO 2026", "4° ANNO 2026"].includes(anno)) return "Veterani";
+  if (DIDATTI_DOCENTI.has(iscrizione)) return "Didatti&Docenti";
+  if (SEMPRE_MATRICOLE.has(iscrizione)) return "Matricole";
+  if (SEMPRE_VETERANI.has(iscrizione)) return "Veterani";
+  if (iscrizione === "Allievo in corso") {
+    if (ANNI_MATRICOLE.has(anno)) return "Matricole";
+    if (ANNI_VETERANI.has(anno)) return "Veterani";
   }
   return null;
 }
 
-// Legge il file Excel grezzo esportato dal modulo Google (con tutte le
-// colonne italiane del form), unisce tutti i fogli, rimuove i duplicati per
-// email e applica le regole di squadra/sede.
 async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
@@ -105,19 +115,13 @@ function parseCSV(text: string): Record<string, string>[] {
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       if (inQuotes) {
-        if (char === '"' && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else if (char === '"') {
-          inQuotes = false;
-        } else {
-          current += char;
-        }
+        if (char === '"' && line[i + 1] === '"') { current += '"'; i++; }
+        else if (char === '"') { inQuotes = false; }
+        else { current += char; }
       } else if (char === '"') {
         inQuotes = true;
       } else if (char === ",") {
-        fields.push(current);
-        current = "";
+        fields.push(current); current = "";
       } else {
         current += char;
       }
@@ -173,14 +177,14 @@ export async function POST(request: Request) {
   const { data: existing } = await supabase.from("users").select("email, auth_token");
   const existingTokens = new Map((existing || []).map((u) => [u.email, u.auth_token]));
 
-  const validTeams = new Set(["Matricole", "Veterani"]);
+  const validTeams = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
   const validRoles = new Set(["student", "staff", "admin"]);
 
   const records = rawRecords
     .filter((r) => r.email)
     .map((r) => {
       const email = String(r.email).trim().toLowerCase();
-      const team = validTeams.has(r.team) ? r.team : null;
+      const team = r.team && validTeams.has(r.team) ? r.team : null;
       const userRole = validRoles.has(r.role) ? r.role : "student";
       const token =
         existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -218,5 +222,7 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe.` });
+  return NextResponse.json({
+    message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe.`,
+  });
 }
