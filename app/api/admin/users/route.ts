@@ -9,6 +9,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const PROTECTED_EMAIL = "mabras69@gmail.com";
+const VALID_TEAMS = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
 
 // GET: Lista utenti (con paginazione e ricerca)
 export async function GET(request: Request) {
@@ -62,8 +63,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Email obbligatoria" }, { status: 400 });
   }
 
-  // Solo un admin può creare un altro admin: un account staff che richiede
-  // role "admin" viene declassato a "staff", non si fida del client.
   if (userRole === "admin" && requesterRole !== "admin") {
     userRole = "staff";
   }
@@ -80,6 +79,9 @@ export async function POST(request: Request) {
 
   const authToken = randomUUID();
 
+  // Stringa vuota → null, valore non valido → null
+  const teamValue = team && VALID_TEAMS.has(team) ? team : null;
+
   const { data, error } = await supabase
     .from("users")
     .insert({
@@ -87,7 +89,7 @@ export async function POST(request: Request) {
       email,
       first_name: first_name || "",
       last_name: last_name || "",
-      team: team || null,
+      team: teamValue,
       role: userRole || "student",
       auth_token: authToken,
     })
@@ -128,19 +130,19 @@ export async function PUT(request: Request) {
 
   const isProtectedAccount = userToUpdate?.email === PROTECTED_EMAIL;
 
-  // Solo un admin può promuovere qualcuno ad admin.
   if (userRole === "admin" && requesterRole !== "admin") {
     userRole = "staff";
   }
 
   const updateData: any = {};
 
-  // Sull'account protetto si può correggere nome/cognome, ma non si può
-  // mai cambiare email o ruolo, da nessuno — evita che un account staff
-  // possa "retrocedere" l'admin principale o rubarne l'identità.
   if (first_name !== undefined) updateData.first_name = first_name;
   if (last_name !== undefined) updateData.last_name = last_name;
-  if (team !== undefined) updateData.team = team;
+
+  // Stringa vuota → null, valore non valido → null
+  if (team !== undefined) {
+    updateData.team = team && VALID_TEAMS.has(team) ? team : null;
+  }
 
   if (!isProtectedAccount) {
     if (email) updateData.email = email;
