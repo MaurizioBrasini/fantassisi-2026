@@ -15,11 +15,12 @@ function setCookieClient(name: string, value: string) {
 }
 
 // ─────────────────────────────────────────────
-// Dashboard Didatti&Docenti
+// Dashboard Didatti&Docenti (con pulsante Admin)
 // ─────────────────────────────────────────────
-function DashboardDidatti({ userName, userId, onEnrolled }: {
+function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
   userName: string;
   userId: string;
+  userRole: string;
   onEnrolled: (team: string) => void;
 }) {
   const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
@@ -82,6 +83,8 @@ function DashboardDidatti({ userName, userId, onEnrolled }: {
     }
     setEnrolling(false);
   };
+
+  const isAdmin = userRole === "admin" || userRole === "staff";
 
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
 
@@ -191,6 +194,13 @@ function DashboardDidatti({ userName, userId, onEnrolled }: {
             Annulla
           </button>
         </div>
+      )}
+
+      {/* Pulsante Admin (visibile solo a admin/staff) */}
+      {isAdmin && (
+        <Link href="/admin" style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
+          ⚙️ Admin
+        </Link>
       )}
 
       <button
@@ -442,11 +452,14 @@ export default function Dashboard() {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
   }
 
-  if (myTeam === "Didatti&Docenti") {
+  // Mostra DashboardDidatti per chiunque NON sia in una squadra
+  // (Didatti&Docenti, null, "", o qualsiasi altro valore)
+  if (myTeam !== "Matricole" && myTeam !== "Veterani") {
     return (
       <DashboardDidatti
         userName={userName}
         userId={userId}
+        userRole={userRole}
         onEnrolled={(team) => setMyTeam(team)}
       />
     );
