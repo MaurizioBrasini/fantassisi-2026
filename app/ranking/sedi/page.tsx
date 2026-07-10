@@ -11,7 +11,7 @@ function getCookie(name: string): string | null {
 
 const VALID_YEARS = ["1° ANNO 2026", "2° ANNO 2026", "3° ANNO 2026", "4° ANNO 2026"];
 
-type Row = { site: string; points: number; schoolsCount: number; average: number };
+type Row = { site: string; points: number; classCount: number; average: number };
 
 export default function SiteRanking() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -51,13 +51,16 @@ export default function SiteRanking() {
       const me = usersById.get(id);
       if (me?.site) setMySite(me.site);
 
-      const schoolsBySite = new Map<string, Set<string>>();
+      // Raccogliamo le combinazioni (school, year) per ogni sede (solo anni validi)
+      const classesBySite = new Map<string, Set<string>>();
       for (const u of allUsersRaw) {
         if (!u.school || !u.site || !u.year || !VALID_YEARS.includes(u.year)) continue;
-        if (!schoolsBySite.has(u.site)) schoolsBySite.set(u.site, new Set());
-        schoolsBySite.get(u.site)!.add(u.school);
+        const key = `${u.school}||${u.year}`;
+        if (!classesBySite.has(u.site)) classesBySite.set(u.site, new Set());
+        classesBySite.get(u.site)!.add(key);
       }
 
+      // Raccogliamo i punti per sede
       const pointsBySite = new Map<string, number>();
       for (const v of allVotes || []) {
         const recipient = usersById.get(v.recipient_id);
@@ -65,18 +68,17 @@ export default function SiteRanking() {
         pointsBySite.set(recipient.site, (pointsBySite.get(recipient.site) || 0) + (v.points || 0));
       }
 
-      // Unione delle chiavi senza spread su iteratori (incompatibile col target TS del progetto)
+      // Unione delle chiavi
       const siteSet = new Set<string>();
-      Array.from(schoolsBySite.keys()).forEach((k) => siteSet.add(k));
+      Array.from(classesBySite.keys()).forEach((k) => siteSet.add(k));
       Array.from(pointsBySite.keys()).forEach((k) => siteSet.add(k));
       const sites = Array.from(siteSet);
 
       const ranking: Row[] = sites.map((site) => {
-        const schoolsCount = schoolsBySite.get(site)?.size || 0;
+        const classCount = classesBySite.get(site)?.size || 0;
         const points = pointsBySite.get(site) || 0;
-        const denominator = schoolsCount * 4;
-        const average = denominator > 0 ? points / denominator : 0;
-        return { site, points, schoolsCount, average };
+        const average = classCount > 0 ? points / classCount : 0;
+        return { site, points, classCount, average };
       });
 
       ranking.sort((a, b) => b.average - a.average);
@@ -112,7 +114,7 @@ export default function SiteRanking() {
         🏛️ Classifica per Sede
       </h1>
       <p style={{ color: "#999", fontSize: "0.75rem", marginBottom: 16 }}>
-        Punti totali della sede divisi per il numero di classi (1°-4° anno × scuole presenti)
+        Punti totali della sede divisi per il numero di classi reali (combinazioni scuola + anno)
       </p>
 
       {myRow && (
@@ -120,7 +122,7 @@ export default function SiteRanking() {
           <div style={{ fontSize: "0.8rem", opacity: 0.85 }}>La tua sede</div>
           <div style={{ fontWeight: 800, fontSize: "1.4rem" }}>{myIndex + 1}° posto</div>
           <div style={{ fontSize: "0.9rem" }}>
-            {myRow.site} · media {myRow.average.toFixed(1)} ({myRow.points} punti / {myRow.schoolsCount * 4} classi)
+            {myRow.site} · media {myRow.average.toFixed(1)} ({myRow.points} punti / {myRow.classCount} classi)
           </div>
         </div>
       )}
@@ -147,7 +149,7 @@ export default function SiteRanking() {
               >
                 <span style={{ fontWeight: isMine ? 800 : 600, color: "#1E3A5F" }}>
                   {i + 1}. {r.site}
-                  <span style={{ color: "#999", fontWeight: 400, fontSize: "0.75rem" }}> ({r.schoolsCount * 4} classi)</span>
+                  <span style={{ color: "#999", fontWeight: 400, fontSize: "0.75rem" }}> ({r.classCount} classi)</span>
                 </span>
                 <strong style={{ color: "#1E3A5F" }}>{r.average.toFixed(1)}</strong>
               </div>
