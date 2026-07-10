@@ -11,8 +11,32 @@ function getCookie(name: string): string | null {
 
 type Row = { id: string; name: string; team: string | null; points: number };
 
+// Funzione per calcolare i rank con pari merito (1, 2, 2, 3)
+function assignRanks(rows: Row[]): { rank: number }[] {
+  const result: { rank: number }[] = [];
+  let currentRank = 1;
+  let i = 0;
+  while (i < rows.length) {
+    const currentPoints = rows[i].points;
+    // Conta quanti hanno lo stesso punteggio
+    let j = i;
+    while (j < rows.length && rows[j].points === currentPoints) {
+      j++;
+    }
+    // Assegna lo stesso rank a tutti i pari merito
+    for (let k = i; k < j; k++) {
+      result.push({ rank: currentRank });
+    }
+    // Il prossimo rank salta di quanti elementi abbiamo processato
+    currentRank += (j - i);
+    i = j;
+  }
+  return result;
+}
+
 export default function IndividualRanking() {
   const [rows, setRows] = useState<Row[]>([]);
+  const [ranks, setRanks] = useState<{ rank: number }[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
@@ -27,7 +51,7 @@ export default function IndividualRanking() {
       }
       setMyId(id);
 
-      // Scarica tutti gli utenti a blocchi da 1000 per non perderne nessuno
+      // Scarica tutti gli utenti a blocchi da 1000
       let allUsersRaw: { id: string; first_name: string; last_name: string; team: string | null }[] = [];
       let from = 0;
       while (true) {
@@ -63,7 +87,11 @@ export default function IndividualRanking() {
         })
         .sort((a, b) => b.points - a.points);
 
+      // Calcola i rank con pari merito
+      const assignedRanks = assignRanks(ranking);
+
       setRows(ranking);
+      setRanks(assignedRanks);
       setLoading(false);
     };
 
@@ -85,6 +113,7 @@ export default function IndividualRanking() {
 
   const myIndex = rows.findIndex((r) => r.id === myId);
   const myRow = myIndex >= 0 ? rows[myIndex] : null;
+  const myRank = myIndex >= 0 ? ranks[myIndex]?.rank : null;
 
   const teamStyle = (team: string | null) => {
     if (team === "Matricole") return { background: "#FFEDE3", color: "#FF6B35", borderColor: "#FF6B35" };
@@ -104,7 +133,7 @@ export default function IndividualRanking() {
       {myRow && (
         <div style={{ background: "#1E3A5F", color: "white", borderRadius: 14, padding: 16, marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: "0.8rem", opacity: 0.85 }}>La tua posizione</div>
-          <div style={{ fontWeight: 800, fontSize: "1.4rem" }}>{myIndex + 1}° posto</div>
+          <div style={{ fontWeight: 800, fontSize: "1.4rem" }}>{myRank}° posto</div>
           <div style={{ fontSize: "0.9rem" }}>{myRow.name} · {myRow.points} punti</div>
         </div>
       )}
@@ -116,6 +145,7 @@ export default function IndividualRanking() {
           {rows.map((r, i) => {
             const style = teamStyle(r.team);
             const isMe = r.id === myId;
+            const rank = ranks[i]?.rank ?? i + 1;
             return (
               <div
                 key={r.id}
@@ -131,7 +161,7 @@ export default function IndividualRanking() {
                 }}
               >
                 <span style={{ color: style.color, fontWeight: isMe ? 800 : 600 }}>
-                  {i + 1}. {r.name}
+                  {rank}. {r.name}
                 </span>
                 <strong style={{ color: style.color }}>{r.points}</strong>
               </div>
