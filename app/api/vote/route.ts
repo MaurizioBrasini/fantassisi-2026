@@ -33,9 +33,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Utente da votare non trovato" }, { status: 404 });
   }
 
-  let points = 3;
-  if (voter.team && voter.team === recipient.team) {
-    points = voter.site && voter.site === recipient.site ? 1 : 2;
+  // --- NUOVA LOGICA PUNTEGGI ---
+  let points = 1; // default
+
+  const isVoterValid = voter.team === "Matricole" || voter.team === "Veterani";
+  const isRecipientValid = recipient.team === "Matricole" || recipient.team === "Veterani";
+
+  // Raddoppia solo se entrambi sono in squadre diverse e valide
+  if (isVoterValid && isRecipientValid && voter.team !== recipient.team) {
+    points = 2;
   }
 
   const today = new Date().toISOString().split("T")[0];
