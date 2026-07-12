@@ -47,13 +47,24 @@ export default function ScanPage() {
         return;
       }
 
-      const now = new Date();
-      const start = new Date(event.start_time);
-      const end = new Date(event.end_time);
-      if (now < start || now > end) {
-        alert("Evento non attivo in questo momento");
+      // 🔥 MODIFICA: controlla active OPPURE l'orario
+      // Se active è false, non è attivo
+      if (event.active === false) {
+        alert("Evento non attivo");
         router.push("/");
         return;
+      }
+
+      // Se ha start_time/end_time, controlla l'orario
+      if (event.start_time && event.end_time) {
+        const now = new Date();
+        const start = new Date(event.start_time);
+        const end = new Date(event.end_time);
+        if (now < start || now > end) {
+          alert("Evento non attivo in questo momento");
+          router.push("/");
+          return;
+        }
       }
 
       const res = await fetch("/api/event-vote", {
