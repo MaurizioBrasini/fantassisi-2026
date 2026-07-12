@@ -52,7 +52,26 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
       const votesToday = votes.filter(
         (v) => v.voter_id === userId && v.voted_at?.startsWith(today)
       ).length;
-      setRemainingCoins(Math.max(0, 20 - votesToday));
+
+      // 🔥 MODIFICA CBT COINS: aggiungi i bonus riscattati oggi
+      const { data: bonusRedemptions } = await supabase
+        .from("bonus_redemptions")
+        .select("bonus_id")
+        .eq("user_id", userId)
+        .gte("redeemed_at", today);
+
+      const bonusIds = bonusRedemptions?.map(b => b.bonus_id) || [];
+      let totalBonus = 0;
+      if (bonusIds.length > 0) {
+        const { data: bonusData } = await supabase
+          .from("bonus_qr")
+          .select("amount")
+          .in("id", bonusIds);
+        totalBonus = bonusData?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
+      }
+
+      const remaining = 20 + totalBonus - votesToday;
+      setRemainingCoins(Math.max(0, remaining));
 
       const pts = { Matricole: 0, Veterani: 0 };
       for (const v of votes) {
@@ -259,7 +278,26 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
       const votesToday = votes.filter(
         (v) => v.voter_id === userId && v.voted_at?.startsWith(today)
       ).length;
-      setRemainingCoins(Math.max(0, 20 - votesToday));
+
+      // 🔥 MODIFICA CBT COINS: aggiungi i bonus riscattati oggi
+      const { data: bonusRedemptions } = await supabase
+        .from("bonus_redemptions")
+        .select("bonus_id")
+        .eq("user_id", userId)
+        .gte("redeemed_at", today);
+
+      const bonusIds = bonusRedemptions?.map(b => b.bonus_id) || [];
+      let totalBonus = 0;
+      if (bonusIds.length > 0) {
+        const { data: bonusData } = await supabase
+          .from("bonus_qr")
+          .select("amount")
+          .in("id", bonusIds);
+        totalBonus = bonusData?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
+      }
+
+      const remaining = 20 + totalBonus - votesToday;
+      setRemainingCoins(Math.max(0, remaining));
 
       const pointsByUser = new Map<string, number>();
       const pts = { Matricole: 0, Veterani: 0 };
@@ -367,7 +405,9 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
       </div>
 
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>Vota i colleghi</div>
+        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+          Vota i colleghi
+        </div>
         <Link href="/scan" style={{ display: "block", padding: 16, borderRadius: 60, textAlign: "center", fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", textDecoration: "none" }}>
           📷 Scan QR
         </Link>
