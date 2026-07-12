@@ -317,8 +317,11 @@ export default function AdminPage() {
                     <button onClick={() => handleToggleEvent(e.id, e.active !== false)} style={{ padding: "4px 8px", marginRight: 4, background: e.active !== false ? "#dc3545" : "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       {e.active !== false ? "Disattiva" : "Attiva"}
                     </button>
-                    <button onClick={() => downloadQR(e.qr_code, e.title)} style={{ padding: "4px 8px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                    <button onClick={() => downloadQR(e.qr_code, e.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       ⬇️ QR
+                    </button>
+                    <button onClick={async () => { if (!confirm(`Eliminare "${e.title}"?`)) return; const { error } = await supabase.from("votable_events").delete().eq("id", e.id); if (error) setMessage("❌ " + error.message); else { setMessage("✅ QR eliminato"); loadData(); } }} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                      🗑️
                     </button>
                   </td>
                 </tr>
@@ -355,8 +358,11 @@ export default function AdminPage() {
                     <button onClick={() => handleToggleBonus(b.id, b.active !== false)} style={{ padding: "4px 8px", marginRight: 4, background: b.active !== false ? "#dc3545" : "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       {b.active !== false ? "Disattiva" : "Attiva"}
                     </button>
-                    <button onClick={() => downloadQR(b.code, b.title)} style={{ padding: "4px 8px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                    <button onClick={() => downloadQR(b.code, b.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       ⬇️ QR
+                    </button>
+                    <button onClick={async () => { if (!confirm(`Eliminare "${b.title}"?`)) return; const { error } = await supabase.from("bonus_qr").delete().eq("id", b.id); if (error) setMessage("❌ " + error.message); else { setMessage("✅ QR eliminato"); loadData(); } }} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                      🗑️
                     </button>
                   </td>
                 </tr>
@@ -473,7 +479,11 @@ export default function AdminPage() {
             )}
 
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button onClick={handleCreaQR} style={{ flex: 1, padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>Genera QR</button>
+              {!previewQR ? (
+                <button onClick={handleCreaQR} style={{ flex: 1, padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>Genera QR</button>
+              ) : (
+                <button onClick={() => { setPreviewQR(null); }} style={{ flex: 1, padding: 12, background: "#6c757d", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>+ Genera un altro</button>
+              )}
               <button onClick={() => { setShowQRModal(false); setPreviewQR(null); }} style={{ padding: 12, background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Chiudi</button>
             </div>
 
