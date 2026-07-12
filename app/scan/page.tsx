@@ -34,7 +34,7 @@ export default function ScanPage() {
   // --- FINE BLOCCO TEMPORANEO ---
 
   const handleScanResult = async (decodedText: string, userId: string) => {
-    // ----- EVENTO -----
+    // ----- EVENTO (legacy) -----
     if (decodedText.startsWith("EVENT:")) {
       const { data: event } = await supabase
         .from("votable_events")
@@ -73,7 +73,7 @@ export default function ScanPage() {
       return;
     }
 
-    // ----- BONUS -----
+    // ----- BONUS (legacy) -----
     if (decodedText.startsWith("BONUS:")) {
       const { data: bonus } = await supabase
         .from("bonus_qr")
@@ -99,6 +99,31 @@ export default function ScanPage() {
       }
 
       alert(`⚡ +${bonus.amount} CBTcoin extra!`);
+      router.push("/");
+      return;
+    }
+
+    // ----- NUOVO SISTEMA QR UNIFICATO (QR: ...) -----
+    if (decodedText.startsWith("QR:")) {
+      const res = await fetch("/api/qr/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: decodedText }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "QR non valido o già utilizzato");
+        router.push("/");
+        return;
+      }
+
+      if (data.type === "bonus") {
+        alert(`⚡ +${data.amount} CBTcoin extra!`);
+      } else if (data.type === "vote") {
+        alert(`✅ Voto registrato per: ${data.targets?.join(", ") || "squadra"}`);
+      } else {
+        alert(data.message || "QR riscattato con successo!");
+      }
       router.push("/");
       return;
     }
