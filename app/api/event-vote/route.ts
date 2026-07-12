@@ -73,29 +73,18 @@ export async function POST(request: Request) {
     }
   }
 
-  // 🔥 MODIFICA: Costruisci l'oggetto da inserire con le nuove colonne
+  // Costruisci l'oggetto da inserire con le nuove colonne
   const insertData: any = {
     user_id: userId,
     event_id: eventId,
     points: points,
   };
 
-  // Popola le nuove colonne se presenti nell'evento
-  if (event.team_target) {
-    insertData.team_target = event.team_target;
-  }
-  if (event.qr_type) {
-    insertData.qr_type = event.qr_type;
-  }
-  if (event.class_school) {
-    insertData.class_school = event.class_school;
-  }
-  if (event.class_site) {
-    insertData.class_site = event.class_site;
-  }
-  if (event.class_year) {
-    insertData.class_year = event.class_year;
-  }
+  if (event.team_target) insertData.team_target = event.team_target;
+  if (event.qr_type) insertData.qr_type = event.qr_type;
+  if (event.class_school) insertData.class_school = event.class_school;
+  if (event.class_site) insertData.class_site = event.class_site;
+  if (event.class_year) insertData.class_year = event.class_year;
 
   const { error } = await supabase
     .from("event_votes")
@@ -105,5 +94,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Errore nel salvataggio del voto: " + error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, points, team_target: event.team_target });
+  // 🔥 MODIFICA: Costruisci messaggio di conferma dinamico
+  let confirmationMessage = `✅ +${points} punti per i ${event.team_target || 'squadra'}`;
+
+  if (event.qr_type === 'class' && event.class_school && event.class_site && event.class_year) {
+    const yearLabel = event.class_year.replace('° ANNO 2026', '°');
+    confirmationMessage = `✅ +${points} punti per ${event.class_school} ${event.class_site} ${yearLabel} anno`;
+  } else if (event.qr_type === 'site' && event.class_site) {
+    confirmationMessage = `✅ +${points} punti per ${event.class_site}`;
+  }
+
+  return NextResponse.json({ 
+    success: true, 
+    points, 
+    team_target: event.team_target,
+    message: confirmationMessage 
+  });
 }
