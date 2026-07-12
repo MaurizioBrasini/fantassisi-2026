@@ -53,7 +53,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         (v) => v.voter_id === userId && v.voted_at?.startsWith(today)
       ).length;
 
-      // 🔥 MODIFICA CBT COINS: aggiungi i bonus riscattati oggi
+      // Recupera i bonus riscattati oggi
       const { data: bonusRedemptions } = await supabase
         .from("bonus_redemptions")
         .select("bonus_id")
@@ -73,12 +73,24 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
       const remaining = 20 + totalBonus - votesToday;
       setRemainingCoins(Math.max(0, remaining));
 
+      // 🔥 MODIFICA: Punteggi squadra da votes + event_votes
       const pts = { Matricole: 0, Veterani: 0 };
       for (const v of votes) {
         const r = usersById.get(v.recipient_id);
         if (r?.team === "Matricole") pts.Matricole += v.points || 0;
         if (r?.team === "Veterani") pts.Veterani += v.points || 0;
       }
+
+      // Aggiungi i voti da event_votes (QR voto)
+      const { data: eventVotes } = await supabase
+        .from("event_votes")
+        .select("team_target, points");
+
+      for (const ev of eventVotes || []) {
+        if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
+        if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
+      }
+
       setTeamScores(pts);
       setLoading(false);
     };
@@ -279,7 +291,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
         (v) => v.voter_id === userId && v.voted_at?.startsWith(today)
       ).length;
 
-      // 🔥 MODIFICA CBT COINS: aggiungi i bonus riscattati oggi
+      // Recupera i bonus riscattati oggi
       const { data: bonusRedemptions } = await supabase
         .from("bonus_redemptions")
         .select("bonus_id")
@@ -300,6 +312,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
       setRemainingCoins(Math.max(0, remaining));
 
       const pointsByUser = new Map<string, number>();
+      // 🔥 MODIFICA: Punteggi squadra da votes + event_votes
       const pts = { Matricole: 0, Veterani: 0 };
 
       for (const v of votes) {
@@ -309,6 +322,16 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
         pointsByUser.set(v.recipient_id, (pointsByUser.get(v.recipient_id) || 0) + p);
         if (r.team === "Matricole") pts.Matricole += p;
         if (r.team === "Veterani") pts.Veterani += p;
+      }
+
+      // Aggiungi i voti da event_votes (QR voto)
+      const { data: eventVotes } = await supabase
+        .from("event_votes")
+        .select("team_target, points");
+
+      for (const ev of eventVotes || []) {
+        if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
+        if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
       }
 
       setTeamScores(pts);
