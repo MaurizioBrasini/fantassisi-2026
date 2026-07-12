@@ -38,7 +38,7 @@ export default function AdminPage() {
   const [bonuses, setBonuses] = useState<any[]>([]);
   const [message, setMessage] = useState("");
 
-  // 🔥 NUOVO: Filtri, ricerca e paginazione per QR Voto
+  // Filtri, ricerca e paginazione per QR Voto
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [sortBy, setSortBy] = useState("created_desc");
@@ -121,13 +121,10 @@ export default function AdminPage() {
       || (u.email || "").toLowerCase().includes(q);
   });
 
-  // 🔥 NUOVO: Filtra e ordina i QR Voto
+  // Filtra e ordina i QR Voto
   const filteredEvents = events
     .filter((e) => {
-      // Filtro per tipo
       if (filterType !== "all" && e.qr_type !== filterType) return false;
-      
-      // Filtro per ricerca (titolo, scuola, sede, anno, team)
       if (searchTerm.trim()) {
         const search = searchTerm.toLowerCase().trim();
         const title = (e.title || "").toLowerCase();
@@ -141,29 +138,22 @@ export default function AdminPage() {
     })
     .sort((a, b) => {
       switch (sortBy) {
-        case "title_asc":
-          return (a.title || "").localeCompare(b.title || "");
-        case "title_desc":
-          return (b.title || "").localeCompare(a.title || "");
-        case "created_desc":
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case "created_asc":
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case "team_asc":
-          return (a.team_target || "").localeCompare(b.team_target || "");
-        case "team_desc":
-          return (b.team_target || "").localeCompare(a.team_target || "");
-        default:
-          return 0;
+        case "title_asc": return (a.title || "").localeCompare(b.title || "");
+        case "title_desc": return (b.title || "").localeCompare(a.title || "");
+        case "created_desc": return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "created_asc": return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case "team_asc": return (a.team_target || "").localeCompare(b.team_target || "");
+        case "team_desc": return (b.team_target || "").localeCompare(a.team_target || "");
+        default: return 0;
       }
     });
 
-  // 🔥 NUOVO: Paginazione
   const totalPages = Math.ceil(filteredEvents.length / pageSize);
   const paginatedEvents = filteredEvents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // ── Crea QR ──────────────────────────────────────────────
+  // ── Crea QR (SOLO ADMIN) ──────────────────────────────────
   const handleCreaQR = async () => {
+    if (!isSuper) { setMessage("❌ Solo admin possono creare QR"); return; }
     let qrCode = "";
     let insertData: any = null;
     let table = "";
@@ -201,7 +191,6 @@ export default function AdminPage() {
     const { error } = await supabase.from(table).insert(insertData);
     if (error) { setMessage("❌ Errore creazione QR: " + error.message); return; }
 
-    // Mostra anteprima QR appena creato
     const dataUrl = await QRCode.toDataURL(qrCode, {
       width: 300, margin: 2,
       color: { dark: "#1E3A5F", light: "#ffffff" },
@@ -210,7 +199,6 @@ export default function AdminPage() {
     setPreviewLabel(label);
     setMessage(`✅ QR "${label}" creato!`);
     await loadData();
-    // Reset paginazione per vedere il nuovo QR
     setCurrentPage(1);
   };
 
@@ -224,6 +212,38 @@ export default function AdminPage() {
     const { error } = await supabase.from("bonus_qr").update({ active: !current }).eq("id", id);
     if (error) { setMessage("❌ " + error.message); return; }
     await loadData();
+  };
+
+  // ── Elimina QR (SOLO ADMIN) ──────────────────────────────
+  const handleDeleteEvent = async (id: string, title: string) => {
+    if (!isSuper) { setMessage("❌ Solo admin possono eliminare QR"); return; }
+    if (!confirm(`Eliminare "${title}"?`)) return;
+    const { error } = await supabase.from("votable_events").delete().eq("id", id);
+    if (error) setMessage("❌ " + error.message);
+    else { setMessage("✅ QR eliminato"); loadData(); }
+  };
+
+  const handleDeleteBonus = async (id: string, title: string) => {
+    if (!isSuper) { setMessage("❌ Solo admin possono eliminare QR"); return; }
+    if (!confirm(`Eliminare "${title}"?`)) return;
+    const { error } = await supabase.from("bonus_qr").delete().eq("id", id);
+    if (error) setMessage("❌ " + error.message);
+    else { setMessage("✅ QR eliminato"); loadData(); }
+  };
+
+  // ── Reset (SOLO ADMIN) ────────────────────────────────────
+  const handleReset = async () => {
+    if (!isSuper) { setMessage("❌ Solo admin possono fare reset"); return; }
+    const msgs: Record<string, string> = {
+      today: "🗑️ Cancellare SOLO i voti di oggi?",
+      scores: "⚠️ Cancellare TUTTI i voti? Operazione irreversibile!",
+      full: "🚨 RESET COMPLETO: cancellare tutto?",
+    };
+    if (!confirm(msgs[resetType])) return;
+    const res = await fetch("/api/admin/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: resetType }) });
+    const data = await res.json();
+    setMessage(data.message);
+    if (res.ok) { setShowResetModal(false); loadData(); }
   };
 
   // ── Utenti ───────────────────────────────────────────────
@@ -258,7 +278,9 @@ export default function AdminPage() {
     else { setMessage("❌ " + data.message); }
   };
 
+  // ── Elimina utente (SOLO ADMIN) ──────────────────────────
   const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!isSuper) { setMessage("❌ Solo admin possono eliminare utenti"); return; }
     if (!confirm(`Sei sicuro di voler eliminare ${userName}?`)) return;
     const res = await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" });
     const data = await res.json();
@@ -266,7 +288,9 @@ export default function AdminPage() {
     else { setMessage("❌ " + data.message); }
   };
 
+  // ── Importa CSV (SOLO ADMIN) ─────────────────────────────
   const handleImportCSV = async () => {
+    if (!isSuper) { setMessage("❌ Solo admin possono importare CSV"); return; }
     if (!importFile) { setMessage("Seleziona un file"); return; }
     setMessage("Importazione in corso...");
     const formData = new FormData();
@@ -277,20 +301,8 @@ export default function AdminPage() {
     if (res.ok) loadData();
   };
 
-  const handleReset = async () => {
-    const msgs: Record<string, string> = {
-      today: "🗑️ Cancellare SOLO i voti di oggi?",
-      scores: "⚠️ Cancellare TUTTI i voti? Operazione irreversibile!",
-      full: "🚨 RESET COMPLETO: cancellare tutto?",
-    };
-    if (!confirm(msgs[resetType])) return;
-    const res = await fetch("/api/admin/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: resetType }) });
-    const data = await res.json();
-    setMessage(data.message);
-    if (res.ok) { setShowResetModal(false); loadData(); }
-  };
-
   const handleAddAdmin = async () => {
+    if (!isSuper) { setMessage("❌ Solo admin possono nominare staff"); return; }
     const { data: user } = await supabase.from("users").select("id").eq("email", adminEmail).single();
     if (!user) { setMessage("Utente non trovato"); return; }
     const { error } = await supabase.from("users").update({ role: "staff" }).eq("id", user.id);
@@ -323,22 +335,40 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Bottoni principali */}
+      {/* 🔥 Bottoni principali: solo ADMIN può vedere Genera QR, Reset, Import */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 20 }}>
-        <button onClick={() => { setShowQRModal(true); setPreviewQR(null); }} style={{ padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>🎯 Genera QR</button>
-        <button onClick={() => setShowResetModal(true)} style={{ padding: 12, background: "#dc3545", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>🔄 Reset</button>
-        <button onClick={() => setShowAddUserModal(true)} style={{ padding: 12, background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>➕ Aggiungi Utente</button>
-        {isSuper && <button onClick={() => setShowAdminModal(true)} style={{ padding: 12, background: "#6f42c1", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>👑 Nomina Staff</button>}
+        {isSuper && (
+          <button onClick={() => { setShowQRModal(true); setPreviewQR(null); }} style={{ padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
+            🎯 Genera QR
+          </button>
+        )}
+        {isSuper && (
+          <button onClick={() => setShowResetModal(true)} style={{ padding: 12, background: "#dc3545", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
+            🔄 Reset
+          </button>
+        )}
+        <button onClick={() => setShowAddUserModal(true)} style={{ padding: 12, background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
+          ➕ Aggiungi Utente
+        </button>
+        {isSuper && (
+          <button onClick={() => setShowAdminModal(true)} style={{ padding: 12, background: "#6f42c1", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
+            👑 Nomina Staff
+          </button>
+        )}
       </div>
 
-      {/* Import */}
-      <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
-        <h2>📁 Importa CSV / Excel</h2>
-        <input type="file" accept=".csv,.xlsx" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
-        <button onClick={handleImportCSV} style={{ marginLeft: 8, padding: "8px 16px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}>Importa</button>
-      </div>
+      {/* 🔥 Import CSV: solo ADMIN */}
+      {isSuper && (
+        <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
+          <h2>📁 Importa CSV / Excel</h2>
+          <input type="file" accept=".csv,.xlsx" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+          <button onClick={handleImportCSV} style={{ marginLeft: 8, padding: "8px 16px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer" }}>
+            Importa
+          </button>
+        </div>
+      )}
 
-      {/* 🔥 SEZIONE QR VOTO AGGIORNATA con ricerca, filtri e paginazione */}
+      {/* Sezione QR Voto */}
       <div style={{ marginTop: 20 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <h2 style={{ margin: 0 }}>🎯 QR Voto ({filteredEvents.length} di {events.length})</h2>
@@ -413,9 +443,12 @@ export default function AdminPage() {
                         <button onClick={() => downloadQR(e.qr_code, e.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                           ⬇️ QR
                         </button>
-                        <button onClick={async () => { if (!confirm(`Eliminare "${e.title}"?`)) return; const { error } = await supabase.from("votable_events").delete().eq("id", e.id); if (error) setMessage("❌ " + error.message); else { setMessage("✅ QR eliminato"); loadData(); } }} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                          🗑️
-                        </button>
+                        {/* 🔥 Elimina QR: solo ADMIN */}
+                        {isSuper && (
+                          <button onClick={() => handleDeleteEvent(e.id, e.title)} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                            🗑️
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -423,26 +456,11 @@ export default function AdminPage() {
               </table>
             </div>
 
-            {/* Paginazione */}
             {totalPages > 1 && (
               <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: currentPage === 1 ? "#f0f0f0" : "white", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}
-                >
-                  ◀
-                </button>
-                <span style={{ padding: "4px 12px", color: "#666", fontSize: "0.85rem" }}>
-                  {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                  style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: currentPage === totalPages ? "#f0f0f0" : "white", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}
-                >
-                  ▶
-                </button>
+                <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: currentPage === 1 ? "#f0f0f0" : "white", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>◀</button>
+                <span style={{ padding: "4px 12px", color: "#666", fontSize: "0.85rem" }}>{currentPage} / {totalPages}</span>
+                <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: currentPage === totalPages ? "#f0f0f0" : "white", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>▶</button>
               </div>
             )}
           </>
@@ -479,9 +497,12 @@ export default function AdminPage() {
                     <button onClick={() => downloadQR(b.code, b.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       ⬇️ QR
                     </button>
-                    <button onClick={async () => { if (!confirm(`Eliminare "${b.title}"?`)) return; const { error } = await supabase.from("bonus_qr").delete().eq("id", b.id); if (error) setMessage("❌ " + error.message); else { setMessage("✅ QR eliminato"); loadData(); } }} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                      🗑️
-                    </button>
+                    {/* 🔥 Elimina QR: solo ADMIN */}
+                    {isSuper && (
+                      <button onClick={() => handleDeleteBonus(b.id, b.title)} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                        🗑️
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -518,7 +539,12 @@ export default function AdminPage() {
                     </td>
                     <td style={{ textAlign: "center", padding: 8 }}>
                       <button onClick={() => openEditModal(u)} style={{ padding: "4px 8px", marginRight: 4, background: "#ffc107", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }}>✏️</button>
-                      <button onClick={() => handleDeleteUser(u.id, `${u.first_name} ${u.last_name}`)} disabled={isProtected} style={{ padding: "4px 8px", background: isProtected ? "#ccc" : "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: isProtected ? "not-allowed" : "pointer", fontSize: "0.8rem", opacity: isProtected ? 0.5 : 1 }}>🗑️</button>
+                      {/* 🔥 Elimina utente: solo ADMIN */}
+                      {isSuper && (
+                        <button onClick={() => handleDeleteUser(u.id, `${u.first_name} ${u.last_name}`)} disabled={isProtected} style={{ padding: "4px 8px", background: isProtected ? "#ccc" : "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: isProtected ? "not-allowed" : "pointer", fontSize: "0.8rem", opacity: isProtected ? 0.5 : 1 }}>
+                          🗑️
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -528,8 +554,8 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* MODAL: Genera QR */}
-      {showQRModal && (
+      {/* MODAL: Genera QR (solo ADMIN) */}
+      {isSuper && showQRModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
           <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 520, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
             <h2 style={{ marginBottom: 16 }}>🎯 Genera QR</h2>
@@ -619,8 +645,8 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MODAL: Reset */}
-      {showResetModal && (
+      {/* MODAL: Reset (solo ADMIN) */}
+      {isSuper && showResetModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
             <h2>🔄 Reset</h2>
@@ -637,8 +663,8 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* MODAL: Nomina Staff */}
-      {showAdminModal && (
+      {/* MODAL: Nomina Staff (solo ADMIN) */}
+      {isSuper && showAdminModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
             <h2>👑 Nomina Staff</h2>
