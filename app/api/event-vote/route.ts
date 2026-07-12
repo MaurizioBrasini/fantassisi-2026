@@ -18,6 +18,39 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // Carica evento e votante in parallelo
+  const [{ data: event }, { data: voter }] = await Promise.all([
+    supabase.from("votable_events").select("*").eq("id", eventId).single(),
+    supabase.from("users").select("team").eq("id", userId).single(),
+  ]);
+
+  if (!event) {
+    return NextResponse.json({ error: "Evento non trovato" }, { status: 404 });
+  }
+  if (event.active === false) {
+    return NextResponse.json({ error: "Questo QR non è più attivo" }, { status: 403 });
+  }
+
+  // Verifica CBT coins rimanenti oggi
+  const today = new Date().toISOString().split("T")[0];
+  const { count: votesToday } = await supabase
+    .from("event_votes")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("voted_at", today);
+
+  // Conta anche i voti normali di oggi per il totale CBT coins
+  const { count: normalVotesToday } = await supabase
+    .from("votes")
+    .select("id", { count: "exact", head: true })
+    .eq("voter_id", userId)
+    .gte("voted_at", today);
+
+  const totalVotesToday = (votesToday || 0) + (normalVotesToday || 0);
+  if (totalVotesToday >= 20) {
+    return NextResponse.json({ error: "CBT coins esauriti per oggi" }, { status: 400 });
+  }
+
   // Verifica se l'utente ha già votato questo evento
   const { data: existing } = await supabase
     .from("event_votes")
@@ -27,16 +60,27 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (existing) {
-    return NextResponse.json({ error: "Hai già votato questo evento" }, { status: 409 });
+    return NextResponse.json({ error: "Hai già votato questo QR" }, { status: 409 });
+  }
+
+  // Calcolo punti: 2 se il votante è della squadra opposta, 1 altrimenti
+  // (stessa logica del voto individuale ma applicata al team_target dell'evento)
+  let points = 1;
+  if (voter?.team && event.team_target) {
+    if (voter.team !== event.team_target &&
+        (voter.team === "Matricole" || voter.team === "Veterani") &&
+        (event.team_target === "Matricole" || event.team_target === "Veterani")) {
+      points = 2;
+    }
   }
 
   const { error } = await supabase
     .from("event_votes")
-    .insert({ user_id: userId, event_id: eventId });
+    .insert({ user_id: userId, event_id: eventId, points });
 
   if (error) {
-    return NextResponse.json({ error: "Errore nel salvataggio del voto evento" }, { status: 500 });
+    return NextResponse.json({ error: "Errore nel salvataggio del voto" }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, points, team_target: event.team_target });
 }
