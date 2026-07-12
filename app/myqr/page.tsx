@@ -21,14 +21,12 @@ export default function MyQRPage() {
     const generateQR = async () => {
       const userId = getCookie("user_id");
       const userTeam = getCookie("user_team");
-
       if (!userId) {
         setNoAccess(true);
         setLoading(false);
         return;
       }
 
-      // Recupera nome utente
       const { data: user } = await supabase
         .from("users")
         .select("first_name, last_name, team")
@@ -43,14 +41,10 @@ export default function MyQRPage() {
       }
 
       try {
-        // Genera QR con l'ID utente
         const qr = await QRCode.toDataURL(userId, {
           width: 300,
           margin: 2,
-          color: {
-            dark: "#1E3A5F",
-            light: "#ffffff",
-          },
+          color: { dark: "#1E3A5F", light: "#ffffff" },
         });
         setQrDataUrl(qr);
       } catch (err) {
@@ -59,16 +53,19 @@ export default function MyQRPage() {
         setLoading(false);
       }
     };
-
     generateQR();
   }, []);
 
+  const handleDownload = () => {
+    if (!qrDataUrl || !userInfo) return;
+    const link = document.createElement("a");
+    link.href = qrDataUrl;
+    link.download = `QR_${userInfo.name.replace(/\s+/g, "_")}.png`;
+    link.click();
+  };
+
   if (noAccess) {
-    return (
-      <div style={{ textAlign: "center", padding: 40 }}>
-        Accesso non valido. Usa il link personale che ti è stato inviato.
-      </div>
-    );
+    return <div style={{ textAlign: "center", padding: 40 }}>Accesso non valido. Usa il link personale che ti è stato inviato.</div>;
   }
 
   if (loading) {
@@ -76,26 +73,18 @@ export default function MyQRPage() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "0 auto", padding: 20, textAlign: "center" }}>
+    <div style={{ maxWidth: 420, margin: "0 auto", padding: 20, textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
       <button
         onClick={() => router.push("/")}
-        style={{
-          color: "#FF6B35",
-          background: "none",
-          border: "none",
-          fontSize: "1rem",
-          marginBottom: 16,
-          cursor: "pointer",
-        }}
+        style={{ color: "#FF6B35", background: "none", border: "none", fontSize: "1rem", marginBottom: 16, cursor: "pointer" }}
       >
         ← Torna alla dashboard
       </button>
 
       <h2 style={{ color: "#1E3A5F", marginBottom: 4 }}>Il mio QR</h2>
-
       {userInfo && (
         <p style={{ color: "#333", marginBottom: 20 }}>
-          {userInfo.name} • {userInfo.team}
+          {userInfo.name} · {userInfo.team}
         </p>
       )}
 
@@ -104,17 +93,21 @@ export default function MyQRPage() {
           <img
             src={qrDataUrl}
             alt="QR Code"
-            style={{
-              width: "100%",
-              maxWidth: 300,
-              margin: "0 auto",
-              display: "block",
-              borderRadius: 12,
-            }}
+            style={{ width: "100%", maxWidth: 300, margin: "0 auto", display: "block", borderRadius: 12 }}
           />
           <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 12 }}>
             Mostra questo QR ai colleghi per ricevere voti
           </p>
+          <button
+            onClick={handleDownload}
+            style={{
+              marginTop: 16, padding: "12px 24px", borderRadius: 60,
+              background: "#1E3A5F", color: "white", border: "none",
+              fontWeight: 700, cursor: "pointer", fontSize: "0.9rem",
+            }}
+          >
+            ⬇️ Scarica QR
+          </button>
         </div>
       ) : (
         <p>Errore nella generazione del QR</p>
