@@ -47,23 +47,32 @@ export default function ScanPage() {
         return;
       }
 
-      // 🔥 MODIFICA: controlla active OPPURE l'orario
-      // Se active è false, non è attivo
-      if (event.active === false) {
-        alert("Evento non attivo");
-        router.push("/");
-        return;
-      }
+      // 🔥 NUOVA LOGICA: distingue QR voto puro vs evento con orario
+      const isVoteQR = event.qr_type && ['team', 'site', 'class'].includes(event.qr_type);
 
-      // Se ha start_time/end_time, controlla l'orario
-      if (event.start_time && event.end_time) {
-        const now = new Date();
-        const start = new Date(event.start_time);
-        const end = new Date(event.end_time);
-        if (now < start || now > end) {
-          alert("Evento non attivo in questo momento");
+      if (isVoteQR) {
+        // QR voto puro: controlla solo active
+        if (event.active !== true) {
+          alert("Evento non attivo");
           router.push("/");
           return;
+        }
+      } else {
+        // Evento normale con orario: controlla active E orari
+        if (event.active === false) {
+          alert("Evento non attivo");
+          router.push("/");
+          return;
+        }
+        if (event.start_time && event.end_time) {
+          const now = new Date();
+          const start = new Date(event.start_time);
+          const end = new Date(event.end_time);
+          if (now < start || now > end) {
+            alert("Evento non attivo in questo momento");
+            router.push("/");
+            return;
+          }
         }
       }
 
@@ -79,7 +88,8 @@ export default function ScanPage() {
         return;
       }
 
-      alert(`✅ Votato! +1 punto per i ${event.team_target}`);
+      // 🔥 MODIFICA: usa il messaggio personalizzato dall'API
+      alert(data.message || `✅ Votato! +1 punto per i ${event.team_target}`);
       router.push("/");
       return;
     }
