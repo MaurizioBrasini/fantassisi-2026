@@ -18,8 +18,29 @@ function yearLabel(year: string | null): string {
 
 type Row = { key: string; school: string; site: string; year: string; points: number };
 
+// Funzione per calcolare i rank con pari merito (1, 2, 2, 3)
+function assignRanks(rows: Row[]): { rank: number }[] {
+  const result: { rank: number }[] = [];
+  let currentRank = 1;
+  let i = 0;
+  while (i < rows.length) {
+    const currentPoints = rows[i].points;
+    let j = i;
+    while (j < rows.length && rows[j].points === currentPoints) {
+      j++;
+    }
+    for (let k = i; k < j; k++) {
+      result.push({ rank: currentRank });
+    }
+    currentRank += (j - i);
+    i = j;
+  }
+  return result;
+}
+
 export default function ClassRanking() {
   const [rows, setRows] = useState<Row[]>([]);
+  const [ranks, setRanks] = useState<{ rank: number }[]>([]);
   const [myKey, setMyKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
@@ -61,6 +82,7 @@ export default function ClassRanking() {
       const pointsByClass = new Map<string, number>();
       const classInfo = new Map<string, { school: string; site: string; year: string }>();
 
+      // 1. Punteggi dai voti individuali (tabella votes)
       for (const v of allVotes || []) {
         const recipient = usersById.get(v.recipient_id);
         if (!recipient?.school || !recipient?.site || !recipient?.year) continue;
@@ -71,6 +93,25 @@ export default function ClassRanking() {
         }
       }
 
+      // 🔥 MODIFICA: 2. Punteggi dai QR voto per classe (tabella event_votes)
+      const { data: eventVotes } = await supabase
+        .from("event_votes")
+        .select("class_school, class_site, class_year, points")
+        .eq("qr_type", "class");
+
+      for (const ev of eventVotes || []) {
+        if (!ev.class_school || !ev.class_site || !ev.class_year) continue;
+        const key = `${ev.class_school}||${ev.class_site}||${ev.class_year}`;
+        pointsByClass.set(key, (pointsByClass.get(key) || 0) + (ev.points || 1));
+        if (!classInfo.has(key)) {
+          classInfo.set(key, {
+            school: ev.class_school,
+            site: ev.class_site,
+            year: ev.class_year,
+          });
+        }
+      }
+
       const ranking: Row[] = Array.from(pointsByClass.entries())
         .map(([key, points]) => {
           const info = classInfo.get(key)!;
@@ -78,7 +119,11 @@ export default function ClassRanking() {
         })
         .sort((a, b) => b.points - a.points);
 
+      // Calcola i rank con pari merito
+      const assignedRanks = assignRanks(ranking);
+
       setRows(ranking);
+      setRanks(assignedRanks);
       setLoading(false);
     };
 
@@ -100,6 +145,7 @@ export default function ClassRanking() {
 
   const myIndex = rows.findIndex((r) => r.key === myKey);
   const myRow = myIndex >= 0 ? rows[myIndex] : null;
+  const myRank = myIndex >= 0 ? ranks[myIndex]?.rank : null;
 
   const teamColor = (year: string) => {
     const isVeterani = year.startsWith("3°") || year.startsWith("4°");
@@ -120,7 +166,7 @@ export default function ClassRanking() {
       {myRow && (
         <div style={{ background: "#1E3A5F", color: "white", borderRadius: 14, padding: 16, marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: "0.8rem", opacity: 0.85 }}>La tua classe</div>
-          <div style={{ fontWeight: 800, fontSize: "1.4rem" }}>{myIndex + 1}° posto</div>
+          <div style={{ fontWeight: 800, fontSize: "1.4rem" }}>{myRank}° posto</div>
           <div style={{ fontSize: "0.9rem" }}>
             {myRow.school} {myRow.site} {yearLabel(myRow.year)} · {myRow.points} punti
           </div>
@@ -134,6 +180,7 @@ export default function ClassRanking() {
           {rows.map((r, i) => {
             const style = teamColor(r.year);
             const isMine = r.key === myKey;
+            const rank = ranks[i]?.rank ?? i + 1;
             return (
               <div
                 key={r.key}
@@ -149,7 +196,7 @@ export default function ClassRanking() {
                 }}
               >
                 <span style={{ color: style.color, fontWeight: isMine ? 800 : 600 }}>
-                  {i + 1}. {r.school} {r.site} {yearLabel(r.year)}
+                  {rank}. {r.school} {r.site} {yearLabel(r.year)}
                 </span>
                 <strong style={{ color: style.color }}>{r.points}</strong>
               </div>
