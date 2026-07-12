@@ -64,7 +64,6 @@ export async function POST(request: Request) {
   }
 
   // Calcolo punti: 2 se il votante è della squadra opposta, 1 altrimenti
-  // (stessa logica del voto individuale ma applicata al team_target dell'evento)
   let points = 1;
   if (voter?.team && event.team_target) {
     if (voter.team !== event.team_target &&
@@ -74,12 +73,36 @@ export async function POST(request: Request) {
     }
   }
 
+  // 🔥 MODIFICA: Costruisci l'oggetto da inserire con le nuove colonne
+  const insertData: any = {
+    user_id: userId,
+    event_id: eventId,
+    points: points,
+  };
+
+  // Popola le nuove colonne se presenti nell'evento
+  if (event.team_target) {
+    insertData.team_target = event.team_target;
+  }
+  if (event.qr_type) {
+    insertData.qr_type = event.qr_type;
+  }
+  if (event.class_school) {
+    insertData.class_school = event.class_school;
+  }
+  if (event.class_site) {
+    insertData.class_site = event.class_site;
+  }
+  if (event.class_year) {
+    insertData.class_year = event.class_year;
+  }
+
   const { error } = await supabase
     .from("event_votes")
-    .insert({ user_id: userId, event_id: eventId, points });
+    .insert(insertData);
 
   if (error) {
-    return NextResponse.json({ error: "Errore nel salvataggio del voto" }, { status: 500 });
+    return NextResponse.json({ error: "Errore nel salvataggio del voto: " + error.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, points, team_target: event.team_target });
