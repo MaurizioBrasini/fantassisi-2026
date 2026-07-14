@@ -755,7 +755,6 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-    </div>
 
       {/* Toast notification */}
       {toast && (
