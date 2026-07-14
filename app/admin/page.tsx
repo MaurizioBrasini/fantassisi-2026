@@ -37,6 +37,7 @@ export default function AdminPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [bonuses, setBonuses] = useState<any[]>([]);
   const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
 
   // Filtri, ricerca e paginazione per QR Voto
   const [searchTerm, setSearchTerm] = useState("");
@@ -67,6 +68,11 @@ export default function AdminPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [resetType, setResetType] = useState("scores");
   const [importFile, setImportFile] = useState<File | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -565,7 +571,7 @@ export default function AdminPage() {
                     </td>
                     <td style={{ textAlign: "center", padding: 8 }}>
                       <button onClick={() => openEditModal(u)} style={{ padding: "4px 8px", marginRight: 4, background: "#ffc107", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Modifica">✏️</button>
-                      <button onClick={() => { navigator.clipboard.writeText(`https://fantassisi-2026.onrender.com/api/auth?token=${u.auth_token}`); setMessage(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
+                      <button onClick={() => { navigator.clipboard.writeText(`https://fantassisi-2026.onrender.com/api/auth?token=${u.auth_token}`); showToast(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
                       <button onClick={() => handleSendLink(u.id, `${u.first_name} ${u.last_name}`, u.email)} style={{ padding: "4px 8px", marginRight: 4, background: "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Invia link via email">✉️</button>
                       {/* 🔥 Elimina utente: solo ADMIN */}
                       {isSuper && (
@@ -747,6 +753,20 @@ export default function AdminPage() {
               <button onClick={() => { setShowEditUserModal(false); setSelectedUser(null); }} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+          background: "#1E3A5F", color: "white", padding: "12px 24px",
+          borderRadius: 30, fontWeight: 600, fontSize: "0.9rem",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.3)", zIndex: 9999,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          {toast}
         </div>
       )}
     </div>
