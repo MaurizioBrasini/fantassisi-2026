@@ -1,7 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import * as nodemailer from "nodemailer";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: Request) {
   const role = cookies().get("user_role")?.value;
@@ -11,69 +15,66 @@ export async function POST(request: Request) {
 
   const { userId } = await request.json();
   if (!userId) {
-    return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
+    return NextResponse.json({ message: "ID utente mancante" }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  const { data: user } = await supabase
+  // Recupera l'utente
+  const { data: user, error } = await supabase
     .from("users")
-    .select("first_name, last_name, email, auth_token, team")
+    .select("first_name, last_name, email, auth_token")
     .eq("id", userId)
     .single();
 
-  if (!user || !user.email || !user.auth_token) {
-    return NextResponse.json({ message: "Utente non trovato o dati mancanti" }, { status: 404 });
+  if (error || !user) {
+    return NextResponse.json({ message: "Utente non trovato" }, { status: 404 });
+  }
+
+  if (!user.email) {
+    return NextResponse.json({ message: "Utente senza email" }, { status: 400 });
   }
 
   const link = `https://fantassisi-2026.onrender.com/api/auth?token=${user.auth_token}`;
-  const name = `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email;
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.GMAIL_FROM,
-      pass: process.env.GMAIL_APP_PASSWORD,
-    },
-  });
+  // 🔥 INVIO VIA RESEND API
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM || "FantAssisi <noreply@psiconet.it>";
 
-  try {
-    await transporter.sendMail({
-      from: `FantAssisi 2026 <${process.env.GMAIL_FROM}>`,
-      to: user.email,
-      subject: "Il tuo link personale per FantAssisi 2026",
-      html: `
-        <div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #1E3A5F;">Ciao ${name}!</h2>
-          <p>Ecco il tuo link personale per accedere a <strong>FantAssisi 2026</strong>:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${link}"
-               style="background: #FF6B35; color: white; padding: 14px 28px; border-radius: 30px;
-                      text-decoration: none; font-weight: bold; font-size: 1rem;">
-              Accedi a FantAssisi 2026
-            </a>
-          </div>
-          <p style="color: #666; font-size: 0.85rem;">
-            Oppure copia e incolla questo indirizzo nel browser:<br/>
-            <a href="${link}" style="color: #1E3A5F;">${link}</a>
-          </p>
-          <p style="color: #666; font-size: 0.85rem;">
-            Il link è personale e non va condiviso con altri.
-          </p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;"/>
-          <p style="color: #999; font-size: 0.75rem; text-align: center;">
-            Forum FantAssisi 2026 · APC/SPC
-          </p>
-        </div>
-      `,
-    });
-  } catch (err: any) {
-    console.error("Errore invio email:", err);
-    return NextResponse.json({ message: "Errore invio email: " + err.message }, { status: 500 });
+  if (!resendApiKey) {
+    return NextResponse.json({ message: "API Key Resend non configurata" }, { status: 500 });
   }
 
-  return NextResponse.json({ message: `✅ Email inviata a ${user.email}` });
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${resendApiKey}`,
+    },
+    body: JSON.stringify({
+      from: from,
+      to: user.email,
+      subject: "🔑 Il tuo link di accesso a FantAssisi 2026",
+      html: `
+        <h1>Ciao ${user.first_name || "Partecipante"}!</h1>
+        <p>Ecco il tuo link personale per accedere a <strong>FantAssisi 2026</strong>:</p>
+        <p>
+          <a href="${link}" style="display: inline-block; padding: 12px 24px; background: #FF6B35; color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+            🔑 Accedi ora
+          </a>
+        </p>
+        <p>Oppure copia questo link nel browser:</p>
+        <p><code style="background: #f4f4f4; padding: 8px; display: block; word-break: break-all;">${link}</code></p>
+        <p style="color: #666; font-size: 0.9rem;">Questo link è personale e non va condiviso.</p>
+        <p style="color: #999; font-size: 0.8rem;">Hai ricevuto questa email perché sei registrato a FantAssisi 2026.</p>
+      `,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("Errore Resend:", data);
+    return NextResponse.json({ message: "Errore invio email: " + (data.message || "Sconosciuto") }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, message: `✅ Email inviata a ${user.email}` });
 }
