@@ -37,6 +37,25 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="FantAssisi" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+        
+        {/* 🔥 Service Worker - necessario per il banner "Aggiungi a schermata Home" */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(reg) {
+                      console.log('✅ Service Worker registrato con successo');
+                    })
+                    .catch(function(err) {
+                      console.log('❌ Errore registrazione Service Worker: ', err);
+                    });
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body style={{ margin: 0, padding: 0, background: "#f5f5f5" }}>
         {children}
