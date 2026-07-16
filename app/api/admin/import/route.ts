@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import * as XLSX from "xlsx";
 
-const BRANDS = ["CCMA Marco Aurelio", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
+const BRANDS = ["CCMA", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
 
 const DIDATTI_DOCENTI = new Set([
   "Didatta",
@@ -18,6 +18,28 @@ const ANNI_MATRICOLE = new Set([
   "2° ANNO 2026",
 ]);
 const ANNI_VETERANI = new Set(["3° ANNO 2026", "4° ANNO 2026"]);
+
+// Mappatura anni per il valore normalizzato
+const YEAR_MAP: Record<string, string> = {
+  "PRE-ISCRITTI 2027 E 2028": "preiscrizione",
+  "1° ANNO 2026": "primo",
+  "2° ANNO 2026": "secondo",
+  "3° ANNO 2026": "terzo",
+  "4° ANNO 2026": "quarto",
+};
+
+function normalizeYear(raw: string): string | null {
+  const trimmed = raw?.trim() || "";
+  if (YEAR_MAP[trimmed]) return YEAR_MAP[trimmed];
+  // Fallback: estrai numero dall'anno
+  const match = trimmed.match(/(\d+)°\s*ANNO/i);
+  if (match) {
+    const num = parseInt(match[1]);
+    const map: Record<number, string> = { 1: "primo", 2: "secondo", 3: "terzo", 4: "quarto" };
+    return map[num] || null;
+  }
+  return null;
+}
 
 function splitSchoolSite(raw: string | undefined): { school: string | null; site: string | null } {
   if (!raw || !raw.trim()) return { school: null, site: null };
@@ -94,9 +116,9 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
       first_name: String(row["NOME"] || "").trim() || null,
       last_name: String(row["COGNOME"] || "").trim() || null,
       email: String(row["Indirizzo email"] || "").trim().toLowerCase(),
-      school,
-      site,
-      year: anno || null,
+      school: school || null,
+      site: site || null,
+      year: normalizeYear(anno),
       role: "student",
       team: assignTeam(iscrizione, anno),
       auth_token: "",
@@ -179,6 +201,7 @@ export async function POST(request: Request) {
 
   const validTeams = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
   const validRoles = new Set(["student", "staff", "admin"]);
+  const validYears = new Set(["preiscrizione", "primo", "secondo", "terzo", "quarto", "specializzato"]);
 
   const records = rawRecords
     .filter((r) => r.email)
@@ -186,6 +209,7 @@ export async function POST(request: Request) {
       const email = String(r.email).trim().toLowerCase();
       const team = r.team && validTeams.has(r.team) ? r.team : null;
       const userRole = validRoles.has(r.role) ? r.role : "student";
+      const year = r.year && validYears.has(r.year) ? r.year : null;
       const token =
         existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
       return {
@@ -194,7 +218,7 @@ export async function POST(request: Request) {
         last_name: r.last_name || null,
         school: r.school || null,
         site: r.site || null,
-        year: r.year || null,
+        year: year,
         role: userRole,
         team,
         auth_token: token,
