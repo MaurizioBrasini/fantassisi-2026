@@ -63,8 +63,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Email obbligatoria" }, { status: 400 });
   }
 
-  if (userRole === "admin" && requesterRole !== "admin") {
-    userRole = "staff";
+  // Solo un admin può assegnare un ruolo diverso da "student" in fase di creazione
+  if (requesterRole !== "admin") {
+    userRole = "student";
   }
 
   const { data: existing } = await supabase
@@ -130,8 +131,10 @@ export async function PUT(request: Request) {
 
   const isProtectedAccount = userToUpdate?.email === PROTECTED_EMAIL;
 
-  if (userRole === "admin" && requesterRole !== "admin") {
-    userRole = "staff";
+  // Solo un admin può cambiare il ruolo di un utente. Uno staff può modificare
+  // nome/cognome/team/email ma non toccare il campo role in alcun modo.
+  if (requesterRole !== "admin") {
+    userRole = undefined;
   }
 
   const updateData: any = {};
