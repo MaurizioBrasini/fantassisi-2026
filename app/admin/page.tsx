@@ -392,7 +392,7 @@ export default function AdminPage() {
     });
     const data = await res.json();
     if (res.ok) {
-      setMessage("✅ Staff nominato!");
+      setMessage(`✅ Staff nominato! (ruolo confermato dal server: ${data.user?.role ?? "sconosciuto"})`);
       setShowAdminModal(false);
       setAdminEmail("");
       loadData();
