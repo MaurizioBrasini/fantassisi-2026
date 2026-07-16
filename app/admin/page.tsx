@@ -34,6 +34,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [userSortBy, setUserSortBy] = useState<"name" | "email" | "team" | "role">("name");
+  const [userSortDir, setUserSortDir] = useState<"asc" | "desc">("asc");
   const [events, setEvents] = useState<any[]>([]);
   const [bonuses, setBonuses] = useState<any[]>([]);
   const [message, setMessage] = useState("");
@@ -120,12 +123,54 @@ export default function AdminPage() {
     setBonuses(bn || []);
   };
 
-  const filteredUsers = users.filter((u) => {
-    if (!userSearch.trim()) return true;
-    const q = userSearch.trim().toLowerCase();
-    return `${u.first_name || ""} ${u.last_name || ""}`.toLowerCase().includes(q)
-      || (u.email || "").toLowerCase().includes(q);
-  });
+  const filteredUsers = users
+    .filter((u) => {
+      if (userRoleFilter !== "all") {
+        if (userRoleFilter === "admin" && u.role !== "admin") return false;
+        if (userRoleFilter === "staff" && u.role !== "staff") return false;
+        if (userRoleFilter === "student" && u.role !== "student") return false;
+        if (userRoleFilter === "Matricole" && u.team !== "Matricole") return false;
+        if (userRoleFilter === "Veterani" && u.team !== "Veterani") return false;
+        if (userRoleFilter === "Didatti&Docenti" && u.team !== "Didatti&Docenti") return false;
+      }
+      if (!userSearch.trim()) return true;
+      const q = userSearch.trim().toLowerCase();
+      return `${u.first_name || ""} ${u.last_name || ""}`.toLowerCase().includes(q)
+        || (u.email || "").toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      let valA = "";
+      let valB = "";
+      if (userSortBy === "name") {
+        valA = `${a.first_name || ""} ${a.last_name || ""}`.toLowerCase().trim();
+        valB = `${b.first_name || ""} ${b.last_name || ""}`.toLowerCase().trim();
+      } else if (userSortBy === "email") {
+        valA = (a.email || "").toLowerCase();
+        valB = (b.email || "").toLowerCase();
+      } else if (userSortBy === "team") {
+        valA = (a.team || "").toLowerCase();
+        valB = (b.team || "").toLowerCase();
+      } else if (userSortBy === "role") {
+        valA = (a.role || "").toLowerCase();
+        valB = (b.role || "").toLowerCase();
+      }
+      const cmp = valA.localeCompare(valB);
+      return userSortDir === "asc" ? cmp : -cmp;
+    });
+
+  const toggleUserSort = (col: "name" | "email" | "team" | "role") => {
+    if (userSortBy === col) {
+      setUserSortDir(userSortDir === "asc" ? "desc" : "asc");
+    } else {
+      setUserSortBy(col);
+      setUserSortDir("asc");
+    }
+  };
+
+  const sortArrow = (col: "name" | "email" | "team" | "role") => {
+    if (userSortBy !== col) return "";
+    return userSortDir === "asc" ? " ▲" : " ▼";
+  };
 
   // Filtra e ordina i QR Voto
   const filteredEvents = events
@@ -546,15 +591,26 @@ export default function AdminPage() {
           <button onClick={() => handleExportCSV("Veterani")} style={{ padding: "8px 12px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV Veterani</button>
           <button onClick={() => handleExportCSV("Didatti&Docenti")} style={{ padding: "8px 12px", background: "#6f42c1", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV Didatti</button>
         </div>
-        <input type="text" placeholder="Cerca per nome o email..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} style={{ width: "100%", padding: 10, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }} />
+        <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+          <input type="text" placeholder="Cerca per nome o email..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} style={{ flex: "1 1 260px", padding: 10, borderRadius: 6, border: "1px solid #ccc" }} />
+          <select value={userRoleFilter} onChange={(e) => setUserRoleFilter(e.target.value)} style={{ padding: 10, borderRadius: 6, border: "1px solid #ccc" }}>
+            <option value="all">Tutti i ruoli/team</option>
+            <option value="admin">Solo Admin</option>
+            <option value="staff">Solo Staff</option>
+            <option value="student">Solo Studenti</option>
+            <option value="Matricole">Solo Matricole</option>
+            <option value="Veterani">Solo Veterani</option>
+            <option value="Didatti&Docenti">Solo Didatti&amp;Docenti</option>
+          </select>
+        </div>
         <div style={{ maxHeight: 500, overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #ddd" }}>
-                <th style={{ textAlign: "left", padding: 8 }}>Nome</th>
-                <th style={{ textAlign: "left", padding: 8 }}>Email</th>
-                <th style={{ textAlign: "left", padding: 8 }}>Team</th>
-                <th style={{ textAlign: "left", padding: 8 }}>Ruolo</th>
+                <th onClick={() => toggleUserSort("name")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Nome{sortArrow("name")}</th>
+                <th onClick={() => toggleUserSort("email")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Email{sortArrow("email")}</th>
+                <th onClick={() => toggleUserSort("team")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Team{sortArrow("team")}</th>
+                <th onClick={() => toggleUserSort("role")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Ruolo{sortArrow("role")}</th>
                 <th style={{ textAlign: "center", padding: 8 }}>Azioni</th>
               </tr>
             </thead>
