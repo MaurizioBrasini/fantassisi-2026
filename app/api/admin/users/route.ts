@@ -12,6 +12,19 @@ const PROTECTED_EMAIL = "mabras69@gmail.com";
 const VALID_TEAMS = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
 const VALID_ANNI = ["preiscrizione", "primo", "secondo", "terzo", "quarto", "specializzato"];
 
+// Vincoli Team ↔ Anno (FILTRO OBBLIGATORIO)
+const TEAM_ANNI_VALID: Record<string, string[]> = {
+  'Matricole': ['preiscrizione', 'primo', 'secondo'],
+  'Veterani': ['terzo', 'quarto', 'specializzato'],
+  'Didatti&Docenti': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'],
+};
+
+function isValidYearForTeam(team: string | null, year: string | null): boolean {
+  if (!year) return true;
+  const validYears = team ? TEAM_ANNI_VALID[team] || [] : VALID_ANNI;
+  return validYears.includes(year);
+}
+
 // GET: Lista utenti (con paginazione e ricerca)
 export async function GET(request: Request) {
   const role = cookies().get("user_role")?.value;
@@ -67,6 +80,14 @@ export async function POST(request: Request) {
   // Solo un admin può assegnare un ruolo diverso da "student" in fase di creazione
   if (requesterRole !== "admin") {
     userRole = "student";
+  }
+
+  // Validazione Team ↔ Anno
+  if (team && year && !isValidYearForTeam(team, year)) {
+    const yearLabel = VALID_ANNI.includes(year) ? year : year;
+    return NextResponse.json({ 
+      message: `⚠️ L'anno "${yearLabel}" non è valido per il team "${team}"` 
+    }, { status: 400 });
   }
 
   const { data: existing } = await supabase
@@ -126,6 +147,14 @@ export async function PUT(request: Request) {
 
   if (!id) {
     return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
+  }
+
+  // Validazione Team ↔ Anno
+  if (team && year && !isValidYearForTeam(team, year)) {
+    const yearLabel = VALID_ANNI.includes(year) ? year : year;
+    return NextResponse.json({ 
+      message: `⚠️ L'anno "${yearLabel}" non è valido per il team "${team}"` 
+    }, { status: 400 });
   }
 
   const { data: userToUpdate } = await supabase
