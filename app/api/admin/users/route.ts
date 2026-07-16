@@ -10,6 +10,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const PROTECTED_EMAIL = "mabras69@gmail.com";
 const VALID_TEAMS = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
+const VALID_ANNI = ["preiscrizione", "primo", "secondo", "terzo", "quarto", "specializzato"];
 
 // GET: Lista utenti (con paginazione e ricerca)
 export async function GET(request: Request) {
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { email, first_name, last_name, team } = body;
+  const { email, first_name, last_name, team, site, school, year } = body;
   let userRole = body.role;
 
   if (!email) {
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
 
   // Stringa vuota → null, valore non valido → null
   const teamValue = team && VALID_TEAMS.has(team) ? team : null;
+  const yearValue = year && VALID_ANNI.includes(year) ? year : null;
 
   const { data, error } = await supabase
     .from("users")
@@ -93,6 +95,9 @@ export async function POST(request: Request) {
       team: teamValue,
       role: userRole || "student",
       auth_token: authToken,
+      site: site || null,
+      school: school || null,
+      year: yearValue,
     })
     .select()
     .single();
@@ -116,7 +121,7 @@ export async function PUT(request: Request) {
   }
 
   const body = await request.json();
-  const { id, email, first_name, last_name, team } = body;
+  const { id, email, first_name, last_name, team, site, school, year } = body;
   let userRole = body.role;
 
   if (!id) {
@@ -145,6 +150,15 @@ export async function PUT(request: Request) {
   // Stringa vuota → null, valore non valido → null
   if (team !== undefined) {
     updateData.team = team && VALID_TEAMS.has(team) ? team : null;
+  }
+  if (site !== undefined) {
+    updateData.site = site || null;
+  }
+  if (school !== undefined) {
+    updateData.school = school || null;
+  }
+  if (year !== undefined) {
+    updateData.year = year && VALID_ANNI.includes(year) ? year : null;
   }
 
   if (!isProtectedAccount) {
