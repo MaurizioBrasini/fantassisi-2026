@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import { CONFIG_ISCRIZIONE } from "@/lib/config";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -26,6 +27,94 @@ async function downloadQR(code: string, label: string) {
   link.download = `QR_${label.replace(/\s+/g, "_")}.png`;
   link.click();
 }
+
+// Componente per la selezione della scuola con input custom
+const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
+  const [isCustom, setIsCustom] = useState(false);
+  const [customValue, setCustomValue] = useState('');
+
+  useEffect(() => {
+    if (value && !suggested.includes(value)) {
+      setIsCustom(true);
+      setCustomValue(value);
+    } else {
+      setIsCustom(false);
+      setCustomValue('');
+    }
+  }, [value, suggested]);
+
+  return (
+    <div className="flex-1">
+      {!isCustom ? (
+        <div className="flex gap-2">
+          <select
+            value={value || ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '__custom__') {
+                setIsCustom(true);
+                setCustomValue('');
+                onChange('');
+              } else {
+                onChange(val);
+              }
+            }}
+            className="flex-1 px-3 py-2 border rounded-md"
+            style={{ width: "100%", padding: 8, marginTop: 8 }}
+          >
+            <option value="">Seleziona scuola</option>
+            {suggested.map((s: string) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+            <option value="__custom__">+ Altro (inserisci manualmente)</option>
+          </select>
+          {site && (
+            <span className="text-xs text-gray-500 self-center whitespace-nowrap" style={{ marginTop: 8 }}>
+              (sede: {site})
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={customValue}
+            onChange={(e) => {
+              setCustomValue(e.target.value);
+              onChange(e.target.value);
+            }}
+            placeholder="Inserisci nome scuola"
+            className="flex-1 px-3 py-2 border rounded-md"
+            style={{ width: "100%", padding: 8, marginTop: 8 }}
+          />
+          <button
+            onClick={() => {
+              setIsCustom(false);
+              setCustomValue('');
+              onChange('');
+            }}
+            className="px-3 py-2 border rounded-md hover:bg-gray-50 text-sm whitespace-nowrap"
+            style={{ marginTop: 8 }}
+          >
+            Annulla
+          </button>
+        </div>
+      )}
+      
+      {value && site && !CONFIG_ISCRIZIONE.scuolePerSede[site]?.includes(value) && (
+        <p className="text-xs text-yellow-600 mt-1">
+          ⚠️ "{value}" non è tra le scuole di {site}. Verifica che sia corretto.
+        </p>
+      )}
+      
+      {value && !site && CONFIG_ISCRIZIONE.sediPerScuola[value] && (
+        <p className="text-xs text-blue-600 mt-1">
+          💡 "{value}" è presente a: {CONFIG_ISCRIZIONE.sediPerScuola[value].join(', ')}
+        </p>
+      )}
+    </div>
+  );
+};
 
 export default function AdminPage() {
   const router = useRouter();
@@ -67,10 +156,23 @@ export default function AdminPage() {
   const [previewLabel, setPreviewLabel] = useState("");
 
   // Form utente
-  const [userForm, setUserForm] = useState({ email: "", first_name: "", last_name: "", team: "", role: "student" });
+  const [userForm, setUserForm] = useState({ 
+    email: "", 
+    first_name: "", 
+    last_name: "", 
+    team: "", 
+    role: "student",
+    site: "",
+    school: "",
+    year: ""
+  });
   const [adminEmail, setAdminEmail] = useState("");
   const [resetType, setResetType] = useState("scores");
   const [importFile, setImportFile] = useState<File | null>(null);
+
+  // Scuole suggerite per il form
+  const [suggestedSchools, setSuggestedSchools] = useState<string[]>(CONFIG_ISCRIZIONE.scuole);
+  const [editSuggestedSchools, setEditSuggestedSchools] = useState<string[]>(CONFIG_ISCRIZIONE.scuole);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -91,6 +193,24 @@ export default function AdminPage() {
     };
     checkAdmin();
   }, [router]);
+
+  // Aggiorna le scuole suggerite quando cambia la sede nel form
+  useEffect(() => {
+    if (userForm.site && CONFIG_ISCRIZIONE.scuolePerSede[userForm.site]) {
+      setSuggestedSchools(CONFIG_ISCRIZIONE.scuolePerSede[userForm.site]);
+    } else {
+      setSuggestedSchools(CONFIG_ISCRIZIONE.scuole);
+    }
+  }, [userForm.site]);
+
+  // Aggiorna le scuole suggerite in modifica
+  useEffect(() => {
+    if (selectedUser?.site && CONFIG_ISCRIZIONE.scuolePerSede[selectedUser.site]) {
+      setEditSuggestedSchools(CONFIG_ISCRIZIONE.scuolePerSede[selectedUser.site]);
+    } else {
+      setEditSuggestedSchools(CONFIG_ISCRIZIONE.scuole);
+    }
+  }, [selectedUser?.site]);
 
   const loadData = async () => {
     const allUsersData: any[] = [];
@@ -302,27 +422,58 @@ export default function AdminPage() {
     if (!userForm.email) { setMessage("❌ Email obbligatoria"); return; }
     const res = await fetch("/api/admin/users", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userForm),
+      body: JSON.stringify({
+        email: userForm.email,
+        first_name: userForm.first_name,
+        last_name: userForm.last_name,
+        team: userForm.team,
+        role: userForm.role,
+        site: userForm.site || null,
+        school: userForm.school || null,
+        year: userForm.year || null
+      }),
     });
     const data = await res.json();
     if (res.ok) {
       setMessage(`✅ ${data.message}\nLink: ${data.link}`);
       setShowAddUserModal(false);
-      setUserForm({ email: "", first_name: "", last_name: "", team: "", role: "student" });
+      setUserForm({ email: "", first_name: "", last_name: "", team: "", role: "student", site: "", school: "", year: "" });
       loadData();
     } else { setMessage("❌ " + data.message); }
   };
 
   const openEditModal = (user: any) => {
     setSelectedUser(user);
-    setUserForm({ email: user.email || "", first_name: user.first_name || "", last_name: user.last_name || "", team: user.team || "", role: user.role || "student" });
+    setUserForm({
+      email: user.email || "",
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      team: user.team || "",
+      role: user.role || "student",
+      site: user.site || "",
+      school: user.school || "",
+      year: user.year || ""
+    });
+    if (user.site) {
+      setEditSuggestedSchools(CONFIG_ISCRIZIONE.scuolePerSede[user.site] || CONFIG_ISCRIZIONE.scuole);
+    }
     setShowEditUserModal(true);
   };
 
   const handleEditUser = async () => {
     const res = await fetch("/api/admin/users", {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: selectedUser.id, ...userForm }),
+      body: JSON.stringify({
+        id: selectedUser.id,
+        email: userForm.email,
+        first_name: userForm.first_name,
+        last_name: userForm.last_name,
+        team: userForm.team,
+        role: userForm.role,
+        site: userForm.site || null,
+        school: userForm.school || null,
+        year: userForm.year || null
+      }),
     });
     const data = await res.json();
     if (res.ok) { setMessage("✅ " + data.message); setShowEditUserModal(false); setSelectedUser(null); loadData(); }
@@ -388,6 +539,9 @@ export default function AdminPage() {
         last_name: user.last_name,
         team: user.team,
         role: "staff",
+        site: user.site || null,
+        school: user.school || null,
+        year: user.year || null
       }),
     });
     const data = await res.json();
@@ -631,12 +785,16 @@ export default function AdminPage() {
                 <th onClick={() => toggleUserSort("email")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Email{sortArrow("email")}</th>
                 <th onClick={() => toggleUserSort("team")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Team{sortArrow("team")}</th>
                 <th onClick={() => toggleUserSort("role")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Ruolo{sortArrow("role")}</th>
+                <th style={{ textAlign: "left", padding: 8 }}>Sede</th>
+                <th style={{ textAlign: "left", padding: 8 }}>Scuola</th>
+                <th style={{ textAlign: "left", padding: 8 }}>Anno</th>
                 <th style={{ textAlign: "center", padding: 8 }}>Azioni</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((u) => {
                 const isProtected = u.email === "mabras69@gmail.com";
+                const yearLabel = u.year ? CONFIG_ISCRIZIONE.anni.find(a => a.value === u.year)?.label || u.year : "-";
                 return (
                   <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
                     <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
@@ -645,6 +803,9 @@ export default function AdminPage() {
                     <td style={{ padding: 8 }}>
                       <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.7rem", fontWeight: "bold", color: "white", background: u.role === "admin" ? "#dc3545" : u.role === "staff" ? "#6f42c1" : "#28a745" }}>{u.role}</span>
                     </td>
+                    <td style={{ padding: 8 }}>{u.site || "-"}</td>
+                    <td style={{ padding: 8 }}>{u.school || "-"}</td>
+                    <td style={{ padding: 8 }}>{yearLabel}</td>
                     <td style={{ textAlign: "center", padding: 8 }}>
                       <button onClick={() => openEditModal(u)} style={{ padding: "4px 8px", marginRight: 4, background: "#ffc107", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Modifica">✏️</button>
                       <button onClick={() => { navigator.clipboard.writeText(`https://fantassisi-2026.onrender.com/api/auth?token=${u.auth_token}`); showToast(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
@@ -790,12 +951,14 @@ export default function AdminPage() {
       {/* MODAL: Aggiungi Utente */}
       {showAddUserModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 600, width: "100%" }}>
             <h2>➕ Aggiungi Utente</h2>
             <input type="email" placeholder="Email *" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            
             <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
+            
             {isSuper ? (
               <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
                 <option value="student">Studente</option>
@@ -807,9 +970,44 @@ export default function AdminPage() {
                 Ruolo: Studente (solo un admin può assegnare ruoli diversi)
               </p>
             )}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <select
+                value={userForm.site}
+                onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: "" })}
+                style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
+              >
+                <option value="">Sede (opzionale)</option>
+                {CONFIG_ISCRIZIONE.sedi.map((sede) => (
+                  <option key={sede} value={sede}>{sede}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              <SchoolSelect
+                value={userForm.school}
+                onChange={(val: string) => setUserForm({ ...userForm, school: val })}
+                suggested={suggestedSchools}
+                site={userForm.site}
+              />
+            </div>
+
+            <select
+              value={userForm.year}
+              onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
+            >
+              {CONFIG_ISCRIZIONE.anni.map((anno) => (
+                <option key={anno.value} value={anno.value}>
+                  {anno.label}
+                </option>
+              ))}
+            </select>
+
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleAddUser} style={{ padding: "8px 16px", background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Crea</button>
-              <button onClick={() => { setShowAddUserModal(false); setUserForm({ email: "", first_name: "", last_name: "", team: "", role: "student" }); }} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
+              <button onClick={() => { setShowAddUserModal(false); setUserForm({ email: "", first_name: "", last_name: "", team: "", role: "student", site: "", school: "", year: "" }); }} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
             </div>
           </div>
         </div>
@@ -818,13 +1016,15 @@ export default function AdminPage() {
       {/* MODAL: Modifica Utente */}
       {showEditUserModal && selectedUser && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 500, width: "100%" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 600, width: "100%" }}>
             <h2>✏️ Modifica Utente</h2>
             <p style={{ color: "#999", fontSize: "0.8rem", marginBottom: 8 }}>{selectedUser.first_name} {selectedUser.last_name}</p>
             <input type="email" placeholder="Email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            
             <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
+            
             {isSuper ? (
               <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
                 <option value="student">Studente</option>
@@ -836,6 +1036,41 @@ export default function AdminPage() {
                 Ruolo attuale: {userForm.role} (solo un admin può modificarlo)
               </p>
             )}
+
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <select
+                value={userForm.site}
+                onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: "" })}
+                style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
+              >
+                <option value="">Sede (opzionale)</option>
+                {CONFIG_ISCRIZIONE.sedi.map((sede) => (
+                  <option key={sede} value={sede}>{sede}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginTop: 8 }}>
+              <SchoolSelect
+                value={userForm.school}
+                onChange={(val: string) => setUserForm({ ...userForm, school: val })}
+                suggested={editSuggestedSchools}
+                site={userForm.site}
+              />
+            </div>
+
+            <select
+              value={userForm.year}
+              onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
+              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
+            >
+              {CONFIG_ISCRIZIONE.anni.map((anno) => (
+                <option key={anno.value} value={anno.value}>
+                  {anno.label}
+                </option>
+              ))}
+            </select>
+
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleEditUser} style={{ padding: "8px 16px", background: "#ffc107", color: "black", border: "none", borderRadius: 8, cursor: "pointer" }}>Salva</button>
               <button onClick={() => { setShowEditUserModal(false); setSelectedUser(null); }} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
