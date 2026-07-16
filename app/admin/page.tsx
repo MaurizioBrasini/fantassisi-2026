@@ -374,11 +374,31 @@ export default function AdminPage() {
 
   const handleAddAdmin = async () => {
     if (!isSuper) { setMessage("❌ Solo admin possono nominare staff"); return; }
-    const { data: user } = await supabase.from("users").select("id").eq("email", adminEmail).single();
-    if (!user) { setMessage("Utente non trovato"); return; }
-    const { error } = await supabase.from("users").update({ role: "staff" }).eq("id", user.id);
-    if (error) { setMessage("❌ " + error.message); }
-    else { setMessage("✅ Staff nominato!"); setShowAdminModal(false); setAdminEmail(""); loadData(); }
+    const email = adminEmail.trim();
+    if (!email) { setMessage("❌ Inserisci un'email"); return; }
+    const { data: user, error: selError } = await supabase.from("users").select("*").eq("email", email).single();
+    if (selError || !user) { setMessage("❌ Utente non trovato"); return; }
+    const res = await fetch("/api/admin/users", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        team: user.team,
+        role: "staff",
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setMessage("✅ Staff nominato!");
+      setShowAdminModal(false);
+      setAdminEmail("");
+      loadData();
+    } else {
+      setMessage("❌ " + (data.message || "Errore durante la nomina"));
+    }
   };
 
   const TeamSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
