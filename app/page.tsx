@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import InstallButton from "@/components/InstallButton"; // 🔥 MODIFICA 1: Aggiunto import
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -129,6 +130,9 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         </h1>
         <span style={{ fontSize: "2.2rem" }}>🐄</span>
       </div>
+
+      {/* 🔥 MODIFICA 2: Pulsante Installa app - visibile su mobile e desktop */}
+      <InstallButton />
 
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
@@ -360,6 +364,9 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
         </h1>
         <span style={{ fontSize: "2.2rem" }}>🐄</span>
       </div>
+
+      {/* 🔥 MODIFICA 3: Pulsante Installa app - visibile su mobile e desktop */}
+      <InstallButton />
 
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
