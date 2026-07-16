@@ -28,6 +28,13 @@ async function downloadQR(code: string, label: string) {
   link.click();
 }
 
+// Verifica se l'anno è valido per il team
+function isYearValidForTeam(team: string, year: string): boolean {
+  if (!year) return true;
+  const validYears = CONFIG_ISCRIZIONE.teamAnniValid[team] || CONFIG_ISCRIZIONE.teamAnniValid[''];
+  return validYears.includes(year);
+}
+
 // Componente per la selezione della scuola con input custom
 const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
   const [isCustom, setIsCustom] = useState(false);
@@ -44,9 +51,9 @@ const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
   }, [value, suggested]);
 
   return (
-    <div className="flex-1">
+    <div style={{ flex: 1 }}>
       {!isCustom ? (
-        <div className="flex gap-2">
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <select
             value={value || ''}
             onChange={(e) => {
@@ -59,23 +66,22 @@ const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
                 onChange(val);
               }
             }}
-            className="flex-1 px-3 py-2 border rounded-md"
-            style={{ width: "100%", padding: 8, marginTop: 8 }}
+            style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ccc", marginTop: 8 }}
           >
-            <option value="">Seleziona scuola</option>
+            <option value="">Non specificato</option>
             {suggested.map((s: string) => (
               <option key={s} value={s}>{s}</option>
             ))}
             <option value="__custom__">+ Altro (inserisci manualmente)</option>
           </select>
           {site && (
-            <span className="text-xs text-gray-500 self-center whitespace-nowrap" style={{ marginTop: 8 }}>
+            <span style={{ fontSize: "0.75rem", color: "#666", marginTop: 8, whiteSpace: "nowrap" }}>
               (sede: {site})
             </span>
           )}
         </div>
       ) : (
-        <div className="flex gap-2">
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           <input
             type="text"
             value={customValue}
@@ -84,8 +90,7 @@ const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
               onChange(e.target.value);
             }}
             placeholder="Inserisci nome scuola"
-            className="flex-1 px-3 py-2 border rounded-md"
-            style={{ width: "100%", padding: 8, marginTop: 8 }}
+            style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
           />
           <button
             onClick={() => {
@@ -93,8 +98,7 @@ const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
               setCustomValue('');
               onChange('');
             }}
-            className="px-3 py-2 border rounded-md hover:bg-gray-50 text-sm whitespace-nowrap"
-            style={{ marginTop: 8 }}
+            style={{ padding: "8px 12px", border: "1px solid #ccc", borderRadius: 6, background: "#f5f5f5", cursor: "pointer" }}
           >
             Annulla
           </button>
@@ -102,13 +106,13 @@ const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
       )}
       
       {value && site && !CONFIG_ISCRIZIONE.scuolePerSede[site]?.includes(value) && (
-        <p className="text-xs text-yellow-600 mt-1">
+        <p style={{ color: "#856404", fontSize: "0.75rem", marginTop: 4 }}>
           ⚠️ "{value}" non è tra le scuole di {site}. Verifica che sia corretto.
         </p>
       )}
       
       {value && !site && CONFIG_ISCRIZIONE.sediPerScuola[value] && (
-        <p className="text-xs text-blue-600 mt-1">
+        <p style={{ color: "#0d6efd", fontSize: "0.75rem", marginTop: 4 }}>
           💡 "{value}" è presente a: {CONFIG_ISCRIZIONE.sediPerScuola[value].join(', ')}
         </p>
       )}
@@ -173,6 +177,10 @@ export default function AdminPage() {
   // Scuole suggerite per il form
   const [suggestedSchools, setSuggestedSchools] = useState<string[]>(CONFIG_ISCRIZIONE.scuole);
   const [editSuggestedSchools, setEditSuggestedSchools] = useState<string[]>(CONFIG_ISCRIZIONE.scuole);
+  
+  // Anni validi per il team corrente
+  const [validYears, setValidYears] = useState<string[]>(CONFIG_ISCRIZIONE.teamAnniValid['']);
+  const [editValidYears, setEditValidYears] = useState<string[]>(CONFIG_ISCRIZIONE.teamAnniValid['']);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -203,6 +211,16 @@ export default function AdminPage() {
     }
   }, [userForm.site]);
 
+  // Aggiorna gli anni validi quando cambia il team nel form
+  useEffect(() => {
+    const years = CONFIG_ISCRIZIONE.teamAnniValid[userForm.team] || CONFIG_ISCRIZIONE.teamAnniValid[''];
+    setValidYears(years);
+    // Se l'anno corrente non è valido, resettalo
+    if (userForm.year && !years.includes(userForm.year)) {
+      setUserForm(prev => ({ ...prev, year: '' }));
+    }
+  }, [userForm.team]);
+
   // Aggiorna le scuole suggerite in modifica
   useEffect(() => {
     if (selectedUser?.site && CONFIG_ISCRIZIONE.scuolePerSede[selectedUser.site]) {
@@ -211,6 +229,13 @@ export default function AdminPage() {
       setEditSuggestedSchools(CONFIG_ISCRIZIONE.scuole);
     }
   }, [selectedUser?.site]);
+
+  // Aggiorna gli anni validi in modifica
+  useEffect(() => {
+    const team = selectedUser?.team || '';
+    const years = CONFIG_ISCRIZIONE.teamAnniValid[team] || CONFIG_ISCRIZIONE.teamAnniValid[''];
+    setEditValidYears(years);
+  }, [selectedUser?.team]);
 
   const loadData = async () => {
     const allUsersData: any[] = [];
@@ -420,13 +445,20 @@ export default function AdminPage() {
   // ── Utenti ───────────────────────────────────────────────
   const handleAddUser = async () => {
     if (!userForm.email) { setMessage("❌ Email obbligatoria"); return; }
+    
+    // Validazione Team ↔ Anno
+    if (userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year)) {
+      setMessage(`❌ L'anno "${CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per ${userForm.team}`);
+      return;
+    }
+    
     const res = await fetch("/api/admin/users", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: userForm.email,
         first_name: userForm.first_name,
         last_name: userForm.last_name,
-        team: userForm.team,
+        team: userForm.team || null,
         role: userForm.role,
         site: userForm.site || null,
         school: userForm.school || null,
@@ -457,10 +489,18 @@ export default function AdminPage() {
     if (user.site) {
       setEditSuggestedSchools(CONFIG_ISCRIZIONE.scuolePerSede[user.site] || CONFIG_ISCRIZIONE.scuole);
     }
+    const years = CONFIG_ISCRIZIONE.teamAnniValid[user.team || ''] || CONFIG_ISCRIZIONE.teamAnniValid[''];
+    setEditValidYears(years);
     setShowEditUserModal(true);
   };
 
   const handleEditUser = async () => {
+    // Validazione Team ↔ Anno
+    if (userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year)) {
+      setMessage(`❌ L'anno "${CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per ${userForm.team}`);
+      return;
+    }
+    
     const res = await fetch("/api/admin/users", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -468,7 +508,7 @@ export default function AdminPage() {
         email: userForm.email,
         first_name: userForm.first_name,
         last_name: userForm.last_name,
-        team: userForm.team,
+        team: userForm.team || null,
         role: userForm.role,
         site: userForm.site || null,
         school: userForm.school || null,
@@ -537,7 +577,7 @@ export default function AdminPage() {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        team: user.team,
+        team: user.team || null,
         role: "staff",
         site: user.site || null,
         school: user.school || null,
@@ -556,11 +596,15 @@ export default function AdminPage() {
   };
 
   const TeamSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: "100%", padding: 8, marginTop: 8 }}>
-      <option value="">Nessun team</option>
-      <option value="Matricole">Matricole</option>
-      <option value="Veterani">Veterani</option>
-      <option value="Didatti&Docenti">Didatti&amp;Docenti</option>
+    <select 
+      value={value} 
+      onChange={(e) => onChange(e.target.value)} 
+      style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
+    >
+      <option value="">Non specificato</option>
+      <option value="Matricole">🐓 Matricole</option>
+      <option value="Veterani">🐄 Veterani</option>
+      <option value="Didatti&Docenti">Didatti &amp; Docenti</option>
     </select>
   );
 
@@ -688,7 +732,6 @@ export default function AdminPage() {
                         <button onClick={() => downloadQR(e.qr_code, e.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                           ⬇️ QR
                         </button>
-                        {/* 🔥 Elimina QR: solo ADMIN */}
                         {isSuper && (
                           <button onClick={() => handleDeleteEvent(e.id, e.title)} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                             🗑️
@@ -742,7 +785,6 @@ export default function AdminPage() {
                     <button onClick={() => downloadQR(b.code, b.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       ⬇️ QR
                     </button>
-                    {/* 🔥 Elimina QR: solo ADMIN */}
                     {isSuper && (
                       <button onClick={() => handleDeleteBonus(b.id, b.title)} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                         🗑️
@@ -810,7 +852,6 @@ export default function AdminPage() {
                       <button onClick={() => openEditModal(u)} style={{ padding: "4px 8px", marginRight: 4, background: "#ffc107", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Modifica">✏️</button>
                       <button onClick={() => { navigator.clipboard.writeText(`https://fantassisi-2026.onrender.com/api/auth?token=${u.auth_token}`); showToast(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
                       <button onClick={() => handleSendLink(u.id, `${u.first_name} ${u.last_name}`, u.email)} style={{ padding: "4px 8px", marginRight: 4, background: "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Invia link via email">✉️</button>
-                      {/* 🔥 Elimina utente: solo ADMIN */}
                       {isSuper && (
                         <button onClick={() => handleDeleteUser(u.id, `${u.first_name} ${u.last_name}`)} disabled={isProtected} style={{ padding: "4px 8px", background: isProtected ? "#ccc" : "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: isProtected ? "not-allowed" : "pointer", fontSize: "0.8rem", opacity: isProtected ? 0.5 : 1 }}>
                           🗑️
@@ -831,7 +872,6 @@ export default function AdminPage() {
           <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 520, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
             <h2 style={{ marginBottom: 16 }}>🎯 Genera QR</h2>
 
-            {/* Tab */}
             <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
               {(["squadra", "classe", "ricarica"] as const).map((tab) => (
                 <button key={tab} onClick={() => { setQrTab(tab); setPreviewQR(null); }}
@@ -841,7 +881,6 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {/* QR Squadra */}
             {qrTab === "squadra" && (
               <div>
                 <input type="text" placeholder="Titolo (es. Talk di Mario Rossi)" value={qrSquadraForm.title} onChange={(e) => setQrSquadraForm({ ...qrSquadraForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }} />
@@ -853,7 +892,6 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* QR Classe */}
             {qrTab === "classe" && (
               <div>
                 <input type="text" placeholder="Titolo (facoltativo)" value={qrClasseForm.title} onChange={(e) => setQrClasseForm({ ...qrClasseForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }} />
@@ -881,7 +919,6 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* QR Ricarica */}
             {qrTab === "ricarica" && (
               <div>
                 <input type="text" placeholder="Titolo (es. Sessione mattutina)" value={qrRicaricaForm.title} onChange={(e) => setQrRicaricaForm({ ...qrRicaricaForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }} />
@@ -902,7 +939,6 @@ export default function AdminPage() {
               <button onClick={() => { setShowQRModal(false); setPreviewQR(null); }} style={{ padding: 12, background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Chiudi</button>
             </div>
 
-            {/* Anteprima QR generato */}
             {previewQR && (
               <div style={{ marginTop: 20, textAlign: "center", borderTop: "1px solid #eee", paddingTop: 16 }}>
                 <p style={{ fontWeight: 700, color: "#1E3A5F" }}>QR generato: {previewLabel}</p>
@@ -951,16 +987,17 @@ export default function AdminPage() {
       {/* MODAL: Aggiungi Utente */}
       {showAddUserModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 600, width: "100%" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 600, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
             <h2>➕ Aggiungi Utente</h2>
-            <input type="email" placeholder="Email *" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
-            <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
-            <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            
+            <input type="email" placeholder="Email *" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
+            <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
+            <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
             
             <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
             
             {isSuper ? (
-              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
+              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}>
                 <option value="student">Studente</option>
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
@@ -971,19 +1008,19 @@ export default function AdminPage() {
               </p>
             )}
 
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <select
-                value={userForm.site}
-                onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: "" })}
-                style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
-              >
-                <option value="">Sede (opzionale)</option>
-                {CONFIG_ISCRIZIONE.sedi.map((sede) => (
-                  <option key={sede} value={sede}>{sede}</option>
-                ))}
-              </select>
-            </div>
+            {/* Sede */}
+            <select
+              value={userForm.site}
+              onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: '' })}
+              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
+            >
+              <option value="">Non specificato</option>
+              {CONFIG_ISCRIZIONE.sedi.map((sede) => (
+                <option key={sede} value={sede}>{sede}</option>
+              ))}
+            </select>
 
+            {/* Scuola */}
             <div style={{ marginTop: 8 }}>
               <SchoolSelect
                 value={userForm.school}
@@ -993,17 +1030,27 @@ export default function AdminPage() {
               />
             </div>
 
+            {/* Anno - FILTRATO per team */}
             <select
               value={userForm.year}
               onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
               style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
             >
-              {CONFIG_ISCRIZIONE.anni.map((anno) => (
-                <option key={anno.value} value={anno.value}>
-                  {anno.label}
-                </option>
-              ))}
+              {CONFIG_ISCRIZIONE.anni
+                .filter(anno => validYears.includes(anno.value))
+                .map((anno) => (
+                  <option key={anno.value} value={anno.value}>
+                    {anno.label}
+                  </option>
+                ))}
             </select>
+
+            {/* Avviso se anno non valido per il team */}
+            {userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year) && (
+              <p style={{ color: "#dc3545", fontSize: "0.8rem", marginTop: 4 }}>
+                ⚠️ L'anno "{CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per {userForm.team}.
+              </p>
+            )}
 
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleAddUser} style={{ padding: "8px 16px", background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Crea</button>
@@ -1016,17 +1063,18 @@ export default function AdminPage() {
       {/* MODAL: Modifica Utente */}
       {showEditUserModal && selectedUser && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 600, width: "100%" }}>
+          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 600, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
             <h2>✏️ Modifica Utente</h2>
             <p style={{ color: "#999", fontSize: "0.8rem", marginBottom: 8 }}>{selectedUser.first_name} {selectedUser.last_name}</p>
-            <input type="email" placeholder="Email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
-            <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
-            <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
+            
+            <input type="email" placeholder="Email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
+            <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
+            <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
             
             <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
             
             {isSuper ? (
-              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
+              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}>
                 <option value="student">Studente</option>
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
@@ -1037,19 +1085,19 @@ export default function AdminPage() {
               </p>
             )}
 
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <select
-                value={userForm.site}
-                onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: "" })}
-                style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
-              >
-                <option value="">Sede (opzionale)</option>
-                {CONFIG_ISCRIZIONE.sedi.map((sede) => (
-                  <option key={sede} value={sede}>{sede}</option>
-                ))}
-              </select>
-            </div>
+            {/* Sede */}
+            <select
+              value={userForm.site}
+              onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: '' })}
+              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
+            >
+              <option value="">Non specificato</option>
+              {CONFIG_ISCRIZIONE.sedi.map((sede) => (
+                <option key={sede} value={sede}>{sede}</option>
+              ))}
+            </select>
 
+            {/* Scuola */}
             <div style={{ marginTop: 8 }}>
               <SchoolSelect
                 value={userForm.school}
@@ -1059,17 +1107,27 @@ export default function AdminPage() {
               />
             </div>
 
+            {/* Anno - FILTRATO per team */}
             <select
               value={userForm.year}
               onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
               style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
             >
-              {CONFIG_ISCRIZIONE.anni.map((anno) => (
-                <option key={anno.value} value={anno.value}>
-                  {anno.label}
-                </option>
-              ))}
+              {CONFIG_ISCRIZIONE.anni
+                .filter(anno => editValidYears.includes(anno.value))
+                .map((anno) => (
+                  <option key={anno.value} value={anno.value}>
+                    {anno.label}
+                  </option>
+                ))}
             </select>
+
+            {/* Avviso se anno non valido per il team */}
+            {userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year) && (
+              <p style={{ color: "#dc3545", fontSize: "0.8rem", marginTop: 4 }}>
+                ⚠️ L'anno "{CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per {userForm.team}.
+              </p>
+            )}
 
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleEditUser} style={{ padding: "8px 16px", background: "#ffc107", color: "black", border: "none", borderRadius: 8, cursor: "pointer" }}>Salva</button>
