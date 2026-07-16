@@ -796,11 +796,17 @@ export default function AdminPage() {
             <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
-            <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
-              <option value="student">Studente</option>
-              <option value="staff">Staff</option>
-              {isSuper && <option value="admin">Admin</option>}
-            </select>
+            {isSuper ? (
+              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
+                <option value="student">Studente</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+              </select>
+            ) : (
+              <p style={{ marginTop: 8, padding: 8, background: "#f5f5f5", borderRadius: 6, fontSize: "0.85rem", color: "#666" }}>
+                Ruolo: Studente (solo un admin può assegnare ruoli diversi)
+              </p>
+            )}
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleAddUser} style={{ padding: "8px 16px", background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Crea</button>
               <button onClick={() => { setShowAddUserModal(false); setUserForm({ email: "", first_name: "", last_name: "", team: "", role: "student" }); }} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
@@ -819,11 +825,17 @@ export default function AdminPage() {
             <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }} />
             <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
-            <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
-              <option value="student">Studente</option>
-              <option value="staff">Staff</option>
-              {isSuper && <option value="admin">Admin</option>}
-            </select>
+            {isSuper ? (
+              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8 }}>
+                <option value="student">Studente</option>
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+              </select>
+            ) : (
+              <p style={{ marginTop: 8, padding: 8, background: "#f5f5f5", borderRadius: 6, fontSize: "0.85rem", color: "#666" }}>
+                Ruolo attuale: {userForm.role} (solo un admin può modificarlo)
+              </p>
+            )}
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleEditUser} style={{ padding: "8px 16px", background: "#ffc107", color: "black", border: "none", borderRadius: 8, cursor: "pointer" }}>Salva</button>
               <button onClick={() => { setShowEditUserModal(false); setSelectedUser(null); }} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
