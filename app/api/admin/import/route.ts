@@ -28,6 +28,13 @@ const YEAR_MAP: Record<string, string> = {
   "4° ANNO 2026": "quarto",
 };
 
+// Vincoli Team ↔ Anno (FILTRO OBBLIGATORIO)
+const TEAM_ANNI_VALID: Record<string, string[]> = {
+  'Matricole': ['preiscrizione', 'primo', 'secondo'],
+  'Veterani': ['terzo', 'quarto', 'specializzato'],
+  'Didatti&Docenti': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'],
+};
+
 function normalizeYear(raw: string): string | null {
   const trimmed = raw?.trim() || "";
   if (YEAR_MAP[trimmed]) return YEAR_MAP[trimmed];
@@ -112,15 +119,37 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
       school = school || fallback.school;
       site = site || fallback.site;
     }
+    const normalizedYear = normalizeYear(anno);
+    const team = assignTeam(iscrizione, anno);
+    
+    // Validazione Team ↔ Anno
+    if (team && normalizedYear) {
+      const validYears = TEAM_ANNI_VALID[team] || [];
+      if (!validYears.includes(normalizedYear)) {
+        // Se non valido, resetta il team
+        return {
+          first_name: String(row["NOME"] || "").trim() || null,
+          last_name: String(row["COGNOME"] || "").trim() || null,
+          email: String(row["Indirizzo email"] || "").trim().toLowerCase(),
+          school: school || null,
+          site: site || null,
+          year: normalizedYear,
+          role: "student",
+          team: null,
+          auth_token: "",
+        };
+      }
+    }
+    
     return {
       first_name: String(row["NOME"] || "").trim() || null,
       last_name: String(row["COGNOME"] || "").trim() || null,
       email: String(row["Indirizzo email"] || "").trim().toLowerCase(),
       school: school || null,
       site: site || null,
-      year: normalizeYear(anno),
+      year: normalizedYear,
       role: "student",
-      team: assignTeam(iscrizione, anno),
+      team: team,
       auth_token: "",
     };
   });
@@ -210,6 +239,16 @@ export async function POST(request: Request) {
       const team = r.team && validTeams.has(r.team) ? r.team : null;
       const userRole = validRoles.has(r.role) ? r.role : "student";
       const year = r.year && validYears.has(r.year) ? r.year : null;
+      
+      // Validazione Team ↔ Anno
+      let finalTeam = team;
+      if (team && year) {
+        const validYearsForTeam = TEAM_ANNI_VALID[team] || [];
+        if (!validYearsForTeam.includes(year)) {
+          finalTeam = null;
+        }
+      }
+      
       const token =
         existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
       return {
@@ -220,7 +259,7 @@ export async function POST(request: Request) {
         site: r.site || null,
         year: year,
         role: userRole,
-        team,
+        team: finalTeam,
         auth_token: token,
       };
     });
