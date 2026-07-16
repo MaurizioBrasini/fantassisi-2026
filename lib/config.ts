@@ -41,7 +41,7 @@ export const CONFIG_ISCRIZIONE = {
     'Verona': ['APC', 'SPC']
   },
   
-  // Relazione Scuola → Sedi (per validazione/suggerimenti)
+  // Relazione Scuola → Sedi (per validazione)
   sediPerScuola: {
     'APC': ['Lecce', 'Roma', 'Verona', 'Romania'],
     'AIPC': ['Bari'],
@@ -59,5 +59,13 @@ export const CONFIG_ISCRIZIONE = {
     { value: 'terzo', label: '3° Anno' },
     { value: 'quarto', label: '4° Anno' },
     { value: 'specializzato', label: 'Specializzato' }
-  ]
+  ],
+  
+  // Vincoli Team → Anni (FILTRO OBBLIGATORIO)
+  teamAnniValid: {
+    'Matricole': ['preiscrizione', 'primo', 'secondo'],
+    'Veterani': ['terzo', 'quarto', 'specializzato'],
+    'Didatti&Docenti': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'],
+    '': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'] // nessun team
+  }
 };
