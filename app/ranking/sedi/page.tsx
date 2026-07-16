@@ -46,6 +46,12 @@ export default function SiteRanking() {
         .from("votes")
         .select("recipient_id, points");
 
+      // 🔥 NUOVO: voti dai QR di classe (già hanno class_site direttamente sulla riga)
+      const { data: allEventVotes } = await supabase
+        .from("event_votes")
+        .select("class_site, points")
+        .eq("qr_type", "class");
+
       const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
 
       const me = usersById.get(id);
@@ -60,12 +66,18 @@ export default function SiteRanking() {
         classesBySite.get(u.site)!.add(key);
       }
 
-      // Raccogliamo i punti per sede
+      // Raccogliamo i punti per sede (voti individuali)
       const pointsBySite = new Map<string, number>();
       for (const v of allVotes || []) {
         const recipient = usersById.get(v.recipient_id);
         if (!recipient?.school || !recipient?.site || !recipient?.year || !VALID_YEARS.includes(recipient.year)) continue;
         pointsBySite.set(recipient.site, (pointsBySite.get(recipient.site) || 0) + (v.points || 0));
+      }
+
+      // 🔥 NUOVO: aggiungiamo i punti dai QR di classe (event_votes)
+      for (const ev of allEventVotes || []) {
+        if (!ev.class_site) continue;
+        pointsBySite.set(ev.class_site, (pointsBySite.get(ev.class_site) || 0) + (ev.points || 0));
       }
 
       // Unione delle chiavi
