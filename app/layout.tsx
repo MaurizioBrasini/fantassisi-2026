@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import InstallButton from "@/components/InstallButton";
 
 export const metadata: Metadata = {
   title: "FantAssisi 2026",
@@ -59,6 +60,7 @@ export default function RootLayout({
       </head>
       <body style={{ margin: 0, padding: 0, background: "#f5f5f5" }}>
         {children}
+        <InstallButton />
       </body>
     </html>
   );
