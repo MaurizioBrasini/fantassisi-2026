@@ -1036,6 +1036,7 @@ export default function AdminPage() {
               onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
               style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
             >
+              <option value="">Non specificato</option>
               {CONFIG_ISCRIZIONE.anni
                 .filter(anno => validYears.includes(anno.value))
                 .map((anno) => (
@@ -1113,6 +1114,7 @@ export default function AdminPage() {
               onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
               style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
             >
+              <option value="">Non specificato</option>
               {CONFIG_ISCRIZIONE.anni
                 .filter(anno => editValidYears.includes(anno.value))
                 .map((anno) => (
