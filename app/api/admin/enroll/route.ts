@@ -1,6 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
+import { CONFIG_ISCRIZIONE } from "@/lib/config";
+
+const VALID_TEAMS = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
 
 export async function POST(request: Request) {
   const userId = getVerifiedUserId();
@@ -9,8 +12,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { team } = await request.json();
-  if (team !== "Matricole" && team !== "Veterani") {
+  const { team, site, school, year } = await request.json();
+  if (!VALID_TEAMS.has(team)) {
     return NextResponse.json({ error: "Team non valido" }, { status: 400 });
   }
 
@@ -19,11 +22,10 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  // Verifica che l'utente sia ancora Didatti&Docenti nel database
-  // (non si fida solo del cookie)
+  // Non ci si fida del cookie: si rilegge sempre lo stato reale dal DB
   const { data: user } = await supabase
     .from("users")
-    .select("team, first_name, last_name")
+    .select("team, is_didatta, first_name, last_name")
     .eq("id", userId)
     .single();
 
@@ -31,20 +33,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
   }
 
-  if (user.team !== "Didatti&Docenti") {
-    return NextResponse.json({ error: "Già arruolato" }, { status: 409 });
+  // Solo chi è (o è già stato) Didatti&Docenti può scegliere/cambiare/lasciare la squadra.
+  // Un allievo importato direttamente come Matricola/Veterano non può mai cambiarla.
+  const canChooseTeam = user.team === "Didatti&Docenti" || user.is_didatta === true;
+  if (!canChooseTeam) {
+    return NextResponse.json({ error: "Non puoi cambiare squadra" }, { status: 403 });
+  }
+
+  // Sede e classe hanno senso solo entrando in una squadra reale; sono facoltative,
+  // ma se indicate devono essere coerenti tra loro, con la sede e col team.
+  let finalSite: string | null = null;
+  let finalSchool: string | null = null;
+  let finalYear: string | null = null;
+
+  if (team !== "Didatti&Docenti" && site) {
+    if (!CONFIG_ISCRIZIONE.sedi.includes(site)) {
+      return NextResponse.json({ error: "Sede non valida" }, { status: 400 });
+    }
+    finalSite = site;
+
+    if (school || year) {
+      const validSchools = CONFIG_ISCRIZIONE.scuolePerSede[site] || [];
+      const validYears = CONFIG_ISCRIZIONE.teamAnniValid[team] || [];
+      if (!school || !year || !validSchools.includes(school) || !validYears.includes(year)) {
+        return NextResponse.json({ error: "Classe non valida per questa sede/team" }, { status: 400 });
+      }
+      finalSchool = school;
+      finalYear = year;
+    }
   }
 
   const { error } = await supabase
     .from("users")
-    .update({ team })
+    .update({
+      team,
+      site: finalSite,
+      school: finalSchool,
+      year: finalYear,
+      is_didatta: true, // una volta ottenuto il permesso di scegliere, resta per sempre
+    })
     .eq("id", userId);
 
   if (error) {
-    return NextResponse.json({ error: "Errore durante l'arruolamento" }, { status: 500 });
+    return NextResponse.json({ error: "Errore durante il cambio squadra" }, { status: 500 });
   }
 
   const name = `${user.first_name || ""} ${user.last_name || ""}`.trim();
 
-  return NextResponse.json({ success: true, team, name });
+  return NextResponse.json({ success: true, team, site: finalSite, school: finalSchool, year: finalYear, name });
 }

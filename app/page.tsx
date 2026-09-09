@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import InstallButton from "@/components/InstallButton"; // 🔥 MODIFICA 1: Aggiunto import
 import { startOfTodayInRomeISO } from "@/lib/utils";
+import { CONFIG_ISCRIZIONE } from "@/lib/config";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -17,18 +18,196 @@ function setCookieClient(name: string, value: string) {
 }
 
 // ─────────────────────────────────────────────
+// Box scelta/cambio squadra, con sede+classe facoltative.
+// Usato sia per il primo arruolamento (Didatti&Docenti → squadra)
+// sia, per chi ha is_didatta=true, per cambiare squadra o uscirne.
+// ─────────────────────────────────────────────
+function TeamSwitchBox({ currentTeam, allowLeave, onDone }: {
+  currentTeam: string;
+  allowLeave: boolean;
+  onDone: (team: string, year?: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [team, setTeam] = useState<"" | "Matricole" | "Veterani">("");
+  const [site, setSite] = useState("");
+  const [classe, setClasse] = useState(""); // "scuola||anno"
+
+  const schoolsAtSite = site ? (CONFIG_ISCRIZIONE.scuolePerSede[site] || []) : [];
+  const validYears = team ? (CONFIG_ISCRIZIONE.teamAnniValid[team] || []) : [];
+  const classeOptions = schoolsAtSite.flatMap((school) =>
+    CONFIG_ISCRIZIONE.anni
+      .filter((a) => a.value && validYears.includes(a.value))
+      .map((a) => ({
+        value: `${school}||${a.value}`,
+        label: schoolsAtSite.length > 1 ? `${school} · ${a.label}` : a.label,
+      }))
+  );
+
+  const reset = () => {
+    setOpen(false);
+    setTeam("");
+    setSite("");
+    setClasse("");
+  };
+
+  const submit = async (targetTeam: string, targetSite: string | null, targetClasse: string) => {
+    setBusy(true);
+    const [school, year] = targetClasse ? targetClasse.split("||") : [null, null];
+    const res = await fetch("/api/admin/enroll", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ team: targetTeam, site: targetSite, school, year }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setCookieClient("user_team", targetTeam);
+      reset();
+      onDone(targetTeam, data.year || "");
+    } else {
+      alert(data.error || "Errore durante il cambio squadra");
+    }
+    setBusy(false);
+  };
+
+  const handleLeaveTeam = () => {
+    if (!window.confirm("Tornare a Didatti&Docenti (nessuna squadra)? Potrai riarruolarti quando vuoi.")) return;
+    submit("Didatti&Docenti", null, "");
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        style={{ marginTop: 20, width: "100%", padding: 16, borderRadius: 60, fontWeight: 700, background: "linear-gradient(135deg, #FF6B35, #1E3A5F)", color: "white", border: "none", cursor: "pointer", fontSize: "1rem" }}
+      >
+        {currentTeam === "Didatti&Docenti" ? "⚔️ Arruolati!" : "🔄 Cambia squadra"}
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 20, background: "#f8f9fa", borderRadius: 16, padding: 20, textAlign: "center" }}>
+      {!team ? (
+        <>
+          <p style={{ fontWeight: 700, color: "#1E3A5F", marginBottom: 6 }}>Scegli la tua squadra</p>
+          {!allowLeave && (
+            <p style={{ fontSize: "0.8rem", color: "#666", marginBottom: 16 }}>
+              Attenzione: la scelta è irreversibile!
+            </p>
+          )}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              onClick={() => setTeam("Matricole")}
+              disabled={busy}
+              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: "pointer" }}
+            >
+              🐓 Matricole
+            </button>
+            <button
+              onClick={() => setTeam("Veterani")}
+              disabled={busy}
+              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: "#1E3A5F", color: "white", border: "none", cursor: "pointer" }}
+            >
+              🐄 Veterani
+            </button>
+          </div>
+          {allowLeave && (
+            <button
+              onClick={handleLeaveTeam}
+              disabled={busy}
+              style={{ marginTop: 12, width: "100%", padding: 12, borderRadius: 12, fontWeight: 700, background: "#6c757d", color: "white", border: "none", cursor: busy ? "not-allowed" : "pointer" }}
+            >
+              ↩️ Torna a Didatti&amp;Docenti (nessuna squadra)
+            </button>
+          )}
+          <button
+            onClick={reset}
+            disabled={busy}
+            style={{ marginTop: 12, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Annulla
+          </button>
+        </>
+      ) : (
+        <>
+          <p style={{ fontWeight: 700, color: "#1E3A5F", marginBottom: 6 }}>
+            {team === "Matricole" ? "🐓 Matricole" : "🐄 Veterani"}
+          </p>
+          <p style={{ fontSize: "0.8rem", color: "#666", marginBottom: 14 }}>
+            Se vuoi, indica anche la tua sede e la tua classe (facoltativo)
+          </p>
+
+          <div style={{ textAlign: "left", marginBottom: 12 }}>
+            <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>Sede</label>
+            <select
+              value={site}
+              onChange={(e) => { setSite(e.target.value); setClasse(""); }}
+              style={{ width: "100%", padding: 10, marginTop: 4, borderRadius: 8, border: "1px solid #ccc" }}
+            >
+              <option value="">Nessuna sede</option>
+              {CONFIG_ISCRIZIONE.sedi.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          {site && (
+            <div style={{ textAlign: "left", marginBottom: 12 }}>
+              <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>Classe</label>
+              <select
+                value={classe}
+                onChange={(e) => setClasse(e.target.value)}
+                style={{ width: "100%", padding: 10, marginTop: 4, borderRadius: 8, border: "1px solid #ccc" }}
+              >
+                <option value="">Nessuna classe specifica</option>
+                {classeOptions.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              onClick={() => { setTeam(""); setSite(""); setClasse(""); }}
+              disabled={busy}
+              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: "#e0e0e0", color: "#333", border: "none", cursor: busy ? "not-allowed" : "pointer" }}
+            >
+              Indietro
+            </button>
+            <button
+              onClick={() => submit(team, site || null, classe)}
+              disabled={busy}
+              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: team === "Matricole" ? "#FF6B35" : "#1E3A5F", color: "white", border: "none", cursor: busy ? "not-allowed" : "pointer" }}
+            >
+              {busy ? "..." : "Conferma"}
+            </button>
+          </div>
+          <button
+            onClick={reset}
+            disabled={busy}
+            style={{ marginTop: 12, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Annulla
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Dashboard Didatti&Docenti (con pulsante Admin)
 // ─────────────────────────────────────────────
 function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
   userName: string;
   userId: string;
   userRole: string;
-  onEnrolled: (team: string) => void;
+  onEnrolled: (team: string, year?: string) => void;
 }) {
   const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
   const [remainingCoins, setRemainingCoins] = useState(20);
-  const [showEnroll, setShowEnroll] = useState(false);
-  const [enrolling, setEnrolling] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -123,24 +302,6 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
     fetchData();
   }, [userId]);
 
-  const handleEnroll = async (team: string) => {
-    setEnrolling(true);
-    const res = await fetch("/api/admin/enroll", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ team }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setCookieClient("user_team", team);
-      setShowEnroll(false);
-      onEnrolled(team);
-    } else {
-      alert(data.error || "Errore durante l'arruolamento");
-    }
-    setEnrolling(false);
-  };
-
   const isAdmin = userRole === "admin" || userRole === "staff";
 
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
@@ -218,43 +379,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
       </div>
 
       {/* Bottone arruolamento */}
-      {!showEnroll ? (
-        <button
-          onClick={() => setShowEnroll(true)}
-          style={{ marginTop: 20, width: "100%", padding: 16, borderRadius: 60, fontWeight: 700, background: "linear-gradient(135deg, #FF6B35, #1E3A5F)", color: "white", border: "none", cursor: "pointer", fontSize: "1rem" }}
-        >
-          ⚔️ Arruolati!
-        </button>
-      ) : (
-        <div style={{ marginTop: 20, background: "#f8f9fa", borderRadius: 16, padding: 20, textAlign: "center" }}>
-          <p style={{ fontWeight: 700, color: "#1E3A5F", marginBottom: 6 }}>Scegli la tua squadra</p>
-          <p style={{ fontSize: "0.8rem", color: "#666", marginBottom: 16 }}>
-            Attenzione: la scelta è irreversibile!
-          </p>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button
-              onClick={() => handleEnroll("Matricole")}
-              disabled={enrolling}
-              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: "pointer" }}
-            >
-              🐓 Matricole
-            </button>
-            <button
-              onClick={() => handleEnroll("Veterani")}
-              disabled={enrolling}
-              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: "#1E3A5F", color: "white", border: "none", cursor: "pointer" }}
-            >
-              🐄 Veterani
-            </button>
-          </div>
-          <button
-            onClick={() => setShowEnroll(false)}
-            style={{ marginTop: 12, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
-          >
-            Annulla
-          </button>
-        </div>
-      )}
+      <TeamSwitchBox currentTeam="Didatti&Docenti" allowLeave={false} onDone={onEnrolled} />
 
       {/* Pulsante Admin (visibile solo a admin/staff) */}
       {isAdmin && (
@@ -283,12 +408,14 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
 // ─────────────────────────────────────────────
 // Dashboard normale (Matricole / Veterani)
 // ─────────────────────────────────────────────
-function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
+function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidatta, onTeamChange }: {
   userId: string;
   userName: string;
   myTeam: string;
   myClass: string;
   userRole: string;
+  isDidatta: boolean;
+  onTeamChange: (team: string, year?: string) => void;
 }) {
   const [remainingCoins, setRemainingCoins] = useState(20);
   const [myPoints, setMyPoints] = useState(0);
@@ -432,7 +559,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
 
       <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24 }}>
         Ciao <strong>{userName || "Partecipante"}</strong> · {myTeam || "Team non assegnato"}
-        {myClass && ` · ${myClass}`}
+        {myClass && ` · ${CONFIG_ISCRIZIONE.anni.find((a) => a.value === myClass)?.label || myClass}`}
       </p>
 
       <h2 style={{ fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 10 }}>Contributi</h2>
@@ -492,6 +619,11 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
         </Link>
       </div>
 
+      {/* Solo chi è (o è stato) Didatti&Docenti può cambiare squadra o uscirne */}
+      {isDidatta && (
+        <TeamSwitchBox currentTeam={myTeam} allowLeave onDone={onTeamChange} />
+      )}
+
       {isAdmin && (
         <Link href="/admin" style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
           ⚙️ Admin
@@ -524,6 +656,7 @@ export default function Dashboard() {
   const [myTeam, setMyTeam] = useState("");
   const [myClass, setMyClass] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [isDidatta, setIsDidatta] = useState(false);
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
 
@@ -543,7 +676,7 @@ export default function Dashboard() {
 
       const { data: me } = await supabase
         .from("users")
-        .select("first_name, last_name, team, year")
+        .select("first_name, last_name, team, year, is_didatta")
         .eq("id", id)
         .single();
 
@@ -551,6 +684,7 @@ export default function Dashboard() {
         setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
         setMyTeam(me.team || "");
         setMyClass(me.year || "");
+        setIsDidatta(!!me.is_didatta);
       }
 
       setLoading(false);
@@ -571,6 +705,12 @@ export default function Dashboard() {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
   }
 
+  const handleTeamChange = (team: string, year?: string) => {
+    setMyTeam(team);
+    setMyClass(year || "");
+    setIsDidatta(true); // una volta ottenuta la possibilità di scegliere, resta per sempre
+  };
+
   // Mostra DashboardDidatti per chiunque NON sia in una squadra
   // (Didatti&Docenti, null, "", o qualsiasi altro valore)
   if (myTeam !== "Matricole" && myTeam !== "Veterani") {
@@ -579,7 +719,7 @@ export default function Dashboard() {
         userName={userName}
         userId={userId}
         userRole={userRole}
-        onEnrolled={(team) => setMyTeam(team)}
+        onEnrolled={handleTeamChange}
       />
     );
   }
@@ -591,6 +731,8 @@ export default function Dashboard() {
       myTeam={myTeam}
       myClass={myClass}
       userRole={userRole}
+      isDidatta={isDidatta}
+      onTeamChange={handleTeamChange}
     />
   );
 }

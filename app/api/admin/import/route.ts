@@ -260,6 +260,9 @@ export async function POST(request: Request) {
         year: year,
         role: userRole,
         team: finalTeam,
+        // Chi arriva da roster come Didatti&Docenti può poi scegliere/cambiare/lasciare la
+        // squadra liberamente (vedi /api/admin/enroll); un allievo vero non può mai farlo.
+        is_didatta: finalTeam === "Didatti&Docenti",
         auth_token: token,
       };
     });
