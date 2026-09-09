@@ -134,6 +134,8 @@ export default function AdminPage() {
   const [bonuses, setBonuses] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [sendingBulk, setSendingBulk] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 
   // Filtri, ricerca e paginazione per QR Voto
   const [searchTerm, setSearchTerm] = useState("");
@@ -568,6 +570,57 @@ export default function AdminPage() {
     window.open(url, "_blank");
   };
 
+  // ── Selezione utenti (checkbox in tabella) ────────────────
+  const toggleUserSelection = (id: string) => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const allFilteredSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selectedUserIds.has(u.id));
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedUserIds((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        filteredUsers.forEach((u) => next.delete(u.id));
+      } else {
+        filteredUsers.forEach((u) => next.add(u.id));
+      }
+      return next;
+    });
+  };
+
+  // ── Invia link via email agli utenti selezionati (SOLO ADMIN) ──
+  const handleSendBulk = async () => {
+    if (!isSuper) { setMessage("❌ Solo admin possono inviare email di gruppo"); return; }
+    const targets = users.filter((u) => selectedUserIds.has(u.id) && u.email);
+    if (targets.length === 0) { setMessage("❌ Nessun utente selezionato con email"); return; }
+    if (!confirm(`Inviare il link personale a queste ${targets.length} persone selezionate?\n\n${targets.map((u) => `${u.first_name} ${u.last_name}`).join(", ")}`)) return;
+
+    setSendingBulk(true);
+    setMessage(`Invio in corso a ${targets.length} persone... può richiedere qualche secondo.`);
+    try {
+      const res = await fetch("/api/admin/send-bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: targets.map((u) => u.id) }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setMessage("❌ " + data.message); return; }
+      let msg = data.message;
+      if (data.failed?.length) {
+        msg += "\nFallite: " + data.failed.map((f: any) => f.email).join(", ");
+      }
+      setMessage(msg);
+      setSelectedUserIds(new Set());
+    } finally {
+      setSendingBulk(false);
+    }
+  };
+
   // ── Importa CSV (SOLO ADMIN) ─────────────────────────────
   const handleImportCSV = async () => {
     if (!isSuper) { setMessage("❌ Solo admin possono importare CSV"); return; }
@@ -836,11 +889,31 @@ export default function AdminPage() {
             <option value="Veterani">Solo Veterani</option>
             <option value="Didatti&Docenti">Solo Didatti&amp;Docenti</option>
           </select>
+          {isSuper && (
+            <button
+              onClick={handleSendBulk}
+              disabled={sendingBulk || selectedUserIds.size === 0}
+              style={{ padding: "8px 12px", background: sendingBulk || selectedUserIds.size === 0 ? "#999" : "#28a745", color: "white", border: "none", borderRadius: 6, cursor: sendingBulk || selectedUserIds.size === 0 ? "not-allowed" : "pointer", fontSize: "0.85rem" }}
+              title="Invia il link personale via email agli utenti selezionati con la checkbox"
+            >
+              {sendingBulk ? "Invio in corso..." : `✉️ Invia link ai selezionati (${selectedUserIds.size})`}
+            </button>
+          )}
         </div>
         <div style={{ maxHeight: 500, overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid #ddd" }}>
+                {isSuper && (
+                  <th style={{ padding: 8, textAlign: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleSelectAllFiltered}
+                      title="Seleziona/deseleziona tutti quelli mostrati dal filtro corrente"
+                    />
+                  </th>
+                )}
                 <th onClick={() => toggleUserSort("name")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Nome{sortArrow("name")}</th>
                 <th onClick={() => toggleUserSort("email")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Email{sortArrow("email")}</th>
                 <th onClick={() => toggleUserSort("team")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Team{sortArrow("team")}</th>
@@ -857,6 +930,17 @@ export default function AdminPage() {
                 const yearLabel = u.year ? CONFIG_ISCRIZIONE.anni.find(a => a.value === u.year)?.label || u.year : "-";
                 return (
                   <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
+                    {isSuper && (
+                      <td style={{ padding: 8, textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.has(u.id)}
+                          onChange={() => toggleUserSelection(u.id)}
+                          disabled={!u.email}
+                          title={!u.email ? "Nessuna email" : undefined}
+                        />
+                      </td>
+                    )}
                     <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
                     <td style={{ padding: 8 }}>{u.email}</td>
                     <td style={{ padding: 8 }}>{u.team || "-"}</td>
