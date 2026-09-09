@@ -384,8 +384,14 @@ export default function AdminPage() {
       insertData = { title: qrRicaricaForm.title, amount: qrRicaricaForm.amount, code: qrCode, active: true };
     }
 
-    const { error } = await supabase.from(table).insert(insertData);
-    if (error) { setMessage("❌ Errore creazione QR: " + error.message); return; }
+    const endpoint = table === "votable_events" ? "/api/admin/events" : "/api/admin/bonus";
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(insertData),
+    });
+    const resData = await res.json();
+    if (!res.ok) { setMessage("❌ Errore creazione QR: " + resData.message); return; }
 
     const dataUrl = await QRCode.toDataURL(qrCode, {
       width: 300, margin: 2,
@@ -399,14 +405,24 @@ export default function AdminPage() {
   };
 
   const handleToggleEvent = async (id: string, current: boolean) => {
-    const { error } = await supabase.from("votable_events").update({ active: !current }).eq("id", id);
-    if (error) { setMessage("❌ " + error.message); return; }
+    const res = await fetch("/api/admin/events", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, active: !current }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setMessage("❌ " + data.message); return; }
     await loadData();
   };
 
   const handleToggleBonus = async (id: string, current: boolean) => {
-    const { error } = await supabase.from("bonus_qr").update({ active: !current }).eq("id", id);
-    if (error) { setMessage("❌ " + error.message); return; }
+    const res = await fetch("/api/admin/bonus", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, active: !current }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setMessage("❌ " + data.message); return; }
     await loadData();
   };
 
@@ -414,16 +430,18 @@ export default function AdminPage() {
   const handleDeleteEvent = async (id: string, title: string) => {
     if (!isSuper) { setMessage("❌ Solo admin possono eliminare QR"); return; }
     if (!confirm(`Eliminare "${title}"?`)) return;
-    const { error } = await supabase.from("votable_events").delete().eq("id", id);
-    if (error) setMessage("❌ " + error.message);
+    const res = await fetch(`/api/admin/events?id=${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) setMessage("❌ " + data.message);
     else { setMessage("✅ QR eliminato"); loadData(); }
   };
 
   const handleDeleteBonus = async (id: string, title: string) => {
     if (!isSuper) { setMessage("❌ Solo admin possono eliminare QR"); return; }
     if (!confirm(`Eliminare "${title}"?`)) return;
-    const { error } = await supabase.from("bonus_qr").delete().eq("id", id);
-    if (error) setMessage("❌ " + error.message);
+    const res = await fetch(`/api/admin/bonus?id=${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) setMessage("❌ " + data.message);
     else { setMessage("✅ QR eliminato"); loadData(); }
   };
 

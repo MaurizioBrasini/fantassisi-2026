@@ -1,11 +1,11 @@
 // app/api/admin/reset/route.ts
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { requireRole } from "@/lib/session";
 
 export async function POST(request: Request) {
-  const role = cookies().get("user_role")?.value;
-  if (role !== "admin" && role !== "staff") {
+  const user = await requireRole("admin", "staff");
+  if (!user) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 

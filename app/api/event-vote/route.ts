@@ -1,9 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getVerifiedUserId } from "@/lib/session";
+import { startOfTodayInRomeISO } from "@/lib/utils";
 
 export async function POST(request: Request) {
-  const userId = cookies().get("user_id")?.value;
+  const userId = getVerifiedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
@@ -31,20 +32,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Questo QR non è più attivo" }, { status: 403 });
   }
 
-  // Verifica CBT coins rimanenti oggi
-  const today = new Date().toISOString().split("T")[0];
+  // Verifica CBT coins rimanenti oggi (giornata italiana, non UTC)
+  const startOfToday = startOfTodayInRomeISO();
   const { count: votesToday } = await supabase
     .from("event_votes")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .gte("voted_at", today);
+    .gte("voted_at", startOfToday);
 
   // Conta anche i voti normali di oggi per il totale CBT coins
   const { count: normalVotesToday } = await supabase
     .from("votes")
     .select("id", { count: "exact", head: true })
     .eq("voter_id", userId)
-    .gte("voted_at", today);
+    .gte("voted_at", startOfToday);
 
   const totalVotesToday = (votesToday || 0) + (normalVotesToday || 0);
   if (totalVotesToday >= 20) {

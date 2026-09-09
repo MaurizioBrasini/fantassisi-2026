@@ -1,7 +1,7 @@
 // app/api/admin/users/route.ts
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { requireRole } from "@/lib/session";
 import { randomUUID } from "crypto";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -27,8 +27,8 @@ function isValidYearForTeam(team: string | null, year: string | null): boolean {
 
 // GET: Lista utenti (con paginazione e ricerca)
 export async function GET(request: Request) {
-  const role = cookies().get("user_role")?.value;
-  if (role !== "admin" && role !== "staff") {
+  const requester = await requireRole("admin", "staff");
+  if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
@@ -64,8 +64,8 @@ export async function GET(request: Request) {
 
 // POST: Crea un nuovo utente
 export async function POST(request: Request) {
-  const requesterRole = cookies().get("user_role")?.value;
-  if (requesterRole !== "admin" && requesterRole !== "staff") {
+  const requester = await requireRole("admin", "staff");
+  if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
   }
 
   // Solo un admin può assegnare un ruolo diverso da "student" in fase di creazione
-  if (requesterRole !== "admin") {
+  if (requester.role !== "admin") {
     userRole = "student";
   }
 
@@ -136,8 +136,8 @@ export async function POST(request: Request) {
 
 // PUT: Aggiorna un utente
 export async function PUT(request: Request) {
-  const requesterRole = cookies().get("user_role")?.value;
-  if (requesterRole !== "admin" && requesterRole !== "staff") {
+  const requester = await requireRole("admin", "staff");
+  if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
@@ -167,7 +167,7 @@ export async function PUT(request: Request) {
 
   // Solo un admin può cambiare il ruolo di un utente. Uno staff può modificare
   // nome/cognome/team/email ma non toccare il campo role in alcun modo.
-  if (requesterRole !== "admin") {
+  if (requester.role !== "admin") {
     userRole = undefined;
   }
 
@@ -211,8 +211,8 @@ export async function PUT(request: Request) {
 
 // DELETE: Elimina un utente
 export async function DELETE(request: Request) {
-  const role = cookies().get("user_role")?.value;
-  if (role !== "admin" && role !== "staff") {
+  const requester = await requireRole("admin", "staff");
+  if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 

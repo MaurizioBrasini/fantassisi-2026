@@ -65,9 +65,21 @@ export default function IndividualRanking() {
         from += 1000;
       }
 
-      const { data: allVotes } = await supabase
-        .from("votes")
-        .select("recipient_id, points");
+      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
+      let allVotes: { recipient_id: string; points: number }[] = [];
+      {
+        let voteFrom = 0;
+        while (true) {
+          const { data: page } = await supabase
+            .from("votes")
+            .select("recipient_id, points")
+            .range(voteFrom, voteFrom + 999);
+          if (!page || page.length === 0) break;
+          allVotes.push(...page);
+          if (page.length < 1000) break;
+          voteFrom += 1000;
+        }
+      }
 
       const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
       const pointsByUser = new Map<string, number>();

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { requireRole } from "@/lib/session";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,8 +8,8 @@ const supabase = createClient(
 );
 
 export async function POST(request: Request) {
-  const role = cookies().get("user_role")?.value;
-  if (role !== "admin" && role !== "staff") {
+  const requester = await requireRole("admin", "staff");
+  if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 

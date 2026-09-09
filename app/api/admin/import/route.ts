@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { requireRole } from "@/lib/session";
 import * as XLSX from "xlsx";
 
 const BRANDS = ["CCMA", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
@@ -191,8 +191,8 @@ function parseCSV(text: string): Record<string, string>[] {
 }
 
 export async function POST(request: Request) {
-  const role = cookies().get("user_role")?.value;
-  if (role !== "admin" && role !== "staff") {
+  const requester = await requireRole("admin", "staff");
+  if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 

@@ -1,18 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getVerifiedUserId } from "@/lib/session";
 
 export async function POST(request: Request) {
-  const userId = cookies().get("user_id")?.value;
-  const currentTeam = cookies().get("user_team")?.value;
+  const userId = getVerifiedUserId();
 
   if (!userId) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
-  }
-
-  // Solo i Didatti&Docenti possono arruolarsi
-  if (currentTeam !== "Didatti&Docenti") {
-    return NextResponse.json({ error: "Non autorizzato" }, { status: 403 });
   }
 
   const { team } = await request.json();

@@ -42,15 +42,39 @@ export default function SiteRanking() {
         from += 1000;
       }
 
-      const { data: allVotes } = await supabase
-        .from("votes")
-        .select("recipient_id, points");
+      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
+      let allVotes: { recipient_id: string; points: number }[] = [];
+      {
+        let voteFrom = 0;
+        while (true) {
+          const { data: page } = await supabase
+            .from("votes")
+            .select("recipient_id, points")
+            .range(voteFrom, voteFrom + 999);
+          if (!page || page.length === 0) break;
+          allVotes.push(...page);
+          if (page.length < 1000) break;
+          voteFrom += 1000;
+        }
+      }
 
       // 🔥 NUOVO: voti dai QR di classe (già hanno class_site direttamente sulla riga)
-      const { data: allEventVotes } = await supabase
-        .from("event_votes")
-        .select("class_site, points")
-        .eq("qr_type", "class");
+      // Scarica anch'essi a blocchi da 1000
+      let allEventVotes: { class_site: string; points: number }[] = [];
+      {
+        let evFrom = 0;
+        while (true) {
+          const { data: page } = await supabase
+            .from("event_votes")
+            .select("class_site, points")
+            .eq("qr_type", "class")
+            .range(evFrom, evFrom + 999);
+          if (!page || page.length === 0) break;
+          allEventVotes.push(...page);
+          if (page.length < 1000) break;
+          evFrom += 1000;
+        }
+      }
 
       const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
 

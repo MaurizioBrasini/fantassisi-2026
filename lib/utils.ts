@@ -1,20 +1,37 @@
-export function calculatePoints(
-  voterTeam: string,
-  voterSite: string,
-  recipientTeam: string,
-  recipientSite: string
-): number {
-  if (voterTeam === recipientTeam) {
-    return voterSite === recipientSite ? 1 : 2;
-  } else {
-    return 3;
-  }
-}
+// Il DB e il server girano in UTC, ma i limiti "giornalieri" dell'evento (20 CBT coin,
+// reset "di oggi") devono seguire la mezzanotte italiana, non quella UTC (scarto di 1-2h).
+// Ritorna l'inizio della giornata corrente in Europe/Rome, come istante UTC (ISO string),
+// utilizzabile direttamente in un filtro .gte("voted_at", ...).
+export function startOfTodayInRomeISO(): string {
+  const now = new Date();
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Rome",
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const parts = dtf.formatToParts(now).reduce((acc, p) => {
+    acc[p.type] = p.value;
+    return acc;
+  }, {} as Record<string, string>);
 
-export function getTeam(year: number): string {
-  return year <= 2 ? "Matricole" : "Veterani";
-}
+  // Istante UTC che corrisponde a "adesso" quando letto come orario di Roma:
+  // la differenza rispetto a `now` è esattamente l'offset di Roma in quel momento.
+  const romeNowAsUTC = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second)
+  );
+  const romeOffsetMs = romeNowAsUTC - now.getTime();
 
-export function getClass(school: string, site: string, year: number): string {
-  return `${school} ${site} ${year}°`;
+  // Mezzanotte di oggi, calendario di Roma, poi riportata a istante UTC sottraendo l'offset.
+  const romeMidnightUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+  return new Date(romeMidnightUTC - romeOffsetMs).toISOString();
 }

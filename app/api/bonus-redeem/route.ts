@@ -1,9 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { getVerifiedUserId } from "@/lib/session";
 
 export async function POST(request: Request) {
-  const userId = cookies().get("user_id")?.value;
+  const userId = getVerifiedUserId();
   if (!userId) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
@@ -42,16 +42,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Questo bonus è scaduto" }, { status: 403 });
   }
 
-  // Verifica se l'utente ha già riscattato questo bonus
-  const { data: existing } = await supabase
+  // Verifica quante volte l'utente ha già riscattato questo bonus (rispetta max_uses_per_user, non solo "mai/sempre")
+  const { count: redemptionCount } = await supabase
     .from("bonus_redemptions")
-    .select("id")
+    .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .eq("bonus_id", bonusId)
-    .maybeSingle();
+    .eq("bonus_id", bonusId);
 
-  if (existing) {
-    return NextResponse.json({ error: "Hai già riscattato questo bonus" }, { status: 409 });
+  const maxUses = bonus.max_uses_per_user ?? 1;
+  if ((redemptionCount || 0) >= maxUses) {
+    return NextResponse.json({ error: "Hai già riscattato questo bonus il numero massimo di volte consentito" }, { status: 409 });
   }
 
   const { error } = await supabase

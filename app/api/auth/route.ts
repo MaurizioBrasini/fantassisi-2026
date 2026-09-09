@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { signUserId, SESSION_COOKIE_NAME } from "@/lib/session";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -44,9 +45,13 @@ export async function GET(request: Request) {
     sameSite: "lax" as const,
   };
 
+  // Cookie di sola visualizzazione (usati dal client per la UI, MAI per autorizzare azioni server-side)
   response.cookies.set("user_id", user.id, cookieOptions);
   response.cookies.set("user_team", user.team || "", cookieOptions);
   response.cookies.set("user_role", user.role || "student", cookieOptions);
+
+  // Cookie firmato httpOnly: unica fonte attendibile di identità/autorizzazione lato server
+  response.cookies.set(SESSION_COOKIE_NAME, signUserId(user.id), { ...cookieOptions, httpOnly: true });
 
   if (user.year) {
     response.cookies.set("user_class", user.year, cookieOptions);
