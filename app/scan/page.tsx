@@ -19,20 +19,6 @@ export default function ScanPage() {
   const [cameras, setCameras] = useState<CameraInfo[] | null>(null);
   const [loadingCameras, setLoadingCameras] = useState(false);
 
-  // --- SOLO TEMPORANEO PER DEBUG: console visibile sul telefono, da
-  // togliere una volta risolto il problema dello scanner su Android ---
-  useEffect(() => {
-    if (typeof window !== "undefined" && !(window as any).eruda) {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/eruda";
-      script.onload = () => {
-        (window as any).eruda.init();
-      };
-      document.body.appendChild(script);
-    }
-  }, []);
-  // --- FINE BLOCCO TEMPORANEO ---
-
   const handleScanResult = async (decodedText: string, userId: string) => {
     // ----- EVENTO (legacy) -----
     if (decodedText.startsWith("EVENT:")) {

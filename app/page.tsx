@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import InstallButton from "@/components/InstallButton"; // 🔥 MODIFICA 1: Aggiunto import
+import { startOfTodayInRomeISO } from "@/lib/utils";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -43,15 +44,28 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         from += 1000;
       }
 
-      const { data: allVotes } = await supabase
-        .from("votes").select("voter_id, recipient_id, points, voted_at");
+      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
+      let allVotes: { voter_id: string; recipient_id: string; points: number; voted_at: string }[] = [];
+      {
+        let voteFrom = 0;
+        while (true) {
+          const { data: page } = await supabase
+            .from("votes")
+            .select("voter_id, recipient_id, points, voted_at")
+            .range(voteFrom, voteFrom + 999);
+          if (!page || page.length === 0) break;
+          allVotes.push(...page);
+          if (page.length < 1000) break;
+          voteFrom += 1000;
+        }
+      }
 
       const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
       const votes = allVotes || [];
 
-      const today = new Date().toISOString().split("T")[0];
+      const startOfToday = startOfTodayInRomeISO();
       const votesToday = votes.filter(
-        (v) => v.voter_id === userId && v.voted_at?.startsWith(today)
+        (v) => v.voter_id === userId && v.voted_at && v.voted_at >= startOfToday
       ).length;
 
       // Recupera i bonus riscattati oggi
@@ -59,7 +73,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         .from("bonus_redemptions")
         .select("bonus_id")
         .eq("user_id", userId)
-        .gte("redeemed_at", today);
+        .gte("redeemed_at", startOfToday);
 
       const bonusIds = bonusRedemptions?.map(b => b.bonus_id) || [];
       let totalBonus = 0;
@@ -82,10 +96,21 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         if (r?.team === "Veterani") pts.Veterani += v.points || 0;
       }
 
-      // Aggiungi i voti da event_votes (QR voto)
-      const { data: eventVotes } = await supabase
-        .from("event_votes")
-        .select("team_target, points");
+      // Aggiungi i voti da event_votes (QR voto), a blocchi da 1000
+      let eventVotes: { team_target: string | null; points: number }[] = [];
+      {
+        let evFrom = 0;
+        while (true) {
+          const { data: page } = await supabase
+            .from("event_votes")
+            .select("team_target, points")
+            .range(evFrom, evFrom + 999);
+          if (!page || page.length === 0) break;
+          eventVotes.push(...page);
+          if (page.length < 1000) break;
+          evFrom += 1000;
+        }
+      }
 
       for (const ev of eventVotes || []) {
         if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
@@ -284,15 +309,28 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
         from += 1000;
       }
 
-      const { data: allVotes } = await supabase
-        .from("votes").select("voter_id, recipient_id, points, voted_at");
+      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
+      let allVotes: { voter_id: string; recipient_id: string; points: number; voted_at: string }[] = [];
+      {
+        let voteFrom = 0;
+        while (true) {
+          const { data: page } = await supabase
+            .from("votes")
+            .select("voter_id, recipient_id, points, voted_at")
+            .range(voteFrom, voteFrom + 999);
+          if (!page || page.length === 0) break;
+          allVotes.push(...page);
+          if (page.length < 1000) break;
+          voteFrom += 1000;
+        }
+      }
 
       const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
       const votes = allVotes || [];
 
-      const today = new Date().toISOString().split("T")[0];
+      const startOfToday = startOfTodayInRomeISO();
       const votesToday = votes.filter(
-        (v) => v.voter_id === userId && v.voted_at?.startsWith(today)
+        (v) => v.voter_id === userId && v.voted_at && v.voted_at >= startOfToday
       ).length;
 
       // Recupera i bonus riscattati oggi
@@ -300,7 +338,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
         .from("bonus_redemptions")
         .select("bonus_id")
         .eq("user_id", userId)
-        .gte("redeemed_at", today);
+        .gte("redeemed_at", startOfToday);
 
       const bonusIds = bonusRedemptions?.map(b => b.bonus_id) || [];
       let totalBonus = 0;
@@ -328,10 +366,21 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole }: {
         if (r.team === "Veterani") pts.Veterani += p;
       }
 
-      // Aggiungi i voti da event_votes (QR voto)
-      const { data: eventVotes } = await supabase
-        .from("event_votes")
-        .select("team_target, points");
+      // Aggiungi i voti da event_votes (QR voto), a blocchi da 1000
+      let eventVotes: { team_target: string | null; points: number }[] = [];
+      {
+        let evFrom = 0;
+        while (true) {
+          const { data: page } = await supabase
+            .from("event_votes")
+            .select("team_target, points")
+            .range(evFrom, evFrom + 999);
+          if (!page || page.length === 0) break;
+          eventVotes.push(...page);
+          if (page.length < 1000) break;
+          evFrom += 1000;
+        }
+      }
 
       for (const ev of eventVotes || []) {
         if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
