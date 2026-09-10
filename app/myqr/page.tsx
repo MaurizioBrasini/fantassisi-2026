@@ -76,11 +76,62 @@ export default function MyQRPage() {
     generateQR();
   }, []);
 
-  const handleDownload = () => {
+  // Compone QR + PIN in un'unica immagine scaricabile: il solo QR (qrDataUrl)
+  // non basta più a votare da solo se manca la fotocamera, e chi scarica/
+  // stampa il file perde il PIN mostrato solo a video se non lo includiamo
+  // direttamente nel PNG.
+  const buildDownloadImage = (): Promise<string> =>
+    new Promise((resolve, reject) => {
+      if (!qrDataUrl) return reject(new Error("QR non pronto"));
+      const qrImg = new Image();
+      qrImg.onload = () => {
+        const qrSize = 300;
+        const padding = 24;
+        const pinBlockHeight = myPin ? 110 : 0;
+        const width = qrSize + padding * 2;
+        const height = qrSize + padding * 2 + pinBlockHeight;
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas non supportato"));
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
+
+        if (myPin) {
+          const centerX = width / 2;
+          ctx.fillStyle = "#666666";
+          ctx.font = "16px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Se non riesce a scansionare, vota con il PIN:", centerX, padding + qrSize + 32);
+
+          ctx.fillStyle = "#1E3A5F";
+          ctx.font = "800 40px system-ui, sans-serif";
+          // canvas non supporta letter-spacing in modo affidabile su tutti i
+          // browser: spaziatura manuale per leggibilità, come sullo schermo.
+          ctx.fillText(myPin.split("").join("  "), centerX, padding + qrSize + 80);
+        }
+
+        resolve(canvas.toDataURL("image/png"));
+      };
+      qrImg.onerror = () => reject(new Error("Impossibile caricare il QR"));
+      qrImg.src = qrDataUrl;
+    });
+
+  const handleDownload = async () => {
     if (!qrDataUrl || !userInfo) return;
+    const filename = `QR_${userInfo.name.replace(/\s+/g, "_")}.png`;
+    let href = qrDataUrl;
+    try {
+      href = await buildDownloadImage();
+    } catch (err) {
+      console.error("Errore generazione immagine QR+PIN, scarico solo il QR:", err);
+    }
     const link = document.createElement("a");
-    link.href = qrDataUrl;
-    link.download = `QR_${userInfo.name.replace(/\s+/g, "_")}.png`;
+    link.href = href;
+    link.download = filename;
     link.click();
   };
 
