@@ -119,6 +119,10 @@ export async function POST(request: Request) {
       site: site || null,
       school: school || null,
       year: yearValue,
+      // Chi entra come Didatti&Docenti può poi scegliere/cambiare/lasciare la squadra
+      // liberamente (vedi /api/admin/enroll); vedi anche il PUT sotto per correggere
+      // manualmente i casi di docenti registrati come Matricola/Veterano.
+      is_didatta: teamValue === "Didatti&Docenti",
     })
     .select()
     .single();
@@ -142,7 +146,7 @@ export async function PUT(request: Request) {
   }
 
   const body = await request.json();
-  const { id, email, first_name, last_name, team, site, school, year } = body;
+  const { id, email, first_name, last_name, team, site, school, year, is_didatta } = body;
   let userRole = body.role;
 
   if (!id) {
@@ -188,6 +192,13 @@ export async function PUT(request: Request) {
   }
   if (year !== undefined) {
     updateData.year = year && VALID_ANNI.includes(year) ? year : null;
+  }
+  // Permette di correggere manualmente chi è docente/staff ma è stato registrato
+  // come Matricola/Veterano prima che esistesse il cambio squadra (o comunque non
+  // arrivato dall'import come Didatti&Docenti): senza questo flag non vede i
+  // pulsanti per scegliere/cambiare/lasciare la squadra.
+  if (is_didatta !== undefined) {
+    updateData.is_didatta = !!is_didatta;
   }
 
   if (!isProtectedAccount) {

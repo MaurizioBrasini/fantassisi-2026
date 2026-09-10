@@ -172,6 +172,7 @@ export default function AdminPage() {
     school: "",
     year: ""
   });
+  const [editIsDidatta, setEditIsDidatta] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [resetType, setResetType] = useState("scores");
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -511,6 +512,7 @@ export default function AdminPage() {
     }
     const years = CONFIG_ISCRIZIONE.teamAnniValid[user.team || ''] || CONFIG_ISCRIZIONE.teamAnniValid[''];
     setEditValidYears(years);
+    setEditIsDidatta(!!user.is_didatta);
     setShowEditUserModal(true);
   };
 
@@ -532,7 +534,8 @@ export default function AdminPage() {
         role: userForm.role,
         site: userForm.site || null,
         school: userForm.school || null,
-        year: userForm.year || null
+        year: userForm.year || null,
+        is_didatta: editIsDidatta
       }),
     });
     const data = await res.json();
@@ -1173,9 +1176,14 @@ export default function AdminPage() {
             <input type="email" placeholder="Email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
             <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
             <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            
+
             <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
-            
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: "0.85rem", color: "#444" }}>
+              <input type="checkbox" checked={editIsDidatta} onChange={(e) => setEditIsDidatta(e.target.checked)} />
+              Può scegliere/cambiare/lasciare la squadra (docente/staff registrato come Matricola/Veterano)
+            </label>
+
             {isSuper ? (
               <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}>
                 <option value="student">Studente</option>
