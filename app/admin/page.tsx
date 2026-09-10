@@ -358,13 +358,13 @@ export default function AdminPage() {
 
     if (qrTab === "squadra") {
       if (!qrSquadraForm.title) { setMessage("❌ Inserisci un titolo"); return; }
-      qrCode = `EVENT:${crypto.randomUUID()}`;
+      qrCode = `QR:${crypto.randomUUID()}`;
       label = qrSquadraForm.title;
       table = "votable_events";
       insertData = { title: qrSquadraForm.title, qr_type: "team", team_target: qrSquadraForm.team, qr_code: qrCode, active: true };
     } else if (qrTab === "classe") {
       if (!qrClasseForm.school || !qrClasseForm.site || !qrClasseForm.year) { setMessage("❌ Seleziona una classe"); return; }
-      qrCode = `EVENT:${crypto.randomUUID()}`;
+      qrCode = `QR:${crypto.randomUUID()}`;
       label = `${qrClasseForm.school} ${qrClasseForm.site} ${qrClasseForm.year}`;
       table = "votable_events";
       insertData = {
@@ -379,7 +379,7 @@ export default function AdminPage() {
       };
     } else {
       if (!qrRicaricaForm.title) { setMessage("❌ Inserisci un titolo"); return; }
-      qrCode = `BONUS:${crypto.randomUUID().slice(0, 8)}`;
+      qrCode = `QR:${crypto.randomUUID().slice(0, 8)}`;
       label = qrRicaricaForm.title;
       table = "bonus_qr";
       insertData = { title: qrRicaricaForm.title, amount: qrRicaricaForm.amount, code: qrCode, active: true };
