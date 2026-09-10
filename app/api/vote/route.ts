@@ -35,13 +35,19 @@ export async function POST(request: Request) {
   }
 
   // --- NUOVA LOGICA PUNTEGGI ---
-  let points = 1; // default
-
   const isVoterValid = voter.team === "Matricole" || voter.team === "Veterani";
   const isRecipientValid = recipient.team === "Matricole" || recipient.team === "Veterani";
 
+  // Didatti&Docenti possono votare ma non essere votati: ogni voto deve andare
+  // a una squadra (Matricole/Veterani), altrimenti non entra in nessuna classifica.
+  if (!isRecipientValid) {
+    return NextResponse.json({ error: "Non puoi votare un Didatta/Docente" }, { status: 400 });
+  }
+
+  let points = 1; // default
+
   // Raddoppia solo se entrambi sono in squadre diverse e valide
-  if (isVoterValid && isRecipientValid && voter.team !== recipient.team) {
+  if (isVoterValid && voter.team !== recipient.team) {
     points = 2;
   }
 

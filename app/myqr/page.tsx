@@ -16,6 +16,7 @@ export default function MyQRPage() {
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name: string; team: string } | null>(null);
+  const [notVotable, setNotVotable] = useState(false);
 
   useEffect(() => {
     const generateQR = async () => {
@@ -38,6 +39,14 @@ export default function MyQRPage() {
           name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
           team: user.team || userTeam || "",
         });
+      }
+
+      // Didatti&Docenti possono votare ma non essere votati: niente QR personale.
+      const team = user?.team || userTeam || "";
+      if (team !== "Matricole" && team !== "Veterani") {
+        setNotVotable(true);
+        setLoading(false);
+        return;
       }
 
       try {
@@ -70,6 +79,21 @@ export default function MyQRPage() {
 
   if (loading) {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
+  }
+
+  if (notVotable) {
+    return (
+      <div style={{ maxWidth: 420, margin: "0 auto", padding: 20, textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
+        <button
+          onClick={() => router.push("/")}
+          style={{ color: "#FF6B35", background: "none", border: "none", fontSize: "1rem", marginBottom: 16, cursor: "pointer" }}
+        >
+          ← Torna alla dashboard
+        </button>
+        <h2 style={{ color: "#1E3A5F", marginBottom: 8 }}>Nessun QR personale</h2>
+        <p style={{ color: "#666" }}>Come Didatta/Docente puoi votare, ma non puoi essere votato: non hai un QR personale da mostrare.</p>
+      </div>
+    );
   }
 
   return (
