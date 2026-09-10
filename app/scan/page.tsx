@@ -19,6 +19,18 @@ function extractCode(raw: string): string {
   return match ? match[1] : raw.trim();
 }
 
+// Rilevamento (parziale: molte app tipo WhatsApp non si distinguono in modo
+// affidabile) del browser "in-app" di alcuni social, che spesso non può
+// proprio accedere alla fotocamera — in quel caso mostriamo un avviso mirato.
+function detectInAppBrowser(): string | null {
+  if (typeof navigator === "undefined") return null;
+  const ua = navigator.userAgent || "";
+  if (/FBAN|FBAV/i.test(ua)) return "Facebook";
+  if (/Instagram/i.test(ua)) return "Instagram";
+  if (/\bLine\//i.test(ua)) return "LINE";
+  return null;
+}
+
 type CameraInfo = { id: string; label: string };
 
 export default function ScanPage() {
@@ -27,9 +39,10 @@ export default function ScanPage() {
   const [error, setError] = useState("");
   const [cameras, setCameras] = useState<CameraInfo[] | null>(null);
   const [loadingCameras, setLoadingCameras] = useState(false);
-  const [showManual, setShowManual] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [manualBusy, setManualBusy] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const inAppBrowser = detectInAppBrowser();
 
   const handleScanResult = async (decodedText: string, userId: string) => {
     // ----- PIN a 4 cifre (fallback manuale per chi non riesce a scansionare) -----
@@ -425,40 +438,66 @@ export default function ScanPage() {
 
       <div id="reader" style={{ width: "100%", marginTop: 20 }}></div>
 
-      <div style={{ marginTop: 28, textAlign: "center" }}>
-        {!showManual ? (
+      <div style={{ marginTop: 28, background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
+        <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: "#1E3A5F" }}>
+          Problemi con la fotocamera? Inserisci il PIN di 4 cifre che leggi sotto il QR code
+        </p>
+        <p style={{ margin: "4px 0 8px", fontSize: "0.75rem", color: "#666" }}>
+          (funziona anche per riscattare un bonus: in quel caso incolla qui il codice/link ricevuto invece del PIN)
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={manualCode}
+            onChange={(e) => setManualCode(e.target.value)}
+            placeholder="1234"
+            style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
+          />
           <button
-            onClick={() => setShowManual(true)}
-            style={{ background: "none", border: "none", color: "#999", fontSize: "0.85rem", cursor: "pointer", textDecoration: "underline" }}
+            onClick={handlePasteFromClipboard}
+            style={{ padding: "0 14px", borderRadius: 8, background: "#e0e0e0", color: "#333", border: "none", fontWeight: 600, cursor: "pointer", fontSize: "0.8rem" }}
           >
-            Problemi con la fotocamera? Inserisci il PIN di 4 cifre che leggi sotto il QR code
+            📋 Incolla
+          </button>
+        </div>
+        <button
+          onClick={handleManualSubmit}
+          disabled={manualBusy || !manualCode.trim()}
+          style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: manualBusy ? "not-allowed" : "pointer" }}
+        >
+          {manualBusy ? "..." : "Conferma"}
+        </button>
+      </div>
+
+      <div style={{ marginTop: 16, textAlign: "center" }}>
+        {!showHelp ? (
+          <button
+            onClick={() => setShowHelp(true)}
+            style={{ background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
+          >
+            La fotocamera non si apre proprio? Istruzioni per sbloccarla
           </button>
         ) : (
-          <div style={{ background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
-            <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>PIN a 4 cifre (o link/codice ricevuto)</label>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={manualCode}
-                onChange={(e) => setManualCode(e.target.value)}
-                placeholder="1234"
-                style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
-              />
-              <button
-                onClick={handlePasteFromClipboard}
-                style={{ padding: "0 14px", borderRadius: 8, background: "#e0e0e0", color: "#333", border: "none", fontWeight: 600, cursor: "pointer", fontSize: "0.8rem" }}
-              >
-                📋 Incolla
-              </button>
-            </div>
-            <button
-              onClick={handleManualSubmit}
-              disabled={manualBusy || !manualCode.trim()}
-              style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: manualBusy ? "not-allowed" : "pointer" }}
-            >
-              {manualBusy ? "..." : "Conferma"}
-            </button>
+          <div style={{ background: "#fff8e1", borderRadius: 12, padding: 16, textAlign: "left", fontSize: "0.82rem", color: "#333", lineHeight: 1.5 }}>
+            {inAppBrowser && (
+              <p style={{ fontWeight: 700, color: "#dc3545", marginTop: 0 }}>
+                Sembra che tu abbia aperto questo link da {inAppBrowser}: il suo browser interno spesso blocca la fotocamera. Tocca i tre puntini o l'icona di condivisione in alto e scegli "Apri nel browser" (Chrome/Safari), poi riprova.
+              </p>
+            )}
+            <p style={{ fontWeight: 700, marginTop: 0 }}>Hai aperto questo link da WhatsApp, Gmail o un'altra app?</p>
+            <p>È la causa più comune: quei browser "interni" spesso non possono accedere alla fotocamera. Tocca i tre puntini (⋮) o l'icona di condivisione in alto e scegli "Apri nel browser", poi riprova da lì.</p>
+
+            <p style={{ fontWeight: 700 }}>iPhone (Safari)</p>
+            <p>Tocca "AA" nella barra dell'indirizzo in alto → Impostazioni sito web → Fotocamera → Consenti. Oppure: Impostazioni del telefono → Safari → Fotocamera → Consenti.</p>
+
+            <p style={{ fontWeight: 700 }}>Android (Chrome)</p>
+            <p>Tocca il lucchetto (o la "i") accanto all'indirizzo → Autorizzazioni → Fotocamera → Consenti. Poi ricarica la pagina.</p>
+
+            <p style={{ fontWeight: 700 }}>Samsung Internet</p>
+            <p>Menu (⋮) → Impostazioni → Siti web e download → Autorizzazioni sito → Fotocamera → cerca questo sito → Consenti.</p>
+
+            <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il PIN qui sopra: vota comunque, senza bisogno della fotocamera.</p>
           </div>
         )}
       </div>

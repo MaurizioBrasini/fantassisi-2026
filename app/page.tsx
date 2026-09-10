@@ -364,7 +364,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
             Ricarica i CBT Coins
           </div>
           <Link href="/scan" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" }}>
-            Scan QR
+            ⚡ Ricarica
           </Link>
         </div>
       </div>
@@ -374,7 +374,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
           Vota i colleghi
         </div>
         <Link href="/scan" style={{ display: "block", padding: 16, borderRadius: 60, textAlign: "center", fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", textDecoration: "none" }}>
-          📷 Scan QR
+          🗳️ Vota
         </Link>
       </div>
 
@@ -605,7 +605,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
             Ricarica i CBT Coins
           </div>
           <Link href="/scan" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" }}>
-            Scan QR
+            ⚡ Ricarica
           </Link>
         </div>
       </div>
@@ -615,7 +615,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
           Vota i colleghi
         </div>
         <Link href="/scan" style={{ display: "block", padding: 16, borderRadius: 60, textAlign: "center", fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", textDecoration: "none" }}>
-          📷 Scan QR
+          🗳️ Vota
         </Link>
       </div>
 
