@@ -9,7 +9,7 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
-const VALID_YEARS = ["1° ANNO 2026", "2° ANNO 2026", "3° ANNO 2026", "4° ANNO 2026"];
+const VALID_YEARS = ["primo", "secondo", "terzo", "quarto"];
 
 type Row = { site: string; points: number; classCount: number; average: number };
 
