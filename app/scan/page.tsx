@@ -367,6 +367,23 @@ export default function ScanPage() {
       </button>
 
       {!scanning && !cameras && (
+        <div style={{ background: "#e8f5e9", border: "2px solid #2E7D32", borderRadius: 16, padding: 18, marginBottom: 20, textAlign: "center" }}>
+          <p style={{ fontWeight: 800, fontSize: "1rem", color: "#1E3A5F", margin: "0 0 8px" }}>
+            📸 Il modo più facile per votare
+          </p>
+          <p style={{ fontSize: "0.9rem", color: "#333", margin: 0, lineHeight: 1.5 }}>
+            Apri la <strong>fotocamera normale del telefono</strong> (quella di sempre, per le foto — non serve questa app) e inquadra il QR della persona che vuoi votare. Si apre da sola una pagina che registra il voto, senza chiedere permessi.
+          </p>
+        </div>
+      )}
+
+      {!scanning && !cameras && (
+        <p style={{ textAlign: "center", color: "#999", fontSize: "0.8rem", margin: "0 0 12px" }}>
+          — oppure, se preferisci restare qui dentro —
+        </p>
+      )}
+
+      {!scanning && !cameras && (
         <button
           onClick={handleAvviaScanner}
           disabled={loadingCameras}
@@ -380,7 +397,7 @@ export default function ScanPage() {
             border: "none",
           }}
         >
-          {loadingCameras ? "Ricerca fotocamere..." : "📷 Avvia Scanner"}
+          {loadingCameras ? "Ricerca fotocamere..." : "📷 Scanner qui dentro (chiede il permesso fotocamera)"}
         </button>
       )}
 
@@ -449,7 +466,10 @@ export default function ScanPage() {
           >
             Sblocca l'accesso dal browser
           </button>
-          {" "}oppure inserisci il PIN qui sotto (o il codice, se devi riscattare un bonus):
+          {" "}oppure vota senza fotocamera: chiedi il PIN alla persona che vuoi votare (ce l'ha scritto sotto il suo QR) e scrivilo qui sotto.
+        </p>
+        <p style={{ margin: "0 0 8px", fontSize: "0.78rem", fontWeight: 700, color: "#dc3545" }}>
+          ⚠️ È il PIN della persona che vuoi votare, non il tuo!
         </p>
 
         <div style={{ display: "flex", gap: 8 }}>
@@ -458,7 +478,7 @@ export default function ScanPage() {
             inputMode="numeric"
             value={manualCode}
             onChange={(e) => setManualCode(e.target.value)}
-            placeholder="1234"
+            placeholder="PIN di chi vuoi votare"
             style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
           />
           <button
@@ -468,6 +488,9 @@ export default function ScanPage() {
             📋 Incolla
           </button>
         </div>
+        <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "#999" }}>
+          (oppure il codice del bonus, se devi riscattarne uno)
+        </p>
         <button
           onClick={handleManualSubmit}
           disabled={manualBusy || !manualCode.trim()}

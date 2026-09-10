@@ -21,6 +21,7 @@ export async function POST(request: Request) {
 
   // Fallback per chi non riesce a scansionare: PIN a 4 cifre stampato sotto
   // il proprio QR, risolto qui allo stesso id del destinatario.
+  const votingViaPin = !bodyRecipientId && !!pin;
   let recipientId = bodyRecipientId;
   if (!recipientId && pin) {
     const { data: byPin } = await supabase.from("users").select("id").eq("pin", String(pin)).maybeSingle();
@@ -31,7 +32,12 @@ export async function POST(request: Request) {
   }
 
   if (recipientId === voterId) {
-    return NextResponse.json({ error: "Non puoi votare te stesso" }, { status: 400 });
+    // Errore frequente in collaudo: la gente inserisce il PROPRIO PIN invece
+    // di quello della persona che vuole votare. Messaggio mirato per questo caso.
+    const message = votingViaPin
+      ? "Hai inserito il TUO PIN. Devi inserire il PIN della persona che vuoi votare, non il tuo."
+      : "Non puoi votare te stesso";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   const [{ data: voter }, { data: recipient }] = await Promise.all([
