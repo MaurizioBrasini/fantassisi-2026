@@ -18,6 +18,9 @@ export default function ScanPage() {
   const [error, setError] = useState("");
   const [cameras, setCameras] = useState<CameraInfo[] | null>(null);
   const [loadingCameras, setLoadingCameras] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [manualCode, setManualCode] = useState("");
+  const [manualBusy, setManualBusy] = useState(false);
 
   const handleScanResult = async (decodedText: string, userId: string) => {
     // ----- EVENTO (legacy) -----
@@ -271,6 +274,26 @@ export default function ScanPage() {
     }
   };
 
+  const handleManualSubmit = async () => {
+    const userId = getCookie("user_id");
+    if (!userId) {
+      alert("Accesso non valido. Usa il link personale.");
+      router.push("/");
+      return;
+    }
+    const code = manualCode.trim();
+    if (!code) return;
+    setManualBusy(true);
+    try {
+      await handleScanResult(code, userId);
+    } catch (err: any) {
+      console.error("Errore dopo l'inserimento manuale:", err);
+      setError("Errore: " + (err?.message || String(err)));
+    } finally {
+      setManualBusy(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 420, margin: "0 auto", padding: 20 }}>
       <button
@@ -357,6 +380,35 @@ export default function ScanPage() {
       )}
 
       <div id="reader" style={{ width: "100%", marginTop: 20 }}></div>
+
+      <div style={{ marginTop: 28, textAlign: "center" }}>
+        {!showManual ? (
+          <button
+            onClick={() => setShowManual(true)}
+            style={{ background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Non riesci a scansionare? Inserisci il codice a mano
+          </button>
+        ) : (
+          <div style={{ background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
+            <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>Codice</label>
+            <input
+              type="text"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="Incolla o digita il codice"
+              style={{ width: "100%", padding: 10, marginTop: 4, borderRadius: 8, border: "1px solid #ccc" }}
+            />
+            <button
+              onClick={handleManualSubmit}
+              disabled={manualBusy || !manualCode.trim()}
+              style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: manualBusy ? "not-allowed" : "pointer" }}
+            >
+              {manualBusy ? "..." : "Conferma"}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

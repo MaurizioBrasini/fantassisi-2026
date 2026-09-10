@@ -17,6 +17,8 @@ export default function MyQRPage() {
   const [noAccess, setNoAccess] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name: string; team: string } | null>(null);
   const [notVotable, setNotVotable] = useState(false);
+  const [myId, setMyId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const generateQR = async () => {
@@ -49,6 +51,8 @@ export default function MyQRPage() {
         return;
       }
 
+      setMyId(userId);
+
       try {
         const qr = await QRCode.toDataURL(userId, {
           width: 300,
@@ -71,6 +75,17 @@ export default function MyQRPage() {
     link.href = qrDataUrl;
     link.download = `QR_${userInfo.name.replace(/\s+/g, "_")}.png`;
     link.click();
+  };
+
+  const handleCopyCode = async () => {
+    if (!myId) return;
+    try {
+      await navigator.clipboard.writeText(myId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard non disponibile: l'utente può comunque selezionare il testo a mano.
+    }
   };
 
   if (noAccess) {
@@ -132,6 +147,23 @@ export default function MyQRPage() {
           >
             ⬇️ Scarica QR
           </button>
+
+          {myId && (
+            <div style={{ marginTop: 24, padding: 16, background: "#f8f9fa", borderRadius: 12 }}>
+              <p style={{ fontSize: "0.8rem", color: "#666", marginBottom: 8 }}>
+                Se chi ti vuole votare non riesce a scansionare il QR, può inserire questo codice a mano nella pagina "Vota":
+              </p>
+              <code style={{ display: "block", wordBreak: "break-all", fontSize: "0.85rem", color: "#1E3A5F", background: "white", padding: 10, borderRadius: 8, border: "1px solid #ddd" }}>
+                {myId}
+              </code>
+              <button
+                onClick={handleCopyCode}
+                style={{ marginTop: 10, padding: "8px 16px", borderRadius: 60, background: "#e0e0e0", color: "#333", border: "none", fontWeight: 600, cursor: "pointer", fontSize: "0.8rem" }}
+              >
+                {copied ? "✅ Copiato" : "📋 Copia codice"}
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <p>Errore nella generazione del QR</p>
