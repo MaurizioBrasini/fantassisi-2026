@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useState, useRef } from "react";
+import jsQR from "jsqr";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -19,14 +19,45 @@ function extractCode(raw: string): string {
   return match ? match[1] : raw.trim();
 }
 
-type CameraInfo = { id: string; label: string };
+// Decodifica un QR da una foto scattata con la fotocamera nativa del
+// telefono. Usiamo l'acquisizione foto (input file con capture) invece dello
+// streaming video in-pagina: la schermata di scatto è quella vera del
+// sistema operativo, molto più affidabile su dispositivi/browser dove
+// l'accesso "live" alla fotocamera dentro il browser è inconsistente
+// (fotocamera sbagliata, permesso negato, ecc. — soprattutto su iPhone
+// datati e alcuni Android).
+function decodeQRFromFile(file: File): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      resolve(code ? code.data : null);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Impossibile leggere la foto"));
+    };
+    img.src = url;
+  });
+}
 
 export default function ScanPage() {
   const router = useRouter();
-  const [scanning, setScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
-  const [cameras, setCameras] = useState<CameraInfo[] | null>(null);
-  const [loadingCameras, setLoadingCameras] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [manualBusy, setManualBusy] = useState(false);
@@ -170,57 +201,22 @@ export default function ScanPage() {
     router.push("/");
   };
 
-  // Prova ad avviare la fotocamera (per id specifico, o per vincolo
-  // facingMode). Ritorna true se ci riesce, false se non è utilizzabile
-  // (es. NotReadableError su alcuni obiettivi secondari, o vincolo non
-  // supportato dal dispositivo).
-  const tryStartCamera = async (cameraIdOrConfig: string | MediaTrackConstraints): Promise<boolean> => {
+  const handleAvviaScanner = () => {
     const userId = getCookie("user_id");
-    if (!userId) return false;
-
-    const scanner = new Html5Qrcode("reader");
-    try {
-      await scanner.start(
-        cameraIdOrConfig,
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        async (decodedText) => {
-          try {
-            await scanner.stop();
-            scanner.clear();
-          } catch (stopErr) {
-            console.error("Errore fermando lo scanner:", stopErr);
-          }
-          setScanning(false);
-          try {
-            await handleScanResult(extractCode(decodedText), userId);
-          } catch (err: any) {
-            console.error("Errore dopo la scansione:", err);
-            setError("Errore dopo la scansione: " + (err?.message || String(err)));
-          }
-        },
-        () => {
-          // Chiamato a ogni fotogramma senza QR rilevato: normale, si ignora.
-        }
-      );
-      return true;
-    } catch (err) {
-      console.error("Fotocamera non disponibile:", cameraIdOrConfig, err);
-      return false;
+    if (!userId) {
+      alert("Accesso non valido. Usa il link personale.");
+      router.push("/");
+      return;
     }
-  };
-
-  const startScanWithCamera = async (cameraId: string) => {
-    setCameras(null);
-    setScanning(true);
     setError("");
-    const ok = await tryStartCamera(cameraId);
-    if (!ok) {
-      setScanning(false);
-      setError("Impossibile avviare questa fotocamera. Riprova o scegline un'altra.");
-    }
+    fileInputRef.current?.click();
   };
 
-  const handleAvviaScanner = async () => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permette di riselezionare la stessa foto in un secondo tentativo
+    if (!file) return;
+
     const userId = getCookie("user_id");
     if (!userId) {
       alert("Accesso non valido. Usa il link personale.");
@@ -229,57 +225,19 @@ export default function ScanPage() {
     }
 
     setError("");
-    setLoadingCameras(true);
-    setScanning(true);
-
-    // 1. Prova diretta con vincolo facingMode "environment": è il browser/
-    //    l'hardware a scegliere la fotocamera posteriore corretta, molto più
-    //    affidabile che leggere l'etichetta testuale della fotocamera (che
-    //    varia per marca/lingua del dispositivo e su molti Android non
-    //    contiene affatto "back"/"rear", facendo scegliere per sbaglio la
-    //    fotocamera anteriore/selfie).
-    if (await tryStartCamera({ facingMode: { exact: "environment" } })) {
-      setLoadingCameras(false);
-      return;
-    }
-    if (await tryStartCamera({ facingMode: "environment" })) {
-      setLoadingCameras(false);
-      return;
-    }
-
-    // 2. Fallback: enumera le fotocamere disponibili e prova quelle il cui
-    //    nome sembra indicare la posteriore, poi tutte le altre.
-    let found: CameraInfo[] = [];
+    setProcessing(true);
     try {
-      found = await Html5Qrcode.getCameras();
+      const decoded = await decodeQRFromFile(file);
+      if (!decoded) {
+        setError("Nessun QR trovato nella foto. Riprova inquadrando meglio il codice.");
+        return;
+      }
+      await handleScanResult(extractCode(decoded), userId);
     } catch (err: any) {
-      setLoadingCameras(false);
-      setScanning(false);
-      setError("Impossibile accedere alla fotocamera: " + (err?.message || String(err)));
-      return;
-    }
-    setLoadingCameras(false);
-
-    if (!found || found.length === 0) {
-      setScanning(false);
-      setError("Nessuna fotocamera trovata sul dispositivo");
-      return;
-    }
-
-    const backCameras = found.filter((c) => /back|rear|environment/i.test(c.label));
-    const candidates = backCameras.length > 0 ? backCameras : found;
-
-    for (const cam of candidates) {
-      const ok = await tryStartCamera(cam.id);
-      if (ok) return;
-    }
-
-    // Nessun tentativo automatico ha funzionato: lascia scegliere a mano.
-    setScanning(false);
-    if (found.length > 1) {
-      setCameras(found);
-    } else {
-      setError("Impossibile avviare la fotocamera disponibile sul dispositivo.");
+      console.error("Errore dopo la scansione:", err);
+      setError("Errore: " + (err?.message || String(err)));
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -327,77 +285,39 @@ export default function ScanPage() {
         ← Torna alla dashboard
       </button>
 
-      {!scanning && !cameras && (
-        <button
-          onClick={handleAvviaScanner}
-          disabled={loadingCameras}
-          style={{
-            width: "100%",
-            padding: 14,
-            borderRadius: 60,
-            fontWeight: 600,
-            background: "#FF6B35",
-            color: "white",
-            border: "none",
-          }}
-        >
-          {loadingCameras ? "Ricerca fotocamere..." : "📷 Avvia Scanner"}
-        </button>
-      )}
+      {/* Input nascosto: "capture" apre direttamente la fotocamera nativa
+          del telefono (non uno streaming dentro la pagina) */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileChange}
+        style={{ display: "none" }}
+      />
 
-      {cameras && !scanning && (
-        <div>
-          <p style={{ textAlign: "center", color: "#1E3A5F", fontWeight: 600 }}>
-            Scegli la fotocamera da usare:
-          </p>
-          {cameras.map((cam) => (
-            <button
-              key={cam.id}
-              onClick={() => startScanWithCamera(cam.id)}
-              style={{
-                width: "100%",
-                padding: 12,
-                marginBottom: 8,
-                borderRadius: 10,
-                fontWeight: 600,
-                background: "#f0f0f0",
-                color: "#1E3A5F",
-                border: "1px solid #ccc",
-              }}
-            >
-              {cam.label || "Fotocamera senza nome"}
-            </button>
-          ))}
-          <button
-            onClick={() => setCameras(null)}
-            style={{
-              width: "100%",
-              padding: 10,
-              marginTop: 4,
-              background: "none",
-              color: "#999",
-              border: "none",
-              textDecoration: "underline",
-            }}
-          >
-            Annulla
-          </button>
-        </div>
-      )}
-
-      {scanning && (
-        <p style={{ textAlign: "center", color: "#1E3A5F" }}>
-          Scanner attivo... Inquadra un QR
-        </p>
-      )}
+      <button
+        onClick={handleAvviaScanner}
+        disabled={processing}
+        style={{
+          width: "100%",
+          padding: 14,
+          borderRadius: 60,
+          fontWeight: 600,
+          background: "#FF6B35",
+          color: "white",
+          border: "none",
+          cursor: processing ? "not-allowed" : "pointer",
+        }}
+      >
+        {processing ? "Elaborazione..." : "📷 Avvia Scanner"}
+      </button>
 
       {error && (
         <p style={{ color: "red", textAlign: "center", marginTop: 16 }}>
           {error}
         </p>
       )}
-
-      <div id="reader" style={{ width: "100%", marginTop: 20 }}></div>
 
       <div style={{ marginTop: 28, textAlign: "center" }}>
         {!showManual ? (
