@@ -440,11 +440,18 @@ export default function ScanPage() {
 
       <div style={{ marginTop: 28, background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
         <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: "#1E3A5F" }}>
-          Problemi con la fotocamera? Inserisci il PIN di 4 cifre che leggi sotto il QR code
+          Problemi con la fotocamera?
         </p>
-        <p style={{ margin: "4px 0 8px", fontSize: "0.75rem", color: "#666" }}>
-          (funziona anche per riscattare un bonus: in quel caso incolla qui il codice/link ricevuto invece del PIN)
+        <p style={{ margin: "4px 0 12px", fontSize: "0.82rem", color: "#333" }}>
+          <button
+            onClick={() => setShowHelp(!showHelp)}
+            style={{ background: "none", border: "none", color: "#FF6B35", fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "0.82rem" }}
+          >
+            Sblocca l'accesso dal browser
+          </button>
+          {" "}oppure inserisci il PIN qui sotto (o il codice, se devi riscattare un bonus):
         </p>
+
         <div style={{ display: "flex", gap: 8 }}>
           <input
             type="text"
@@ -468,18 +475,9 @@ export default function ScanPage() {
         >
           {manualBusy ? "..." : "Conferma"}
         </button>
-      </div>
 
-      <div style={{ marginTop: 16, textAlign: "center" }}>
-        {!showHelp ? (
-          <button
-            onClick={() => setShowHelp(true)}
-            style={{ background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
-          >
-            La fotocamera non si apre proprio? Istruzioni per sbloccarla
-          </button>
-        ) : (
-          <div style={{ background: "#fff8e1", borderRadius: 12, padding: 16, textAlign: "left", fontSize: "0.82rem", color: "#333", lineHeight: 1.5 }}>
+        {showHelp && (
+          <div style={{ marginTop: 16, background: "#fff8e1", borderRadius: 12, padding: 16, fontSize: "0.82rem", color: "#333", lineHeight: 1.5 }}>
             {inAppBrowser && (
               <p style={{ fontWeight: 700, color: "#dc3545", marginTop: 0 }}>
                 Sembra che tu abbia aperto questo link da {inAppBrowser}: il suo browser interno spesso blocca la fotocamera. Tocca i tre puntini o l'icona di condivisione in alto e scegli "Apri nel browser" (Chrome/Safari), poi riprova.
