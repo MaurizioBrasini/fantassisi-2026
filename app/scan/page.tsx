@@ -42,6 +42,7 @@ export default function ScanPage() {
   const [manualCode, setManualCode] = useState("");
   const [manualBusy, setManualBusy] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [helpChoice, setHelpChoice] = useState<"permessi" | "fotocamera" | null>(null);
   const inAppBrowser = detectInAppBrowser();
 
   const handleScanResult = async (decodedText: string, userId: string) => {
@@ -367,23 +368,6 @@ export default function ScanPage() {
       </button>
 
       {!scanning && !cameras && (
-        <div style={{ background: "#e8f5e9", border: "2px solid #2E7D32", borderRadius: 16, padding: 18, marginBottom: 20, textAlign: "center" }}>
-          <p style={{ fontWeight: 800, fontSize: "1rem", color: "#1E3A5F", margin: "0 0 8px" }}>
-            📸 Il modo più facile per votare
-          </p>
-          <p style={{ fontSize: "0.9rem", color: "#333", margin: 0, lineHeight: 1.5 }}>
-            Apri la <strong>fotocamera normale del telefono</strong> (quella di sempre, per le foto — non serve questa app) e inquadra il QR della persona che vuoi votare. Si apre da sola una pagina che registra il voto, senza chiedere permessi.
-          </p>
-        </div>
-      )}
-
-      {!scanning && !cameras && (
-        <p style={{ textAlign: "center", color: "#999", fontSize: "0.8rem", margin: "0 0 12px" }}>
-          — oppure, se preferisci restare qui dentro —
-        </p>
-      )}
-
-      {!scanning && !cameras && (
         <button
           onClick={handleAvviaScanner}
           disabled={loadingCameras}
@@ -391,13 +375,14 @@ export default function ScanPage() {
             width: "100%",
             padding: 14,
             borderRadius: 60,
-            fontWeight: 600,
+            fontWeight: 700,
             background: "#FF6B35",
             color: "white",
             border: "none",
+            fontSize: "1rem",
           }}
         >
-          {loadingCameras ? "Ricerca fotocamere..." : "📷 Scanner qui dentro (chiede il permesso fotocamera)"}
+          {loadingCameras ? "Ricerca fotocamere..." : "📷 Scan QR Code"}
         </button>
       )}
 
@@ -455,73 +440,109 @@ export default function ScanPage() {
 
       <div id="reader" style={{ width: "100%", marginTop: 20 }}></div>
 
-      <div style={{ marginTop: 28, background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
-        <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: 600, color: "#1E3A5F" }}>
-          Problemi con la fotocamera?
-        </p>
-        <p style={{ margin: "4px 0 12px", fontSize: "0.82rem", color: "#333" }}>
+      {/* ── Non funziona? ─────────────────────────────────────── */}
+      {!scanning && (
+        <div style={{ marginTop: 24, textAlign: "center" }}>
           <button
-            onClick={() => setShowHelp(!showHelp)}
-            style={{ background: "none", border: "none", color: "#FF6B35", fontWeight: 700, cursor: "pointer", textDecoration: "underline", padding: 0, fontSize: "0.82rem" }}
+            onClick={() => { setShowHelp(!showHelp); if (showHelp) setHelpChoice(null); }}
+            style={{ background: "none", border: "none", color: "#FF6B35", fontWeight: 700, cursor: "pointer", fontSize: "0.9rem", padding: 0 }}
           >
-            Sblocca l'accesso dal browser
+            {showHelp ? "▲" : "▼"} Non funziona?
           </button>
-          {" "}oppure vota senza fotocamera: chiedi il PIN alla persona che vuoi votare (ce l'ha scritto sotto il suo QR) e scrivilo qui sotto.
-        </p>
-        <p style={{ margin: "0 0 8px", fontSize: "0.78rem", fontWeight: 700, color: "#dc3545" }}>
-          ⚠️ È il PIN della persona che vuoi votare, non il tuo!
-        </p>
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={manualCode}
-            onChange={(e) => setManualCode(e.target.value)}
-            placeholder="PIN di chi vuoi votare"
-            style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
-          />
+          {showHelp && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => setHelpChoice(helpChoice === "permessi" ? null : "permessi")}
+                  style={{ flex: 1, padding: 10, borderRadius: 10, fontWeight: 600, fontSize: "0.8rem", background: helpChoice === "permessi" ? "#1E3A5F" : "#f0f0f0", color: helpChoice === "permessi" ? "white" : "#1E3A5F", border: "1px solid #ccc", cursor: "pointer" }}
+                >
+                  🔓 Sblocca permessi fotocamera
+                </button>
+                <button
+                  onClick={() => setHelpChoice(helpChoice === "fotocamera" ? null : "fotocamera")}
+                  style={{ flex: 1, padding: 10, borderRadius: 10, fontWeight: 600, fontSize: "0.8rem", background: helpChoice === "fotocamera" ? "#1E3A5F" : "#f0f0f0", color: helpChoice === "fotocamera" ? "white" : "#1E3A5F", border: "1px solid #ccc", cursor: "pointer" }}
+                >
+                  📸 Usa la fotocamera del telefono
+                </button>
+              </div>
+
+              {helpChoice === "permessi" && (
+                <div style={{ marginTop: 12, background: "#fff8e1", borderRadius: 12, padding: 16, fontSize: "0.82rem", color: "#333", lineHeight: 1.5, textAlign: "left" }}>
+                  {inAppBrowser && (
+                    <p style={{ fontWeight: 700, color: "#dc3545", marginTop: 0 }}>
+                      Sembra che tu abbia aperto questo link da {inAppBrowser}: il suo browser interno spesso blocca la fotocamera. Tocca i tre puntini o l'icona di condivisione in alto e scegli "Apri nel browser" (Chrome/Safari), poi riprova.
+                    </p>
+                  )}
+                  <p style={{ fontWeight: 700, marginTop: 0 }}>Hai aperto questo link da WhatsApp, Gmail o un'altra app?</p>
+                  <p>È la causa più comune: quei browser "interni" spesso non possono accedere alla fotocamera. Tocca i tre puntini (⋮) o l'icona di condivisione in alto e scegli "Apri nel browser", poi riprova da lì.</p>
+
+                  <p style={{ fontWeight: 700 }}>iPhone (Safari)</p>
+                  <p>Tocca "AA" nella barra dell'indirizzo in alto → Impostazioni sito web → Fotocamera → Consenti. Oppure: Impostazioni del telefono → Safari → Fotocamera → Consenti.</p>
+
+                  <p style={{ fontWeight: 700 }}>Android (Chrome)</p>
+                  <p>Tocca il lucchetto (o la "i") accanto all'indirizzo → Autorizzazioni → Fotocamera → Consenti. Poi ricarica la pagina.</p>
+
+                  <p style={{ fontWeight: 700 }}>Samsung Internet</p>
+                  <p>Menu (⋮) → Impostazioni → Siti web e download → Autorizzazioni sito → Fotocamera → cerca questo sito → Consenti.</p>
+
+                  <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il PIN qui sotto: vota comunque, senza bisogno della fotocamera.</p>
+                </div>
+              )}
+
+              {helpChoice === "fotocamera" && (
+                <div style={{ marginTop: 12, background: "#e8f5e9", border: "2px solid #2E7D32", borderRadius: 12, padding: 16, fontSize: "0.85rem", color: "#333", lineHeight: 1.5, textAlign: "left" }}>
+                  <p style={{ margin: 0 }}>
+                    Apri la <strong>fotocamera normale del telefono</strong> (quella di sempre, per le foto — non serve questa app) e inquadra il QR della persona che vuoi votare. Si apre da sola una pagina che registra il voto, senza chiedere nessun permesso.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Vota col PIN ──────────────────────────────────────── */}
+      {!scanning && (
+        <div style={{ marginTop: 20, background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "0.9rem", fontWeight: 700, color: "#1E3A5F" }}>
+            🔢 Vota col PIN
+          </p>
+          <p style={{ margin: "0 0 4px", fontSize: "0.8rem", color: "#333" }}>
+            Inserisci il PIN della persona che vuoi votare (ce l'ha scritto sotto il suo QR):
+          </p>
+          <p style={{ margin: "0 0 10px", fontSize: "0.76rem", fontWeight: 700, color: "#dc3545" }}>
+            ⚠️ È il PIN di chi vuoi votare, non il tuo!
+          </p>
+
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="PIN di chi vuoi votare"
+              style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
+            />
+            <button
+              onClick={handlePasteFromClipboard}
+              style={{ padding: "0 14px", borderRadius: 8, background: "#e0e0e0", color: "#333", border: "none", fontWeight: 600, cursor: "pointer", fontSize: "0.8rem" }}
+            >
+              📋 Incolla
+            </button>
+          </div>
+          <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "#999" }}>
+            (oppure il codice del bonus, se devi riscattarne uno)
+          </p>
           <button
-            onClick={handlePasteFromClipboard}
-            style={{ padding: "0 14px", borderRadius: 8, background: "#e0e0e0", color: "#333", border: "none", fontWeight: 600, cursor: "pointer", fontSize: "0.8rem" }}
+            onClick={handleManualSubmit}
+            disabled={manualBusy || !manualCode.trim()}
+            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: manualBusy ? "not-allowed" : "pointer" }}
           >
-            📋 Incolla
+            {manualBusy ? "..." : "Conferma"}
           </button>
         </div>
-        <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "#999" }}>
-          (oppure il codice del bonus, se devi riscattarne uno)
-        </p>
-        <button
-          onClick={handleManualSubmit}
-          disabled={manualBusy || !manualCode.trim()}
-          style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: manualBusy ? "not-allowed" : "pointer" }}
-        >
-          {manualBusy ? "..." : "Conferma"}
-        </button>
-
-        {showHelp && (
-          <div style={{ marginTop: 16, background: "#fff8e1", borderRadius: 12, padding: 16, fontSize: "0.82rem", color: "#333", lineHeight: 1.5 }}>
-            {inAppBrowser && (
-              <p style={{ fontWeight: 700, color: "#dc3545", marginTop: 0 }}>
-                Sembra che tu abbia aperto questo link da {inAppBrowser}: il suo browser interno spesso blocca la fotocamera. Tocca i tre puntini o l'icona di condivisione in alto e scegli "Apri nel browser" (Chrome/Safari), poi riprova.
-              </p>
-            )}
-            <p style={{ fontWeight: 700, marginTop: 0 }}>Hai aperto questo link da WhatsApp, Gmail o un'altra app?</p>
-            <p>È la causa più comune: quei browser "interni" spesso non possono accedere alla fotocamera. Tocca i tre puntini (⋮) o l'icona di condivisione in alto e scegli "Apri nel browser", poi riprova da lì.</p>
-
-            <p style={{ fontWeight: 700 }}>iPhone (Safari)</p>
-            <p>Tocca "AA" nella barra dell'indirizzo in alto → Impostazioni sito web → Fotocamera → Consenti. Oppure: Impostazioni del telefono → Safari → Fotocamera → Consenti.</p>
-
-            <p style={{ fontWeight: 700 }}>Android (Chrome)</p>
-            <p>Tocca il lucchetto (o la "i") accanto all'indirizzo → Autorizzazioni → Fotocamera → Consenti. Poi ricarica la pagina.</p>
-
-            <p style={{ fontWeight: 700 }}>Samsung Internet</p>
-            <p>Menu (⋮) → Impostazioni → Siti web e download → Autorizzazioni sito → Fotocamera → cerca questo sito → Consenti.</p>
-
-            <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il PIN qui sopra: vota comunque, senza bisogno della fotocamera.</p>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
