@@ -47,6 +47,9 @@ export default function ScanPage() {
 
   const handleScanResult = async (decodedText: string, userId: string) => {
     // ----- PIN a 4 cifre (fallback manuale per chi non riesce a scansionare) -----
+    // Prova prima come PIN personale (vota una persona). Se non corrisponde a
+    // nessuno, potrebbe essere il PIN stampato sotto un QR di squadra/classe/
+    // bonus: in quel caso /api/qr/redeem lo risolve allo stesso modo del QR.
     if (/^\d{4}$/.test(decodedText)) {
       const res = await fetch("/api/vote", {
         method: "POST",
@@ -54,12 +57,33 @@ export default function ScanPage() {
         body: JSON.stringify({ pin: decodedText }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (res.ok) {
+        alert(`✅ +${data.points} punti!`);
+        router.push("/");
+        return;
+      }
+      if (data.error !== "PIN non valido") {
         alert(data.error || "Errore nel voto");
         router.push("/");
         return;
       }
-      alert(`✅ +${data.points} punti!`);
+
+      const res2 = await fetch("/api/qr/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: decodedText }),
+      });
+      const data2 = await res2.json();
+      if (!res2.ok) {
+        alert(data2.error || "PIN non valido");
+        router.push("/");
+        return;
+      }
+      if (data2.type === "bonus") {
+        alert(`⚡ +${data2.amount} CBTcoin extra!`);
+      } else {
+        alert(data2.message || "QR riscattato con successo!");
+      }
       router.push("/");
       return;
     }

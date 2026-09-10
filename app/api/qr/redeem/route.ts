@@ -4,79 +4,42 @@ import { getVerifiedUserId } from "@/lib/session";
 import { startOfTodayInRomeISO } from "@/lib/utils";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 
-// Sistema QR unificato: un unico endpoint per riscattare un codice, che sia
-// un bonus (bonus_qr.code) o un voto/evento (votable_events.qr_code) —
-// stessa logica di /api/bonus-redeem e /api/event-vote, dispatchata in base
-// a dove il codice viene trovato.
-export async function POST(request: Request) {
-  const userId = getVerifiedUserId();
-  if (!userId) {
-    return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
+async function redeemBonus(supabase: any, userId: string, bonus: any) {
+  if (bonus.active === false) {
+    return NextResponse.json({ error: "Questo QR bonus non è più attivo" }, { status: 403 });
   }
 
-  const { code } = await request.json();
-  if (!code) {
-    return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
+  const now = new Date();
+  if (bonus.valid_from && new Date(bonus.valid_from) > now) {
+    return NextResponse.json({ error: "Questo bonus non è ancora attivo" }, { status: 403 });
+  }
+  if (bonus.valid_to && new Date(bonus.valid_to) < now) {
+    return NextResponse.json({ error: "Questo bonus è scaduto" }, { status: 403 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const { count: redemptionCount } = await supabase
+    .from("bonus_redemptions")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("bonus_id", bonus.id);
 
-  // --- 1. Prova come bonus ---
-  const { data: bonus } = await supabase
-    .from("bonus_qr")
-    .select("*")
-    .eq("code", code)
-    .maybeSingle();
-
-  if (bonus) {
-    if (bonus.active === false) {
-      return NextResponse.json({ error: "Questo QR bonus non è più attivo" }, { status: 403 });
-    }
-
-    const now = new Date();
-    if (bonus.valid_from && new Date(bonus.valid_from) > now) {
-      return NextResponse.json({ error: "Questo bonus non è ancora attivo" }, { status: 403 });
-    }
-    if (bonus.valid_to && new Date(bonus.valid_to) < now) {
-      return NextResponse.json({ error: "Questo bonus è scaduto" }, { status: 403 });
-    }
-
-    const { count: redemptionCount } = await supabase
-      .from("bonus_redemptions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("bonus_id", bonus.id);
-
-    const maxUses = bonus.max_uses_per_user ?? 1;
-    if ((redemptionCount || 0) >= maxUses) {
-      return NextResponse.json({ error: "Hai già riscattato questo bonus il numero massimo di volte consentito" }, { status: 409 });
-    }
-
-    const { error } = await supabase
-      .from("bonus_redemptions")
-      .insert({ user_id: userId, bonus_id: bonus.id });
-
-    if (error) {
-      return NextResponse.json({ error: "Errore nel riscatto del bonus" }, { status: 500 });
-    }
-
-    return NextResponse.json({ type: "bonus", amount: bonus.amount, title: bonus.title });
+  const maxUses = bonus.max_uses_per_user ?? 1;
+  if ((redemptionCount || 0) >= maxUses) {
+    return NextResponse.json({ error: "Hai già riscattato questo bonus il numero massimo di volte consentito" }, { status: 409 });
   }
 
-  // --- 2. Prova come evento/voto ---
-  const { data: event } = await supabase
-    .from("votable_events")
-    .select("*")
-    .eq("qr_code", code)
-    .maybeSingle();
+  const { error } = await supabase
+    .from("bonus_redemptions")
+    .insert({ user_id: userId, bonus_id: bonus.id });
 
-  if (!event) {
-    return NextResponse.json({ error: "QR non valido o già utilizzato" }, { status: 404 });
+  if (error) {
+    return NextResponse.json({ error: "Errore nel riscatto del bonus" }, { status: 500 });
   }
 
+  return NextResponse.json({ type: "bonus", amount: bonus.amount, title: bonus.title });
+}
+
+async function redeemEvent(supabase: any, userId: string, event: any) {
   if (event.active === false) {
     return NextResponse.json({ error: "Questo QR non è più attivo" }, { status: 403 });
   }
@@ -153,4 +116,45 @@ export async function POST(request: Request) {
     targets: event.team_target ? [event.team_target] : [],
     message,
   });
+}
+
+// Sistema QR unificato: un unico endpoint per riscattare un codice (bonus_qr.code
+// o votable_events.qr_code), oppure lo stesso evento/bonus tramite il PIN a 4
+// cifre stampato sotto il QR (fallback voto senza fotocamera, stesso principio
+// del PIN personale — quello resta gestito da /api/vote, che lo controlla per
+// primo lato client; questo endpoint copre solo eventi/bonus).
+export async function POST(request: Request) {
+  const userId = getVerifiedUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
+  }
+
+  const { code, pin } = await request.json();
+  if (!code && !pin) {
+    return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const bonusColumn = code ? "code" : "pin";
+  const eventColumn = code ? "qr_code" : "pin";
+  const lookupValue = code || pin;
+
+  const { data: bonus } = await supabase.from("bonus_qr").select("*").eq(bonusColumn, lookupValue).maybeSingle();
+  if (bonus) {
+    return redeemBonus(supabase, userId, bonus);
+  }
+
+  const { data: event } = await supabase.from("votable_events").select("*").eq(eventColumn, lookupValue).maybeSingle();
+  if (event) {
+    return redeemEvent(supabase, userId, event);
+  }
+
+  return NextResponse.json(
+    { error: pin ? "PIN non valido" : "QR non valido o già utilizzato" },
+    { status: 404 }
+  );
 }

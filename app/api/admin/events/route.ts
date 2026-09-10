@@ -1,11 +1,30 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { generateUniquePins } from "@/lib/utils";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+// Un PIN a 4 cifre (fallback voto/riscatto senza fotocamera, come per il QR
+// personale) deve essere univoco su tutto lo spazio PIN, non solo nella
+// propria tabella: altrimenti lo stesso PIN potrebbe risolvere in modo
+// ambiguo a una persona, un evento o un bonus diversi.
+async function generatePin(): Promise<string> {
+  const [{ data: userPins }, { data: eventPins }, { data: bonusPins }] = await Promise.all([
+    supabase.from("users").select("pin").not("pin", "is", null),
+    supabase.from("votable_events").select("pin").not("pin", "is", null),
+    supabase.from("bonus_qr").select("pin").not("pin", "is", null),
+  ]);
+  const used = new Set<string>([
+    ...(userPins || []).map((u: any) => u.pin as string),
+    ...(eventPins || []).map((e: any) => e.pin as string),
+    ...(bonusPins || []).map((b: any) => b.pin as string),
+  ]);
+  return generateUniquePins(1, used)[0];
+}
 
 // POST: crea un QR voto (squadra o classe) — solo admin
 export async function POST(request: Request) {
@@ -19,6 +38,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Dati mancanti" }, { status: 400 });
   }
 
+  const pin = await generatePin();
+
   const { data, error } = await supabase
     .from("votable_events")
     .insert({
@@ -29,6 +50,7 @@ export async function POST(request: Request) {
       class_site: class_site || null,
       class_year: class_year || null,
       qr_code,
+      pin,
       active: true,
     })
     .select()

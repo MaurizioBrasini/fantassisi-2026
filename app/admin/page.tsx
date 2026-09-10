@@ -15,13 +15,59 @@ function teamFromYear(year: string): string {
   return CONFIG_ISCRIZIONE.teamAnniValid['Matricole'].includes(year) ? "Matricole" : "Veterani";
 }
 
-async function downloadQR(code: string, label: string) {
+// Compone QR + PIN in un'unica immagine scaricabile, stesso schema usato per
+// il QR personale (myqr): chi non riesce a scansionare può comunque votare/
+// riscattare inserendo a mano il PIN stampato sotto.
+function buildQrWithPin(qrDataUrl: string, pin?: string | null): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!pin) { resolve(qrDataUrl); return; }
+    const qrImg = new Image();
+    qrImg.onload = () => {
+      const qrSize = 400;
+      const padding = 24;
+      const pinBlockHeight = 130;
+      const width = qrSize + padding * 2;
+      const height = qrSize + padding * 2 + pinBlockHeight;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("Canvas non supportato")); return; }
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
+
+      const centerX = width / 2;
+      ctx.fillStyle = "#666666";
+      ctx.font = "18px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Se non riesce a scansionare, vota/riscatta col PIN:", centerX, padding + qrSize + 36);
+
+      ctx.fillStyle = "#1E3A5F";
+      ctx.font = "800 46px system-ui, sans-serif";
+      ctx.fillText(pin.split("").join("  "), centerX, padding + qrSize + 92);
+
+      resolve(canvas.toDataURL("image/png"));
+    };
+    qrImg.onerror = () => reject(new Error("Impossibile caricare il QR"));
+    qrImg.src = qrDataUrl;
+  });
+}
+
+async function downloadQR(code: string, label: string, pin?: string | null) {
   const dataUrl = await QRCode.toDataURL(code, {
     width: 400, margin: 2,
     color: { dark: "#1E3A5F", light: "#ffffff" },
   });
+  let finalUrl = dataUrl;
+  try {
+    finalUrl = await buildQrWithPin(dataUrl, pin);
+  } catch (err) {
+    console.error("Errore generazione immagine QR+PIN, scarico solo il QR:", err);
+  }
   const link = document.createElement("a");
-  link.href = dataUrl;
+  link.href = finalUrl;
   link.download = `QR_${label.replace(/\s+/g, "_")}.png`;
   link.click();
 }
@@ -158,6 +204,8 @@ export default function AdminPage() {
   const [classiDisponibili, setClassiDisponibili] = useState<{ school: string; site: string; year: string }[]>([]);
   const [previewQR, setPreviewQR] = useState<string | null>(null);
   const [previewLabel, setPreviewLabel] = useState("");
+  const [previewCode, setPreviewCode] = useState("");
+  const [previewPin, setPreviewPin] = useState<string | null>(null);
 
   // Form utente
   const [userForm, setUserForm] = useState({ 
@@ -394,12 +442,16 @@ export default function AdminPage() {
     const resData = await res.json();
     if (!res.ok) { setMessage("❌ Errore creazione QR: " + resData.message); return; }
 
+    const createdPin: string | null = resData.event?.pin || resData.bonus?.pin || null;
+
     const dataUrl = await QRCode.toDataURL(qrCode, {
       width: 300, margin: 2,
       color: { dark: "#1E3A5F", light: "#ffffff" },
     });
     setPreviewQR(dataUrl);
     setPreviewLabel(label);
+    setPreviewCode(qrCode);
+    setPreviewPin(createdPin);
     setMessage(`✅ QR "${label}" creato!`);
     await loadData();
     setCurrentPage(1);
@@ -801,7 +853,7 @@ export default function AdminPage() {
                         <button onClick={() => handleToggleEvent(e.id, e.active !== false)} style={{ padding: "4px 8px", marginRight: 4, background: e.active !== false ? "#dc3545" : "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                           {e.active !== false ? "Disattiva" : "Attiva"}
                         </button>
-                        <button onClick={() => downloadQR(e.qr_code, e.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                        <button onClick={() => downloadQR(e.qr_code, e.title, e.pin)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                           ⬇️ QR
                         </button>
                         {isSuper && (
@@ -854,7 +906,7 @@ export default function AdminPage() {
                     <button onClick={() => handleToggleBonus(b.id, b.active !== false)} style={{ padding: "4px 8px", marginRight: 4, background: b.active !== false ? "#dc3545" : "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       {b.active !== false ? "Disattiva" : "Attiva"}
                     </button>
-                    <button onClick={() => downloadQR(b.code, b.title)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
+                    <button onClick={() => downloadQR(b.code, b.title, b.pin)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
                       ⬇️ QR
                     </button>
                     {isSuper && (
@@ -1037,16 +1089,21 @@ export default function AdminPage() {
               {!previewQR ? (
                 <button onClick={handleCreaQR} style={{ flex: 1, padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>Genera QR</button>
               ) : (
-                <button onClick={() => { setPreviewQR(null); }} style={{ flex: 1, padding: 12, background: "#6c757d", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>+ Genera un altro</button>
+                <button onClick={() => { setPreviewQR(null); setPreviewPin(null); }} style={{ flex: 1, padding: 12, background: "#6c757d", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>+ Genera un altro</button>
               )}
-              <button onClick={() => { setShowQRModal(false); setPreviewQR(null); }} style={{ padding: 12, background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Chiudi</button>
+              <button onClick={() => { setShowQRModal(false); setPreviewQR(null); setPreviewPin(null); }} style={{ padding: 12, background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Chiudi</button>
             </div>
 
             {previewQR && (
               <div style={{ marginTop: 20, textAlign: "center", borderTop: "1px solid #eee", paddingTop: 16 }}>
                 <p style={{ fontWeight: 700, color: "#1E3A5F" }}>QR generato: {previewLabel}</p>
                 <img src={previewQR} alt="QR" style={{ width: 200, height: 200, margin: "12px auto", display: "block", borderRadius: 8 }} />
-                <button onClick={() => downloadQR(previewLabel, previewLabel)} style={{ padding: "10px 20px", background: "#FF6B35", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>
+                {previewPin && (
+                  <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 4 }}>
+                    PIN: <strong style={{ fontSize: "1.3rem", letterSpacing: 4, color: "#1E3A5F" }}>{previewPin}</strong>
+                  </p>
+                )}
+                <button onClick={() => downloadQR(previewCode, previewLabel, previewPin)} style={{ padding: "10px 20px", background: "#FF6B35", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>
                   ⬇️ Scarica QR
                 </button>
               </div>
