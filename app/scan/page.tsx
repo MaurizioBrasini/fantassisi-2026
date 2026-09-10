@@ -10,6 +10,15 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
+// Il QR personale ora contiene un link (/v/<id>) invece del solo id: se lo
+// scansioniamo o incolliamo qui dentro, estraiamo l'id per riusare la stessa
+// logica di sempre. I vecchi formati (id nudo, EVENT:/BONUS:/QR:) restano
+// invariati.
+function extractCode(raw: string): string {
+  const match = raw.trim().match(/\/v\/([^/?#\s]+)/);
+  return match ? match[1] : raw.trim();
+}
+
 type CameraInfo = { id: string; label: string };
 
 export default function ScanPage() {
@@ -183,7 +192,7 @@ export default function ScanPage() {
           }
           setScanning(false);
           try {
-            await handleScanResult(decodedText, userId);
+            await handleScanResult(extractCode(decodedText), userId);
           } catch (err: any) {
             console.error("Errore dopo la scansione:", err);
             setError("Errore dopo la scansione: " + (err?.message || String(err)));
@@ -274,6 +283,15 @@ export default function ScanPage() {
     }
   };
 
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) setManualCode(text.trim());
+    } catch {
+      // Permesso negato o non supportato: l'utente incolla a mano nel campo.
+    }
+  };
+
   const handleManualSubmit = async () => {
     const userId = getCookie("user_id");
     if (!userId) {
@@ -285,7 +303,7 @@ export default function ScanPage() {
     if (!code) return;
     setManualBusy(true);
     try {
-      await handleScanResult(code, userId);
+      await handleScanResult(extractCode(code), userId);
     } catch (err: any) {
       console.error("Errore dopo l'inserimento manuale:", err);
       setError("Errore: " + (err?.message || String(err)));
@@ -387,18 +405,26 @@ export default function ScanPage() {
             onClick={() => setShowManual(true)}
             style={{ background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
           >
-            Non riesci a scansionare? Inserisci il codice a mano
+            Non riesci a scansionare? Incolla il link/codice
           </button>
         ) : (
           <div style={{ background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
-            <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>Codice</label>
-            <input
-              type="text"
-              value={manualCode}
-              onChange={(e) => setManualCode(e.target.value)}
-              placeholder="Incolla o digita il codice"
-              style={{ width: "100%", padding: 10, marginTop: 4, borderRadius: 8, border: "1px solid #ccc" }}
-            />
+            <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>Link o codice ricevuto</label>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <input
+                type="text"
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="Incolla qui"
+                style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+              />
+              <button
+                onClick={handlePasteFromClipboard}
+                style={{ padding: "0 14px", borderRadius: 8, background: "#e0e0e0", color: "#333", border: "none", fontWeight: 600, cursor: "pointer", fontSize: "0.8rem" }}
+              >
+                📋 Incolla
+              </button>
+            </div>
             <button
               onClick={handleManualSubmit}
               disabled={manualBusy || !manualCode.trim()}

@@ -17,7 +17,7 @@ export default function MyQRPage() {
   const [noAccess, setNoAccess] = useState(false);
   const [userInfo, setUserInfo] = useState<{ name: string; team: string } | null>(null);
   const [notVotable, setNotVotable] = useState(false);
-  const [myId, setMyId] = useState<string | null>(null);
+  const [myLink, setMyLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -51,10 +51,15 @@ export default function MyQRPage() {
         return;
       }
 
-      setMyId(userId);
+      // Il QR contiene un link diretto (non il solo id): così chi vota può
+      // scansionarlo con la fotocamera nativa del telefono invece che con
+      // quella in-pagina, molto più affidabile su dispositivi dove l'accesso
+      // alla fotocamera dentro il browser è inaffidabile o bloccato.
+      const link = `${window.location.origin}/v/${userId}`;
+      setMyLink(link);
 
       try {
-        const qr = await QRCode.toDataURL(userId, {
+        const qr = await QRCode.toDataURL(link, {
           width: 300,
           margin: 2,
           color: { dark: "#1E3A5F", light: "#ffffff" },
@@ -78,9 +83,9 @@ export default function MyQRPage() {
   };
 
   const handleCopyCode = async () => {
-    if (!myId) return;
+    if (!myLink) return;
     try {
-      await navigator.clipboard.writeText(myId);
+      await navigator.clipboard.writeText(myLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -135,7 +140,7 @@ export default function MyQRPage() {
             style={{ width: "100%", maxWidth: 300, margin: "0 auto", display: "block", borderRadius: 12 }}
           />
           <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 12 }}>
-            Mostra questo QR ai colleghi per ricevere voti
+            Mostra questo QR ai colleghi per ricevere voti — chi lo scansiona con la fotocamera del telefono (non serve aprire l'app) ti vota direttamente
           </p>
           <button
             onClick={handleDownload}
@@ -148,19 +153,19 @@ export default function MyQRPage() {
             ⬇️ Scarica QR
           </button>
 
-          {myId && (
+          {myLink && (
             <div style={{ marginTop: 24, padding: 16, background: "#f8f9fa", borderRadius: 12 }}>
               <p style={{ fontSize: "0.8rem", color: "#666", marginBottom: 8 }}>
-                Se chi ti vuole votare non riesce a scansionare il QR, può inserire questo codice a mano nella pagina "Vota":
+                In alternativa puoi copiare e mandare questo link a chi ti vuole votare — basta che lo apra sul suo telefono:
               </p>
               <code style={{ display: "block", wordBreak: "break-all", fontSize: "0.85rem", color: "#1E3A5F", background: "white", padding: 10, borderRadius: 8, border: "1px solid #ddd" }}>
-                {myId}
+                {myLink}
               </code>
               <button
                 onClick={handleCopyCode}
                 style={{ marginTop: 10, padding: "8px 16px", borderRadius: 60, background: "#e0e0e0", color: "#333", border: "none", fontWeight: 600, cursor: "pointer", fontSize: "0.8rem" }}
               >
-                {copied ? "✅ Copiato" : "📋 Copia codice"}
+                {copied ? "✅ Copiato" : "📋 Copia link"}
               </button>
             </div>
           )}
