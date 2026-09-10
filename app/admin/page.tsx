@@ -11,10 +11,8 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
-const ANNI_MATRICOLE = new Set(["PRE-ISCRITTI 2027 E 2028", "1° ANNO 2026", "2° ANNO 2026"]);
-
 function teamFromYear(year: string): string {
-  return ANNI_MATRICOLE.has(year) ? "Matricole" : "Veterani";
+  return CONFIG_ISCRIZIONE.teamAnniValid['Matricole'].includes(year) ? "Matricole" : "Veterani";
 }
 
 async function downloadQR(code: string, label: string) {

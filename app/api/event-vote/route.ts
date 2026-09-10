@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 import { startOfTodayInRomeISO } from "@/lib/utils";
+import { CONFIG_ISCRIZIONE } from "@/lib/config";
 
 export async function POST(request: Request) {
   const userId = getVerifiedUserId();
@@ -99,8 +100,8 @@ export async function POST(request: Request) {
   let confirmationMessage = `✅ +${points} punti per i ${event.team_target || 'squadra'}`;
 
   if (event.qr_type === 'class' && event.class_school && event.class_site && event.class_year) {
-    const yearLabel = event.class_year.replace('° ANNO 2026', '°');
-    confirmationMessage = `✅ +${points} punti per ${event.class_school} ${event.class_site} ${yearLabel} anno`;
+    const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === event.class_year)?.label || event.class_year;
+    confirmationMessage = `✅ +${points} punti per ${event.class_school} ${event.class_site} ${yearLabel}`;
   } else if (event.qr_type === 'site' && event.class_site) {
     confirmationMessage = `✅ +${points} punti per ${event.class_site}`;
   }

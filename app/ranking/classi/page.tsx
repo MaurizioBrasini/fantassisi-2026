@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import { CONFIG_ISCRIZIONE } from "@/lib/config";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -11,9 +12,7 @@ function getCookie(name: string): string | null {
 
 function yearLabel(year: string | null): string {
   if (!year) return "";
-  if (year.startsWith("PRE-ISCRITTI")) return "Pre-iscritti";
-  const match = year.match(/^(\d°)\s*ANNO/);
-  return match ? `${match[1]} anno` : year;
+  return CONFIG_ISCRIZIONE.anni.find((a) => a.value === year)?.label || year;
 }
 
 type Row = { key: string; school: string; site: string; year: string; points: number };
@@ -172,7 +171,7 @@ export default function ClassRanking() {
   const myRank = myIndex >= 0 ? ranks[myIndex]?.rank : null;
 
   const teamColor = (year: string) => {
-    const isVeterani = year.startsWith("3°") || year.startsWith("4°");
+    const isVeterani = CONFIG_ISCRIZIONE.teamAnniValid['Veterani'].includes(year);
     return isVeterani
       ? { background: "#E3EAF2", color: "#1E3A5F", border: "#1E3A5F" }
       : { background: "#FFEDE3", color: "#FF6B35", border: "#FF6B35" };
