@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { randomUUID } from "crypto";
+import { generateUniquePins } from "@/lib/utils";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -106,6 +107,10 @@ export async function POST(request: Request) {
   const teamValue = team && VALID_TEAMS.has(team) ? team : null;
   const yearValue = year && VALID_ANNI.includes(year) ? year : null;
 
+  const { data: existingPinsRows } = await supabase.from("users").select("pin");
+  const usedPins = new Set((existingPinsRows || []).map((u) => u.pin).filter(Boolean) as string[]);
+  const [pin] = generateUniquePins(1, usedPins);
+
   const { data, error } = await supabase
     .from("users")
     .insert({
@@ -123,6 +128,7 @@ export async function POST(request: Request) {
       // liberamente (vedi /api/admin/enroll); vedi anche il PUT sotto per correggere
       // manualmente i casi di docenti registrati come Matricola/Veterano.
       is_didatta: teamValue === "Didatti&Docenti",
+      pin,
     })
     .select()
     .single();

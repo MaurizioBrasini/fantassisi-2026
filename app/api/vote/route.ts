@@ -9,18 +9,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { recipientId } = await request.json();
-  if (!recipientId) {
+  const { recipientId: bodyRecipientId, pin } = await request.json();
+  if (!bodyRecipientId && !pin) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
-  }
-  if (recipientId === voterId) {
-    return NextResponse.json({ error: "Non puoi votare te stesso" }, { status: 400 });
   }
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  // Fallback per chi non riesce a scansionare: PIN a 4 cifre stampato sotto
+  // il proprio QR, risolto qui allo stesso id del destinatario.
+  let recipientId = bodyRecipientId;
+  if (!recipientId && pin) {
+    const { data: byPin } = await supabase.from("users").select("id").eq("pin", String(pin)).maybeSingle();
+    if (!byPin) {
+      return NextResponse.json({ error: "PIN non valido" }, { status: 404 });
+    }
+    recipientId = byPin.id;
+  }
+
+  if (recipientId === voterId) {
+    return NextResponse.json({ error: "Non puoi votare te stesso" }, { status: 400 });
+  }
 
   const [{ data: voter }, { data: recipient }] = await Promise.all([
     supabase.from("users").select("team, site").eq("id", voterId).single(),

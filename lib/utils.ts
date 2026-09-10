@@ -35,3 +35,21 @@ export function startOfTodayInRomeISO(): string {
   const romeMidnightUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
   return new Date(romeMidnightUTC - romeOffsetMs).toISOString();
 }
+
+// Genera `count` PIN a 4 cifre univoci (mai usati prima, mai ripetuti tra loro),
+// pescando da una permutazione casuale di tutti i valori 0000-9999 esclusi
+// quelli già assegnati. Con ~1090 utenti votabili su 10000 combinazioni
+// possibili non c'è rischio di esaurimento; se un giorno si superassero i
+// 10000 utenti votabili andrebbe allungato a 5 cifre.
+export function generateUniquePins(count: number, existing: Set<string>): string[] {
+  const pool: string[] = [];
+  for (let i = 0; i < 10000; i++) {
+    const pin = String(i).padStart(4, "0");
+    if (!existing.has(pin)) pool.push(pin);
+  }
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}

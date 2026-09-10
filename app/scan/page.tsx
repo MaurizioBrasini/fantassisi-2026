@@ -32,6 +32,24 @@ export default function ScanPage() {
   const [manualBusy, setManualBusy] = useState(false);
 
   const handleScanResult = async (decodedText: string, userId: string) => {
+    // ----- PIN a 4 cifre (fallback manuale per chi non riesce a scansionare) -----
+    if (/^\d{4}$/.test(decodedText)) {
+      const res = await fetch("/api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: decodedText }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Errore nel voto");
+        router.push("/");
+        return;
+      }
+      alert(`✅ +${data.points} punti!`);
+      router.push("/");
+      return;
+    }
+
     // ----- EVENTO (legacy) -----
     if (decodedText.startsWith("EVENT:")) {
       const { data: event } = await supabase
@@ -411,20 +429,21 @@ export default function ScanPage() {
         {!showManual ? (
           <button
             onClick={() => setShowManual(true)}
-            style={{ background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline" }}
+            style={{ background: "none", border: "none", color: "#999", fontSize: "0.85rem", cursor: "pointer", textDecoration: "underline" }}
           >
-            Non riesci a scansionare? Incolla il link/codice
+            Problemi con la fotocamera? Inserisci il PIN di 4 cifre che leggi sotto il QR code
           </button>
         ) : (
           <div style={{ background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
-            <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>Link o codice ricevuto</label>
+            <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#1E3A5F" }}>PIN a 4 cifre (o link/codice ricevuto)</label>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <input
                 type="text"
+                inputMode="numeric"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="Incolla qui"
-                style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc" }}
+                placeholder="1234"
+                style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
               />
               <button
                 onClick={handlePasteFromClipboard}

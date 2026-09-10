@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { generateUniquePins } from "@/lib/utils";
 import * as XLSX from "xlsx";
 
 const BRANDS = ["CCMA", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
@@ -225,21 +226,38 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: existing } = await supabase.from("users").select("email, auth_token");
+  const { data: existing } = await supabase.from("users").select("email, auth_token, pin");
   const existingTokens = new Map((existing || []).map((u) => [u.email, u.auth_token]));
+  const existingPins = new Map((existing || []).map((u) => [u.email, u.pin]));
+  const usedPins = new Set((existing || []).map((u) => u.pin).filter(Boolean) as string[]);
 
   const validTeams = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
   const validRoles = new Set(["student", "staff", "admin"]);
   const validYears = new Set(["preiscrizione", "primo", "secondo", "terzo", "quarto", "specializzato"]);
 
-  const records = rawRecords
-    .filter((r) => r.email)
+  const filteredRaw = rawRecords.filter((r) => r.email);
+
+  // PIN a 4 cifre (fallback voto senza fotocamera): mai rigenerato per chi
+  // ce l'ha già (sennò il PIN già stampato/mostrato smetterebbe di funzionare
+  // a ogni reimport), assegnato una volta sola per chi non ce l'ha ancora.
+  const emailsNeedingPin: string[] = [];
+  const seenEmails = new Set<string>();
+  for (const r of filteredRaw) {
+    const email = String(r.email).trim().toLowerCase();
+    if (seenEmails.has(email)) continue;
+    seenEmails.add(email);
+    if (!existingPins.get(email)) emailsNeedingPin.push(email);
+  }
+  const newPins = generateUniquePins(emailsNeedingPin.length, usedPins);
+  const pinByEmail = new Map(emailsNeedingPin.map((email, i) => [email, newPins[i]]));
+
+  const records = filteredRaw
     .map((r) => {
       const email = String(r.email).trim().toLowerCase();
       const team = r.team && validTeams.has(r.team) ? r.team : null;
       const userRole = validRoles.has(r.role) ? r.role : "student";
       const year = r.year && validYears.has(r.year) ? r.year : null;
-      
+
       // Validazione Team ↔ Anno
       let finalTeam = team;
       if (team && year) {
@@ -248,7 +266,7 @@ export async function POST(request: Request) {
           finalTeam = null;
         }
       }
-      
+
       const token =
         existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
       return {
@@ -264,6 +282,7 @@ export async function POST(request: Request) {
         // squadra liberamente (vedi /api/admin/enroll); un allievo vero non può mai farlo.
         is_didatta: finalTeam === "Didatti&Docenti",
         auth_token: token,
+        pin: existingPins.get(email) || pinByEmail.get(email) || null,
       };
     });
 

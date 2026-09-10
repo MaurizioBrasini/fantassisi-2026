@@ -21,7 +21,7 @@ export const CONFIG_ISCRIZIONE = {
     'Napoli',
     'Palermo',
     'Reggio Calabria',
-    'Romania',
+    'Bucarest',
     'Roma',
     'Verona'
   ],
@@ -36,14 +36,14 @@ export const CONFIG_ISCRIZIONE = {
     'Napoli': ['SPC'],
     'Palermo': ['IGB'],
     'Reggio Calabria': ['SPC'],
-    'Romania': ['APC'],
+    'Bucarest': ['APC'],
     'Roma': ['APC', 'CCMA', 'SICC', 'SPC'],
     'Verona': ['APC', 'SPC']
   },
   
   // Relazione Scuola → Sedi (per validazione)
   sediPerScuola: {
-    'APC': ['Lecce', 'Roma', 'Verona', 'Romania'],
+    'APC': ['Lecce', 'Roma', 'Verona', 'Bucarest'],
     'AIPC': ['Bari'],
     'CCMA': ['Roma'],
     'IGB': ['Palermo'],
@@ -77,7 +77,7 @@ export const CONFIG_ISCRIZIONE = {
   classiPerSedeScuola: {
     default: 4,
     eccezioni: {
-      'Romania||APC': 2,     // partita da poco, arrivata al 2° anno
+      'Bucarest||APC': 2,    // partita da poco, arrivata al 2° anno
       "L'Aquila||SICC": 1,   // partita da poco, arrivata al 1° anno
       'Roma||CCMA': 1,       // partita da poco, arrivata al 1° anno
     } as Record<string, number>

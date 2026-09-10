@@ -18,6 +18,7 @@ export default function MyQRPage() {
   const [userInfo, setUserInfo] = useState<{ name: string; team: string } | null>(null);
   const [notVotable, setNotVotable] = useState(false);
   const [myLink, setMyLink] = useState<string | null>(null);
+  const [myPin, setMyPin] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function MyQRPage() {
 
       const { data: user } = await supabase
         .from("users")
-        .select("first_name, last_name, team")
+        .select("first_name, last_name, team, pin")
         .eq("id", userId)
         .single();
 
@@ -41,6 +42,7 @@ export default function MyQRPage() {
           name: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
           team: user.team || userTeam || "",
         });
+        setMyPin(user.pin || null);
       }
 
       // Didatti&Docenti possono votare ma non essere votati: niente QR personale.
@@ -142,6 +144,14 @@ export default function MyQRPage() {
           <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 12 }}>
             Mostra questo QR ai colleghi per ricevere voti — chi lo scansiona con la fotocamera del telefono (non serve aprire l'app) ti vota direttamente
           </p>
+
+          {myPin && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: "0.75rem", color: "#666" }}>Se non riesce a scansionare, può votarti con il tuo PIN:</div>
+              <div style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: 6, color: "#1E3A5F", marginTop: 4 }}>{myPin}</div>
+            </div>
+          )}
+
           <button
             onClick={handleDownload}
             style={{
