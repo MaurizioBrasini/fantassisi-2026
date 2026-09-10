@@ -158,17 +158,18 @@ export default function ScanPage() {
     router.push("/");
   };
 
-  // Prova ad avviare una specifica fotocamera. Ritorna true se ci riesce,
-  // false se quella fotocamera non è utilizzabile (es. NotReadableError su
-  // alcuni obiettivi secondari di telefoni con più fotocamere posteriori).
-  const tryStartCamera = async (cameraId: string): Promise<boolean> => {
+  // Prova ad avviare la fotocamera (per id specifico, o per vincolo
+  // facingMode). Ritorna true se ci riesce, false se non è utilizzabile
+  // (es. NotReadableError su alcuni obiettivi secondari, o vincolo non
+  // supportato dal dispositivo).
+  const tryStartCamera = async (cameraIdOrConfig: string | MediaTrackConstraints): Promise<boolean> => {
     const userId = getCookie("user_id");
     if (!userId) return false;
 
     const scanner = new Html5Qrcode("reader");
     try {
       await scanner.start(
-        cameraId,
+        cameraIdOrConfig,
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
           try {
@@ -191,7 +192,7 @@ export default function ScanPage() {
       );
       return true;
     } catch (err) {
-      console.error(`Fotocamera ${cameraId} non disponibile:`, err);
+      console.error("Fotocamera non disponibile:", cameraIdOrConfig, err);
       return false;
     }
   };
@@ -217,34 +218,51 @@ export default function ScanPage() {
 
     setError("");
     setLoadingCameras(true);
+    setScanning(true);
+
+    // 1. Prova diretta con vincolo facingMode "environment": è il browser/
+    //    l'hardware a scegliere la fotocamera posteriore corretta, molto più
+    //    affidabile che leggere l'etichetta testuale della fotocamera (che
+    //    varia per marca/lingua del dispositivo e su molti Android non
+    //    contiene affatto "back"/"rear", facendo scegliere per sbaglio la
+    //    fotocamera anteriore/selfie).
+    if (await tryStartCamera({ facingMode: { exact: "environment" } })) {
+      setLoadingCameras(false);
+      return;
+    }
+    if (await tryStartCamera({ facingMode: "environment" })) {
+      setLoadingCameras(false);
+      return;
+    }
+
+    // 2. Fallback: enumera le fotocamere disponibili e prova quelle il cui
+    //    nome sembra indicare la posteriore, poi tutte le altre.
     let found: CameraInfo[] = [];
     try {
       found = await Html5Qrcode.getCameras();
     } catch (err: any) {
       setLoadingCameras(false);
+      setScanning(false);
       setError("Impossibile accedere alla fotocamera: " + (err?.message || String(err)));
       return;
     }
     setLoadingCameras(false);
 
     if (!found || found.length === 0) {
+      setScanning(false);
       setError("Nessuna fotocamera trovata sul dispositivo");
       return;
     }
 
-    // Prova in automatico tutte le fotocamere posteriori, una dopo l'altra,
-    // saltando in silenzio quelle che danno errore (es. obiettivi secondari
-    // non accessibili). L'utente non deve mai vedere questo tentativo.
     const backCameras = found.filter((c) => /back|rear|environment/i.test(c.label));
     const candidates = backCameras.length > 0 ? backCameras : found;
 
-    setScanning(true);
     for (const cam of candidates) {
       const ok = await tryStartCamera(cam.id);
       if (ok) return;
     }
 
-    // Nessuna fotocamera automatica ha funzionato: lascia scegliere a mano.
+    // Nessun tentativo automatico ha funzionato: lascia scegliere a mano.
     setScanning(false);
     if (found.length > 1) {
       setCameras(found);
