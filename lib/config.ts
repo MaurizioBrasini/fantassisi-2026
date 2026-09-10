@@ -67,5 +67,19 @@ export const CONFIG_ISCRIZIONE = {
     'Veterani': ['terzo', 'quarto', 'specializzato'],
     'Didatti&Docenti': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'],
     '': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'] // nessun team
+  },
+
+  // Numero di classi realmente esistenti per ogni combinazione sede+scuola
+  // (usato per la media della classifica per sede: punti totali della sede /
+  // numero di classi reali, NON il numero di classi con voti/iscritti).
+  // Di norma un corso dura 4 anni quindi vale sempre 4, tranne le scuole
+  // partite da poco che non hanno ancora raggiunto il 4° anno.
+  classiPerSedeScuola: {
+    default: 4,
+    eccezioni: {
+      'Romania||APC': 2,     // partita da poco, arrivata al 2° anno
+      "L'Aquila||SICC": 1,   // partita da poco, arrivata al 1° anno
+      'Roma||CCMA': 1,       // partita da poco, arrivata al 1° anno
+    } as Record<string, number>
   }
 };

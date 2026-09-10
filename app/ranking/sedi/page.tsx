@@ -3,6 +3,18 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import { CONFIG_ISCRIZIONE } from "@/lib/config";
+
+// Numero di classi realmente esistenti in una sede (somma su tutte le scuole
+// presenti), indipendente da quanti iscritti/voti risultano in ogni classe.
+function realClassCount(site: string): number {
+  const schools = CONFIG_ISCRIZIONE.scuolePerSede[site as keyof typeof CONFIG_ISCRIZIONE.scuolePerSede] || [];
+  return schools.reduce((sum, school) => {
+    const n = CONFIG_ISCRIZIONE.classiPerSedeScuola.eccezioni[`${site}||${school}`]
+      ?? CONFIG_ISCRIZIONE.classiPerSedeScuola.default;
+    return sum + n;
+  }, 0);
+}
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -81,15 +93,6 @@ export default function SiteRanking() {
       const me = usersById.get(id);
       if (me?.site) setMySite(me.site);
 
-      // Raccogliamo le combinazioni (school, year) per ogni sede (solo anni validi)
-      const classesBySite = new Map<string, Set<string>>();
-      for (const u of allUsersRaw) {
-        if (!u.school || !u.site || !u.year || !VALID_YEARS.includes(u.year)) continue;
-        const key = `${u.school}||${u.year}`;
-        if (!classesBySite.has(u.site)) classesBySite.set(u.site, new Set());
-        classesBySite.get(u.site)!.add(key);
-      }
-
       // Raccogliamo i punti per sede (voti individuali)
       const pointsBySite = new Map<string, number>();
       for (const v of allVotes || []) {
@@ -104,14 +107,10 @@ export default function SiteRanking() {
         pointsBySite.set(ev.class_site, (pointsBySite.get(ev.class_site) || 0) + (ev.points || 0));
       }
 
-      // Unione delle chiavi
-      const siteSet = new Set<string>();
-      Array.from(classesBySite.keys()).forEach((k) => siteSet.add(k));
-      Array.from(pointsBySite.keys()).forEach((k) => siteSet.add(k));
-      const sites = Array.from(siteSet);
+      const sites = CONFIG_ISCRIZIONE.sedi;
 
       const ranking: Row[] = sites.map((site) => {
-        const classCount = classesBySite.get(site)?.size || 0;
+        const classCount = realClassCount(site);
         const points = pointsBySite.get(site) || 0;
         const average = classCount > 0 ? points / classCount : 0;
         return { site, points, classCount, average };
@@ -150,7 +149,7 @@ export default function SiteRanking() {
         🏛️ Classifica per Sede
       </h1>
       <p style={{ color: "#999", fontSize: "0.75rem", marginBottom: 16 }}>
-        Punti totali della sede divisi per il numero di classi reali (combinazioni scuola + anno)
+        Punti totali della sede divisi per il numero di classi realmente esistenti in quella sede
       </p>
 
       {myRow && (
