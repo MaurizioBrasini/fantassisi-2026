@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -34,7 +34,17 @@ function detectInAppBrowser(): string | null {
 type CameraInfo = { id: string; label: string };
 
 export default function ScanPage() {
+  return (
+    <Suspense fallback={null}>
+      <ScanPageInner />
+    </Suspense>
+  );
+}
+
+function ScanPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isRicarica = searchParams.get("mode") === "ricarica";
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
   const [cameras, setCameras] = useState<CameraInfo[] | null>(null);
@@ -510,14 +520,14 @@ export default function ScanPage() {
                   <p style={{ fontWeight: 700 }}>Samsung Internet</p>
                   <p>Menu (⋮) → Impostazioni → Siti web e download → Autorizzazioni sito → Fotocamera → cerca questo sito → Consenti.</p>
 
-                  <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il PIN qui sotto: vota comunque, senza bisogno della fotocamera.</p>
+                  <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il PIN qui sotto: {isRicarica ? "ricarica" : "vota"} comunque, senza bisogno della fotocamera.</p>
                 </div>
               )}
 
               {helpChoice === "fotocamera" && (
                 <div style={{ marginTop: 12, background: "#e8f5e9", border: "2px solid #2E7D32", borderRadius: 12, padding: 16, fontSize: "0.85rem", color: "#333", lineHeight: 1.5, textAlign: "left" }}>
                   <p style={{ margin: 0 }}>
-                    Apri la <strong>fotocamera normale del telefono</strong> (quella di sempre, per le foto — non serve questa app) e inquadra il QR della persona che vuoi votare. Si apre da sola una pagina che registra il voto, senza chiedere nessun permesso.
+                    Apri la <strong>fotocamera normale del telefono</strong> (quella di sempre, per le foto — non serve questa app) e inquadra {isRicarica ? "il QR della ricarica" : "il QR della persona che vuoi votare"}. Si apre da sola una pagina che {isRicarica ? "accredita i CBTcoin" : "registra il voto"}, senza chiedere nessun permesso.
                   </p>
                 </div>
               )}
@@ -526,18 +536,26 @@ export default function ScanPage() {
         </div>
       )}
 
-      {/* ── Vota col PIN ──────────────────────────────────────── */}
+      {/* ── Vota / Ricarica col PIN ──────────────────────────────── */}
       {!scanning && (
         <div style={{ marginTop: 20, background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
           <p style={{ margin: "0 0 8px", fontSize: "0.9rem", fontWeight: 700, color: "#1E3A5F" }}>
-            🔢 Vota col PIN
+            {isRicarica ? "🔢 Ricarica col PIN" : "🔢 Vota col PIN"}
           </p>
-          <p style={{ margin: "0 0 4px", fontSize: "0.8rem", color: "#333" }}>
-            Inserisci il PIN della persona che vuoi votare (ce l'ha scritto sotto il suo QR):
-          </p>
-          <p style={{ margin: "0 0 10px", fontSize: "0.76rem", fontWeight: 700, color: "#dc3545" }}>
-            ⚠️ È il PIN di chi vuoi votare, non il tuo!
-          </p>
+          {isRicarica ? (
+            <p style={{ margin: "0 0 10px", fontSize: "0.8rem", color: "#333" }}>
+              Inserisci il PIN del bonus ricarica (lo trovi scritto sotto il QR):
+            </p>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 4px", fontSize: "0.8rem", color: "#333" }}>
+                Inserisci il PIN della persona che vuoi votare (ce l'ha scritto sotto il suo QR):
+              </p>
+              <p style={{ margin: "0 0 10px", fontSize: "0.76rem", fontWeight: 700, color: "#dc3545" }}>
+                ⚠️ È il PIN di chi vuoi votare, non il tuo!
+              </p>
+            </>
+          )}
 
           <div style={{ display: "flex", gap: 8 }}>
             <input
@@ -545,7 +563,7 @@ export default function ScanPage() {
               inputMode="numeric"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
-              placeholder="PIN di chi vuoi votare"
+              placeholder={isRicarica ? "PIN del bonus ricarica" : "PIN di chi vuoi votare"}
               style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
             />
             <button
@@ -555,9 +573,11 @@ export default function ScanPage() {
               📋 Incolla
             </button>
           </div>
-          <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "#999" }}>
-            (oppure il codice del bonus, se devi riscattarne uno)
-          </p>
+          {!isRicarica && (
+            <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "#999" }}>
+              (oppure il codice del bonus, se devi riscattarne uno)
+            </p>
+          )}
           <button
             onClick={handleManualSubmit}
             disabled={manualBusy || !manualCode.trim()}
