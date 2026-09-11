@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -128,8 +129,8 @@ export default function IndividualRanking() {
   const myRank = myIndex >= 0 ? ranks[myIndex]?.rank : null;
 
   const teamStyle = (team: string | null) => {
-    if (team === "Matricole") return { background: "#FFEDE3", color: "#FF6B35", borderColor: "#FF6B35" };
-    if (team === "Veterani") return { background: "#E3EAF2", color: "#1E3A5F", borderColor: "#1E3A5F" };
+    if (team === "Matricole") return { background: "#FFEDE3", color: TEAM_COLORS.Matricole, borderColor: TEAM_COLORS.Matricole };
+    if (team === "Veterani") return { background: "#E3EAF2", color: TEAM_COLORS.Veterani, borderColor: TEAM_COLORS.Veterani };
     return { background: "#f0f0f0", color: "#666", borderColor: "#ccc" };
   };
 

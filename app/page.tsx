@@ -6,6 +6,8 @@ import Link from "next/link";
 import InstallButton from "@/components/InstallButton"; // 🔥 MODIFICA 1: Aggiunto import
 import { startOfTodayInRomeISO } from "@/lib/utils";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { TEAM_COLORS } from "@/lib/teamColors";
+import { RoosterIcon, CowIcon } from "@/components/TeamIcons";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -100,16 +102,16 @@ function TeamSwitchBox({ currentTeam, allowLeave, onDone }: {
             <button
               onClick={() => setTeam("Matricole")}
               disabled={busy}
-              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: "#FF6B35", color: "white", border: "none", cursor: "pointer" }}
+              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: TEAM_COLORS.Matricole, color: "white", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
             >
-              🐓 Matricole
+              <RoosterIcon size={22} color="white" /> Matricole
             </button>
             <button
               onClick={() => setTeam("Veterani")}
               disabled={busy}
-              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: "#1E3A5F", color: "white", border: "none", cursor: "pointer" }}
+              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: TEAM_COLORS.Veterani, color: "white", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
             >
-              🐄 Veterani
+              <CowIcon size={22} color="white" /> Veterani
             </button>
           </div>
           {allowLeave && (
@@ -131,8 +133,8 @@ function TeamSwitchBox({ currentTeam, allowLeave, onDone }: {
         </>
       ) : (
         <>
-          <p style={{ fontWeight: 700, color: "#1E3A5F", marginBottom: 6 }}>
-            {team === "Matricole" ? "🐓 Matricole" : "🐄 Veterani"}
+          <p style={{ fontWeight: 700, color: "#1E3A5F", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {team === "Matricole" ? <RoosterIcon size={20} /> : <CowIcon size={20} />} {team}
           </p>
           <p style={{ fontSize: "0.8rem", color: "#666", marginBottom: 14 }}>
             Se vuoi, indica anche la tua sede e la tua classe (facoltativo)
@@ -179,7 +181,7 @@ function TeamSwitchBox({ currentTeam, allowLeave, onDone }: {
             <button
               onClick={() => submit(team, site || null, classe)}
               disabled={busy}
-              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: team === "Matricole" ? "#FF6B35" : "#1E3A5F", color: "white", border: "none", cursor: busy ? "not-allowed" : "pointer" }}
+              style={{ flex: 1, padding: 14, borderRadius: 12, fontWeight: 700, background: team === "Matricole" ? TEAM_COLORS.Matricole : TEAM_COLORS.Veterani, color: "white", border: "none", cursor: busy ? "not-allowed" : "pointer" }}
             >
               {busy ? "..." : "Conferma"}
             </button>
@@ -310,11 +312,11 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <span style={{ fontSize: "2.2rem" }}>🐓</span>
+        <RoosterIcon size={40} />
         <h1 style={{ textAlign: "center", color: "#1E3A5F", fontSize: "1.6rem", margin: 0, lineHeight: 1.2 }}>
           FantAssisi<br />2026
         </h1>
-        <span style={{ fontSize: "2.2rem" }}>🐄</span>
+        <CowIcon size={40} />
       </div>
 
       {/* 🔥 MODIFICA 2: Pulsante Installa app - visibile su mobile e desktop */}
@@ -322,12 +324,12 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
 
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <div style={{ flex: 1, background: "#FF6B35", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+        <div style={{ flex: 1, background: TEAM_COLORS.Matricole, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
           <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Matricole</div>
           <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Matricole}</div>
         </div>
         <div style={{ width: 2, height: 50, background: "#1E3A5F" }} />
-        <div style={{ flex: 1, background: "#1E3A5F", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+        <div style={{ flex: 1, background: TEAM_COLORS.Veterani, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
           <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Veterani</div>
           <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Veterani}</div>
         </div>
@@ -534,11 +536,11 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <span style={{ fontSize: "2.2rem" }}>🐓</span>
+        <RoosterIcon size={40} />
         <h1 style={{ textAlign: "center", color: "#1E3A5F", fontSize: "1.6rem", margin: 0, lineHeight: 1.2 }}>
           FantAssisi<br />2026
         </h1>
-        <span style={{ fontSize: "2.2rem" }}>🐄</span>
+        <CowIcon size={40} />
       </div>
 
       {/* 🔥 MODIFICA 3: Pulsante Installa app - visibile su mobile e desktop */}
@@ -546,12 +548,12 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <div style={{ flex: 1, background: "#FF6B35", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+        <div style={{ flex: 1, background: TEAM_COLORS.Matricole, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
           <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Matricole</div>
           <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Matricole}</div>
         </div>
         <div style={{ width: 2, height: 50, background: "#1E3A5F" }} />
-        <div style={{ flex: 1, background: "#1E3A5F", color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+        <div style={{ flex: 1, background: TEAM_COLORS.Veterani, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
           <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Veterani</div>
           <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Veterani}</div>
         </div>

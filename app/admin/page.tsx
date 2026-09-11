@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -927,8 +928,8 @@ export default function AdminPage() {
         <h2>👥 Utenti ({filteredUsers.length} di {users.length})</h2>
         <div style={{ display: "flex", gap: 8, marginTop: 8, marginBottom: 8, flexWrap: "wrap" }}>
           <button onClick={() => handleExportCSV()} style={{ padding: "8px 12px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV tutti</button>
-          <button onClick={() => handleExportCSV("Matricole")} style={{ padding: "8px 12px", background: "#FF6B35", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV Matricole</button>
-          <button onClick={() => handleExportCSV("Veterani")} style={{ padding: "8px 12px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV Veterani</button>
+          <button onClick={() => handleExportCSV("Matricole")} style={{ padding: "8px 12px", background: TEAM_COLORS.Matricole, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV Matricole</button>
+          <button onClick={() => handleExportCSV("Veterani")} style={{ padding: "8px 12px", background: TEAM_COLORS.Veterani, color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV Veterani</button>
           <button onClick={() => handleExportCSV("Didatti&Docenti")} style={{ padding: "8px 12px", background: "#6f42c1", color: "white", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "0.85rem" }}>⬇️ CSV Didatti</button>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>

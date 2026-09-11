@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { TEAM_COLORS } from "@/lib/teamColors";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -173,8 +174,8 @@ export default function ClassRanking() {
   const teamColor = (year: string) => {
     const isVeterani = CONFIG_ISCRIZIONE.teamAnniValid['Veterani'].includes(year);
     return isVeterani
-      ? { background: "#E3EAF2", color: "#1E3A5F", border: "#1E3A5F" }
-      : { background: "#FFEDE3", color: "#FF6B35", border: "#FF6B35" };
+      ? { background: "#E3EAF2", color: TEAM_COLORS.Veterani, border: TEAM_COLORS.Veterani }
+      : { background: "#FFEDE3", color: TEAM_COLORS.Matricole, border: TEAM_COLORS.Matricole };
   };
 
   return (
