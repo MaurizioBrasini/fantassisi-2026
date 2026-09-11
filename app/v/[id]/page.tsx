@@ -74,5 +74,33 @@ export default function VotePage({ params }: { params: { id: string } }) {
   if (status === "error") {
     return box("Voto non registrato", message, "#dc3545");
   }
-  return box("✅ Voto registrato!", message, "#2E7D32");
+
+  const confetti = ["🎉", "⭐", "✨", "🎊", "⭐", "✨"];
+  return (
+    <div style={{ maxWidth: 420, margin: "0 auto", padding: 20, textAlign: "center", fontFamily: "system-ui, sans-serif", position: "relative", overflow: "hidden" }}>
+      {confetti.map((emoji, i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute",
+            left: `${15 + i * 14}%`,
+            top: "40%",
+            fontSize: "1.4rem",
+            animation: `confettiFloat 1.1s ease-out ${i * 0.06}s both`,
+          }}
+        >
+          {emoji}
+        </span>
+      ))}
+      <h2 style={{ color: "#2E7D32", animation: "pointsPop 0.4s cubic-bezier(.34,1.56,.64,1) both" }}>
+        ✅ Voto registrato!
+      </h2>
+      <p style={{ color: "#2E7D32", fontSize: "1.6rem", fontWeight: 800, animation: "pointsPop 0.4s cubic-bezier(.34,1.56,.64,1) 0.08s both" }}>
+        {message}
+      </p>
+      <Link href="/" style={{ display: "inline-block", marginTop: 16, color: "#FF6B35", fontWeight: 600, textDecoration: "none" }}>
+        ← Torna alla dashboard
+      </Link>
+    </div>
+  );
 }

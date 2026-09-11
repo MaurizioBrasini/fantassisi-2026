@@ -7,7 +7,8 @@ import InstallButton from "@/components/InstallButton"; // 🔥 MODIFICA 1: Aggi
 import { startOfTodayInRomeISO } from "@/lib/utils";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
-import { RoosterIcon, CowIcon } from "@/components/TeamIcons";
+import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
+import GameHeader from "@/components/GameHeader";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -311,13 +312,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <RoosterIcon size={40} />
-        <h1 style={{ textAlign: "center", color: "#1E3A5F", fontSize: "1.6rem", margin: 0, lineHeight: 1.2 }}>
-          FantAssisi<br />2026
-        </h1>
-        <CowIcon size={40} />
-      </div>
+      <GameHeader />
 
       {/* 🔥 MODIFICA 2: Pulsante Installa app - visibile su mobile e desktop */}
       <InstallButton />
@@ -535,13 +530,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <RoosterIcon size={40} />
-        <h1 style={{ textAlign: "center", color: "#1E3A5F", fontSize: "1.6rem", margin: 0, lineHeight: 1.2 }}>
-          FantAssisi<br />2026
-        </h1>
-        <CowIcon size={40} />
-      </div>
+      <GameHeader />
 
       {/* 🔥 MODIFICA 3: Pulsante Installa app - visibile su mobile e desktop */}
       <InstallButton />
@@ -559,8 +548,8 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
         </div>
       </div>
 
-      <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24 }}>
-        Ciao <strong>{userName || "Partecipante"}</strong> · {myTeam || "Team non assegnato"}
+      <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+        Ciao <strong>{userName || "Partecipante"}</strong> · <TeamIcon team={myTeam} size={16} /> {myTeam || "Team non assegnato"}
         {myClass && ` · ${CONFIG_ISCRIZIONE.anni.find((a) => a.value === myClass)?.label || myClass}`}
       </p>
 

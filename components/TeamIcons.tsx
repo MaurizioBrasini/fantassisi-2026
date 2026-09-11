@@ -5,46 +5,52 @@ import { TEAM_COLORS } from "@/lib/teamColors";
 type IconProps = {
   size?: number;
   color?: string;
+  // Il contorno bianco (fedele alle slide) legge bene solo su sfondi scuri
+  // o quando riempimento e contorno coincidono (icona bianca su bottone
+  // colorato). Su sfondo chiaro, a dimensioni piccole (badge inline), il
+  // contorno spezza la sagoma e la rende illeggibile: per quei casi va
+  // disattivato.
+  stroke?: string;
   style?: React.CSSProperties;
 };
 
-export function RoosterIcon({ size = 32, color = TEAM_COLORS.Matricole, style }: IconProps) {
+export function RoosterIcon({ size = 32, color = TEAM_COLORS.Matricole, stroke = "none", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 96 96" style={style} xmlns="http://www.w3.org/2000/svg">
       <path
         d="M77.3 22.5C76.9 20.6 76 18.8 74.6 17.5 73.8 14.5 72.4 11.6 70.6 9.1 70.1 8.3 69.1 8 68.2 8.4 67.3 8.8 66.8 9.7 67 10.6 66.3 9.8 65.8 9.2 65.4 8.8 64.6 8 63.3 8 62.6 8.8 61.8 9.6 61.8 10.9 62.6 11.6L63 11.9C62 11.3 60.9 10.8 59.8 10.3 58.8 9.9 57.6 10.4 57.2 11.4 56.8 12.4 57.3 13.6 58.3 14L59.1 14.4C58.1 14.2 57.1 14.2 56 14.2 54.9 14.2 54 15.1 54 16.2 54 17.3 54.9 18.2 56 18.2 57.4 18.2 58.8 18.4 60.2 18.7 58.4 21.2 58 24.3 58.9 27.2L58.9 34.7C58.9 35.2 58.9 35.7 58.8 36.2L60.9 38.3 63.2 36C63.6 35.6 64.2 35.6 64.6 36L66.9 38.3 68.9 36.3 68.9 33.7C69.5 33.6 70.1 33.5 70.6 33.3L70.9 33.3 70.9 35.3C70.9 36.4 71.8 37.3 72.9 37.3 74 37.3 74.9 36.4 74.9 35.3L74.9 30.7C75.6 30 76.1 29.2 76.5 28.3L83 28.3C81.5 26 79.6 24 77.3 22.5Z"
         fill={color}
-        stroke="#FFFFFF"
+        stroke={stroke}
       />
       <path
         d="M66.3 40.5 64 38.2 61.7 40.5C61.3 40.9 60.7 40.9 60.3 40.5L58.3 38.5C56.8 42.8 52.8 45.3 48 45.3 45.6 45.3 43.5 43.7 42.8 41.4 42.1 39.1 43 36.6 45 35.3L45.6 34.9C50.9 31 52.4 23.7 49 18.1 43.3 6.8 22.7 11 15 22.2 13.9 23.8 13 25.6 12.3 27.5 12.2 27.8 12.3 28.2 12.5 28.4 12.7 28.6 13.1 28.7 13.4 28.5 16.7 26.5 20.4 25.3 24.3 25.1 18.2 28.2 13.8 33.7 12 40.3 11.5 42.2 11.2 44.2 11.1 46.2 11.1 46.5 11.3 46.9 11.6 47 11.9 47.1 12.3 47 12.5 46.8 15.1 43.7 18.5 41.3 22.3 39.8 17.2 45.8 15.4 53.9 17.3 61.5 17.4 61.8 17.7 62.1 18 62.1 18.3 62.1 18.7 62 18.8 61.6 19.9 59.4 21.2 57.3 22.8 55.3 22.8 59.2 28.2 66.3 29.8 68.3L29.9 68.2C32.7 71.3 36.8 73.5 42.8 73.8L42.8 79.7C41.7 79.7 40.8 80.6 40.8 81.7 40.8 82.8 41.7 83.7 42.8 83.7L44 83.7 47.4 87.1C47.8 87.5 48.3 87.7 48.8 87.7 49.3 87.7 49.8 87.5 50.2 87.1 50.6 86.7 50.8 86.2 50.8 85.7 50.8 85.2 50.6 84.7 50.2 84.3L49.6 83.7 52 83.7C53.1 83.7 54 82.8 54 81.7 54 80.6 53.1 79.7 52 79.7L47 79.7 47 73.7C47.4 73.7 47.8 73.6 48.2 73.6 49.1 73.5 50 73.4 51 73.2L51 75.7C49.9 75.7 49 76.6 49 77.7L52 77.7C53.3 77.7 54.6 78.4 55.3 79.5 56 80.6 56.2 82 55.7 83.2 56.1 83.5 56.5 83.7 57 83.7 57.5 83.7 58 83.5 58.4 83.1 58.8 82.7 59 82.2 59 81.7 59 81.2 58.8 80.7 58.4 80.3L57.8 79.7 60 79.7C61.1 79.7 62 78.8 62 77.7 62 76.6 61.1 75.7 60 75.7L55 75.7 55 71.7C63.5 67.8 69 59.3 69 49.9L69 39.2 67.7 40.5C67.3 40.8 66.7 40.8 66.3 40.5Z"
         fill={color}
-        stroke="#FFFFFF"
+        stroke={stroke}
       />
     </svg>
   );
 }
 
-export function CowIcon({ size = 32, color = TEAM_COLORS.Veterani, style }: IconProps) {
+export function CowIcon({ size = 32, color = TEAM_COLORS.Veterani, stroke = "none", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 96 96" style={style} xmlns="http://www.w3.org/2000/svg">
       <path
         d="M20.2 75.1C20.2 76.8 21.5 78.1 23.2 78.1 24.9 78.1 26.2 76.8 26.2 75.1L26.2 66.1 20.2 66.1 20.2 75.1Z"
         fill={color}
-        stroke="#FFFFFF"
+        stroke={stroke}
       />
       <path
         d="M91.2 38.8 81.7 27.7C84.3 27 86.2 24.7 86.2 21.9L86.2 19.9C86.2 18.8 85.3 17.9 84.2 17.9 83.1 17.9 82.2 18.8 82.2 19.9L82.2 21.9C82.2 23 81.3 23.9 80.2 23.9L74.2 23.9C73.1 23.9 72.2 23 72.2 21.9L72.2 19.9C72.2 18.8 71.3 17.9 70.2 17.9 69.1 17.9 68.2 18.8 68.2 19.9L68.2 21.9C68.2 23.4 68.8 24.8 69.7 25.9L61.2 25.9 14.2 25.9C12 25.9 10.2 27.7 10.2 29.9 6.9 29.9 4.2 32.6 4.2 35.9L4.2 57.9C4.2 59 5.1 59.9 6.2 59.9 7.3 59.9 8.2 59 8.2 57.9L8.2 36C8.2 34.9 9.1 34 10.2 34L10.2 60 10.2 75C10.2 76.7 11.5 78 13.2 78 14.9 78 16.2 76.7 16.2 75L16.2 64 26.2 64C28.4 64 30.2 62.2 30.2 60L50.2 60 50.2 75C50.2 76.7 51.5 78 53.2 78 54.9 78 56.2 76.7 56.2 75L56.2 60 60.2 60 60.2 75C60.2 76.7 61.5 78 63.2 78 64.9 78 66.2 76.7 66.2 75L66.2 59.8C69.6 58.9 72.2 55.8 72.2 52.1 72.2 48.5 75.1 43.1 79.2 43.1 81.9 43.1 84.9 44.4 86.6 45.3 87.5 45.8 88.6 45.5 89.2 44.6L91.3 41.4C91.9 40.5 91.8 39.5 91.2 38.8Z"
         fill={color}
-        stroke="#FFFFFF"
+        stroke={stroke}
       />
     </svg>
   );
 }
 
 // Icona per la squadra passata come stringa (usato dove il team è dinamico).
-export function TeamIcon({ team, size = 32, style }: { team: string | null | undefined; size?: number; style?: React.CSSProperties }) {
-  if (team === "Matricole") return <RoosterIcon size={size} style={style} />;
-  if (team === "Veterani") return <CowIcon size={size} style={style} />;
+export function TeamIcon({ team, size = 32, stroke, style }: { team: string | null | undefined; size?: number; stroke?: string; style?: React.CSSProperties }) {
+  if (team === "Matricole") return <RoosterIcon size={size} stroke={stroke} style={style} />;
+  if (team === "Veterani") return <CowIcon size={size} stroke={stroke} style={style} />;
   return null;
 }

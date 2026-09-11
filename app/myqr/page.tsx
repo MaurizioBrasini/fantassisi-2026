@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import { TeamIcon } from "@/components/TeamIcons";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -180,8 +181,8 @@ export default function MyQRPage() {
 
       <h2 style={{ color: "#1E3A5F", marginBottom: 4 }}>Il mio QR</h2>
       {userInfo && (
-        <p style={{ color: "#333", marginBottom: 20 }}>
-          {userInfo.name} · {userInfo.team}
+        <p style={{ color: "#333", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          {userInfo.name} · <TeamIcon team={userInfo.team} size={18} /> {userInfo.team}
         </p>
       )}
 
