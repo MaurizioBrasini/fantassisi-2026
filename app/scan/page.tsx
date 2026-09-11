@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -33,6 +33,49 @@ function detectInAppBrowser(): string | null {
 
 type CameraInfo = { id: string; label: string };
 
+// Screenshot reali del passaggio (da mettere in public/help/, vedi nota in
+// fondo al file). Finché il file non esiste l'immagine si nasconde da sola
+// (onError) e resta solo il testo: nessun rischio di icona "immagine rotta".
+function StepImg({ src, alt }: { src: string; alt: string }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{ display: "block", maxWidth: "100%", borderRadius: 8, margin: "6px 0 12px", border: "1px solid #eee" }}
+      onError={(e) => {
+        (e.currentTarget as HTMLImageElement).style.display = "none";
+      }}
+    />
+  );
+}
+
+// Riconosce etichette di fotocamera anteriore/posteriore anche quando il
+// dispositivo le riporta in italiano o in altre lingue (non solo inglese) —
+// caso frequente su iPhone/Android con lingua di sistema non inglese, che fa
+// fallire il semplice controllo su "back"/"front" e fa scegliere per sbaglio
+// la selfie camera.
+const FRONT_LABEL_RE = /front|user|selfie|facetime|anter|avant|frontal/i;
+const BACK_LABEL_RE = /back|rear|environment|post|world|principal|wide|grandangol|arri[eè]re|tr[aá]sera|r[uü]ck/i;
+
+// Ordina le fotocamere mettendo per prime quelle più probabilmente posteriori,
+// per orientare la scelta di default sia nel tentativo automatico sia nella
+// lista mostrata per la scelta manuale:
+// 1. etichette che sembrano posteriori (qualunque lingua nota)
+// 2. etichette che non sembrano anteriori (nessun segnale chiaro)
+// 3. tutte le altre (probabile selfie), per ultime — mai escluse del tutto,
+//    per permettere comunque la scelta manuale se serve davvero quella.
+function sortCamerasBackFirst(cameras: CameraInfo[]): CameraInfo[] {
+  const score = (c: CameraInfo) => {
+    if (BACK_LABEL_RE.test(c.label)) return 0;
+    if (!c.label || !FRONT_LABEL_RE.test(c.label)) return 1;
+    return 2;
+  };
+  return [...cameras]
+    .map((c, i) => ({ c, i, s: score(c) }))
+    .sort((a, b) => a.s - b.s || a.i - b.i)
+    .map(({ c }) => c);
+}
+
 export default function ScanPage() {
   return (
     <Suspense fallback={null}>
@@ -54,6 +97,9 @@ function ScanPageInner() {
   const [showHelp, setShowHelp] = useState(false);
   const [helpChoice, setHelpChoice] = useState<"permessi" | "fotocamera" | null>(null);
   const inAppBrowser = detectInAppBrowser();
+  // Riferimento allo scanner html5-qrcode attualmente in esecuzione, per poterlo
+  // fermare da "Cambia fotocamera" senza doverne tenere traccia nello stato React.
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   const handleScanResult = async (decodedText: string, userId: string) => {
     // ----- PIN a 4 cifre (fallback manuale per chi non riesce a scansionare) -----
@@ -258,6 +304,7 @@ function ScanPageInner() {
         config,
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
+          scannerRef.current = null;
           try {
             await scanner.stop();
             scanner.clear();
@@ -276,6 +323,7 @@ function ScanPageInner() {
           // Chiamato a ogni fotogramma senza QR rilevato: normale, si ignora.
         }
       );
+      scannerRef.current = scanner;
       return true;
     } catch (err) {
       console.error("Fotocamera non disponibile:", cameraIdOrConfig, err);
@@ -283,7 +331,23 @@ function ScanPageInner() {
     }
   };
 
+  // Ferma lo scanner attivo (se c'è) senza toccare stato/UI: usato prima di
+  // avviarne un altro, sia per il pulsante "Cambia fotocamera" sia in caso di
+  // retry automatico.
+  const stopActiveScanner = async () => {
+    const scanner = scannerRef.current;
+    scannerRef.current = null;
+    if (!scanner) return;
+    try {
+      await scanner.stop();
+      scanner.clear();
+    } catch (err) {
+      console.error("Errore fermando lo scanner:", err);
+    }
+  };
+
   const startScanWithCamera = async (cameraId: string) => {
+    await stopActiveScanner();
     setCameras(null);
     setScanning(true);
     setError("");
@@ -292,6 +356,38 @@ function ScanPageInner() {
       setScanning(false);
       setError("Impossibile avviare questa fotocamera. Riprova o scegline un'altra.");
     }
+  };
+
+  // Elenca le fotocamere e le ordina mettendo per prime quelle più probabilmente
+  // posteriori, per orientare la scelta anche quando l'utente sceglie a mano da
+  // "Cambia fotocamera" (stesso criterio usato nel tentativo automatico).
+  const listCamerasBackFirst = async (): Promise<CameraInfo[]> => {
+    const found = await Html5Qrcode.getCameras();
+    return sortCamerasBackFirst(found || []);
+  };
+
+  // Mostra la lista di fotocamere per la scelta manuale (usato sia come ultima
+  // spiaggia dopo un tentativo automatico fallito, sia on-demand dal pulsante
+  // "Cambia fotocamera" mentre lo scanner è già attivo).
+  const handleChangeCamera = async () => {
+    await stopActiveScanner();
+    setScanning(false);
+    setError("");
+    setLoadingCameras(true);
+    let found: CameraInfo[] = [];
+    try {
+      found = await listCamerasBackFirst();
+    } catch (err: any) {
+      setLoadingCameras(false);
+      setError("Impossibile leggere l'elenco delle fotocamere: " + (err?.message || String(err)));
+      return;
+    }
+    setLoadingCameras(false);
+    if (!found || found.length === 0) {
+      setError("Nessuna fotocamera trovata sul dispositivo");
+      return;
+    }
+    setCameras(found);
   };
 
   const handleAvviaScanner = async () => {
@@ -340,8 +436,7 @@ function ScanPageInner() {
       return;
     }
 
-    const backCameras = found.filter((c) => /back|rear|environment/i.test(c.label));
-    const candidates = backCameras.length > 0 ? backCameras : found;
+    const candidates = sortCamerasBackFirst(found);
 
     for (const cam of candidates) {
       const ok = await tryStartCamera(cam.id);
@@ -351,7 +446,7 @@ function ScanPageInner() {
     // Nessun tentativo automatico ha funzionato: lascia scegliere a mano.
     setScanning(false);
     if (found.length > 1) {
-      setCameras(found);
+      setCameras(candidates);
     } else {
       setError("Impossibile avviare la fotocamera disponibile sul dispositivo.");
     }
@@ -444,6 +539,25 @@ function ScanPageInner() {
             </button>
           ))}
           <button
+            onClick={() => {
+              setCameras(null);
+              setShowHelp(true);
+              setHelpChoice("fotocamera");
+            }}
+            style={{
+              width: "100%",
+              padding: 12,
+              marginBottom: 8,
+              borderRadius: 10,
+              fontWeight: 600,
+              background: "#e8f5e9",
+              color: "#2E7D32",
+              border: "1px solid #2E7D32",
+            }}
+          >
+            📸 Usa invece la fotocamera del telefono
+          </button>
+          <button
             onClick={() => setCameras(null)}
             style={{
               width: "100%",
@@ -461,9 +575,26 @@ function ScanPageInner() {
       )}
 
       {scanning && (
-        <p style={{ textAlign: "center", color: "#1E3A5F" }}>
-          Scanner attivo... Inquadra un QR
-        </p>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ color: "#1E3A5F" }}>Scanner attivo... Inquadra un QR</p>
+          <p style={{ fontSize: "0.8rem", color: "#666", marginTop: -4, marginBottom: 12 }}>
+            Vedi l&apos;immagine sbagliata (es. il tuo viso)?
+          </p>
+          <button
+            onClick={handleChangeCamera}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 60,
+              fontWeight: 700,
+              background: "#f0f0f0",
+              color: "#1E3A5F",
+              border: "1px solid #ccc",
+              cursor: "pointer",
+            }}
+          >
+            🔄 Cambia fotocamera
+          </button>
+        </div>
       )}
 
       {error && (
@@ -511,10 +642,24 @@ function ScanPageInner() {
                   <p style={{ fontWeight: 700, marginTop: 0 }}>Hai aperto questo link da WhatsApp, Gmail o un'altra app?</p>
                   <p>È la causa più comune: quei browser "interni" spesso non possono accedere alla fotocamera. Tocca i tre puntini (⋮) o l'icona di condivisione in alto e scegli "Apri nel browser", poi riprova da lì.</p>
 
-                  <p style={{ fontWeight: 700 }}>iPhone (Safari)</p>
-                  <p>Tocca "AA" nella barra dell'indirizzo in alto → Impostazioni sito web → Fotocamera → Consenti. Oppure: Impostazioni del telefono → Safari → Fotocamera → Consenti.</p>
+                  <p style={{ fontWeight: 700 }}>📱 iPhone (Safari) — passo 1</p>
+                  <p>In alto, a sinistra dell'indirizzo del sito, tocca "AA" (a volte è uno scudo):</p>
+                  <StepImg src="/help/ios-1-aa.png" alt="Icona AA nella barra degli indirizzi di Safari" />
 
-                  <p style={{ fontWeight: 700 }}>Android (Chrome)</p>
+                  <p style={{ fontWeight: 700 }}>Passo 2</p>
+                  <p>Nel menu che si apre, tocca "Impostazioni sito web":</p>
+                  <StepImg src="/help/ios-2-impostazioni.png" alt="Voce Impostazioni sito web nel menu AA" />
+
+                  <p style={{ fontWeight: 700 }}>Passo 3</p>
+                  <p>Tocca "Fotocamera" e scegli "Consenti", poi ricarica la pagina:</p>
+                  <StepImg src="/help/ios-3-consenti.png" alt="Impostazione Fotocamera su Consenti" />
+
+                  <p style={{ fontWeight: 700, color: "#dc3545" }}>Non vedi "Fotocamera" nel menu, o hai già provato senza risultato?</p>
+                  <p>Il blocco allora è un livello più su, nell'app Impostazioni del telefono (non dentro Safari):</p>
+                  <p>1. Impostazioni → Safari → Fotocamera → Consenti.<br />
+                  2. Se non basta: Impostazioni → Privacy e sicurezza → Fotocamera → controlla che l'interruttore accanto a "Safari" sia acceso (verde).</p>
+
+                  <p style={{ fontWeight: 700 }}>🤖 Android (Chrome)</p>
                   <p>Tocca il lucchetto (o la "i") accanto all'indirizzo → Autorizzazioni → Fotocamera → Consenti. Poi ricarica la pagina.</p>
 
                   <p style={{ fontWeight: 700 }}>Samsung Internet</p>
