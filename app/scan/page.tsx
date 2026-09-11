@@ -658,9 +658,19 @@ function ScanPageInner() {
                   <p>Il blocco allora è un livello più su, nell'app Impostazioni del telefono (non dentro Safari):</p>
                   <p>1. Impostazioni → Safari → Fotocamera → Consenti.<br />
                   2. Se non basta: Impostazioni → Privacy e sicurezza → Fotocamera → controlla che l'interruttore accanto a "Safari" sia acceso (verde).</p>
+                  <p style={{ color: "#666", fontSize: "0.78rem" }}>(Su iPhone, usando Chrome invece di Safari, il permesso si trova come su Android: tocca il lucchetto accanto all'indirizzo.)</p>
 
-                  <p style={{ fontWeight: 700 }}>🤖 Android (Chrome)</p>
-                  <p>Tocca il lucchetto (o la "i") accanto all'indirizzo → Autorizzazioni → Fotocamera → Consenti. Poi ricarica la pagina.</p>
+                  <p style={{ fontWeight: 700 }}>🤖 Android (Chrome / Edge) — passo 1</p>
+                  <p>Tocca il lucchetto accanto all'indirizzo, in alto:</p>
+                  <StepImg src="/help/android-1-lucchetto.png" alt="Icona lucchetto nella barra degli indirizzi" />
+
+                  <p style={{ fontWeight: 700 }}>Passo 2</p>
+                  <p>Tocca "Autorizzazioni" (o "Impostazioni sito"):</p>
+                  <StepImg src="/help/android-2-autorizzazioni.png" alt="Voce Autorizzazioni nel menu del lucchetto" />
+
+                  <p style={{ fontWeight: 700 }}>Passo 3</p>
+                  <p>Scorri fino a "Fotocamera" (su Chrome ed Edge non è sempre la prima voce) e scegli "Consenti", poi ricarica la pagina:</p>
+                  <StepImg src="/help/android-3-fotocamera.png" alt="Permesso Fotocamera impostato su Consenti" />
 
                   <p style={{ fontWeight: 700 }}>Samsung Internet</p>
                   <p>Menu (⋮) → Impostazioni → Siti web e download → Autorizzazioni sito → Fotocamera → cerca questo sito → Consenti.</p>
