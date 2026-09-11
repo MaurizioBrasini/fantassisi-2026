@@ -94,11 +94,6 @@ function TeamSwitchBox({ currentTeam, allowLeave, onDone }: {
       {!team ? (
         <>
           <p style={{ fontWeight: 700, color: "#1E3A5F", marginBottom: 6 }}>Scegli la tua squadra</p>
-          {!allowLeave && (
-            <p style={{ fontSize: "0.8rem", color: "#666", marginBottom: 16 }}>
-              Attenzione: la scelta è irreversibile!
-            </p>
-          )}
           <div style={{ display: "flex", gap: 12 }}>
             <button
               onClick={() => setTeam("Matricole")}

@@ -33,9 +33,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
   }
 
-  // Solo chi è (o è già stato) Didatti&Docenti può scegliere/cambiare/lasciare la squadra.
-  // Un allievo importato direttamente come Matricola/Veterano non può mai cambiarla.
-  const canChooseTeam = user.team === "Didatti&Docenti" || user.is_didatta === true;
+  // Può scegliere/cambiare/lasciare la squadra solo chi non è già bloccato in una squadra
+  // assegnata dall'import (Matricole/Veterani in base all'anno) — quindi chi è Didatti&Docenti,
+  // chi non ha ancora nessuna squadra (es. account creati senza team), o chi è già stato
+  // Didatti&Docenti in passato (is_didatta). Un allievo importato direttamente come
+  // Matricola/Veterano non può mai cambiarla.
+  const canChooseTeam =
+    (user.team !== "Matricole" && user.team !== "Veterani") || user.is_didatta === true;
   if (!canChooseTeam) {
     return NextResponse.json({ error: "Non puoi cambiare squadra" }, { status: 403 });
   }
