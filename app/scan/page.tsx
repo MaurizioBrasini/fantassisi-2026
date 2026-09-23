@@ -4,6 +4,7 @@ import { Suspense, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
+import { invalidateCachedDashboardScores } from "@/lib/utils";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -114,6 +115,7 @@ function ScanPageInner() {
       });
       const data = await res.json();
       if (res.ok) {
+        invalidateCachedDashboardScores(userId);
         alert(`✅ +${data.points} punti!`);
         router.push("/");
         return;
@@ -135,6 +137,7 @@ function ScanPageInner() {
         router.push("/");
         return;
       }
+      invalidateCachedDashboardScores(userId);
       if (data2.type === "bonus") {
         alert(`⚡ +${data2.amount} CBTcoin extra!`);
       } else {
@@ -198,6 +201,7 @@ function ScanPageInner() {
         return;
       }
 
+      invalidateCachedDashboardScores(userId);
       // 🔥 MODIFICA: usa il messaggio personalizzato dall'API
       alert(data.message || `✅ Votato! +1 punto per i ${event.team_target}`);
       router.push("/");
@@ -229,6 +233,7 @@ function ScanPageInner() {
         return;
       }
 
+      invalidateCachedDashboardScores(userId);
       alert(`⚡ +${bonus.amount} CBTcoin extra!`);
       router.push("/");
       return;
@@ -248,6 +253,7 @@ function ScanPageInner() {
         return;
       }
 
+      invalidateCachedDashboardScores(userId);
       if (data.type === "bonus") {
         alert(`⚡ +${data.amount} CBTcoin extra!`);
       } else if (data.type === "vote") {
@@ -278,6 +284,7 @@ function ScanPageInner() {
       return;
     }
 
+    invalidateCachedDashboardScores(userId);
     alert(`✅ +${data.points} punti!`);
     router.push("/");
   };

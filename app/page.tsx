@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import InstallButton from "@/components/InstallButton"; // 🔥 MODIFICA 1: Aggiunto import
-import { startOfTodayInRomeISO } from "@/lib/utils";
+import { startOfTodayInRomeISO, getCachedDashboardScores, setCachedDashboardScores } from "@/lib/utils";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
@@ -210,6 +210,14 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
 
   useEffect(() => {
     const fetchData = async () => {
+      const cached = getCachedDashboardScores(userId);
+      if (cached) {
+        setRemainingCoins(cached.remainingCoins);
+        setTeamScores(cached.teamScores);
+        setLoading(false);
+        return;
+      }
+
       let allUsersRaw: { id: string; team: string | null }[] = [];
       let from = 0;
       while (true) {
@@ -296,6 +304,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
 
       setTeamScores(pts);
       setLoading(false);
+      setCachedDashboardScores(userId, { remainingCoins: Math.max(0, remaining), teamScores: pts });
     };
     fetchData();
   }, [userId]);
@@ -417,6 +426,16 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
   useEffect(() => {
     const fetchData = async () => {
+      const cached = getCachedDashboardScores(userId);
+      if (cached) {
+        setRemainingCoins(cached.remainingCoins);
+        setTeamScores(cached.teamScores);
+        setMyPoints(cached.myPoints || 0);
+        setMyRank(cached.myRank ?? null);
+        setLoading(false);
+        return;
+      }
+
       let allUsersRaw: { id: string; team: string | null }[] = [];
       let from = 0;
       while (true) {
@@ -507,13 +526,21 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
       }
 
       setTeamScores(pts);
-      setMyPoints(pointsByUser.get(userId) || 0);
+      const myPointsValue = pointsByUser.get(userId) || 0;
+      setMyPoints(myPointsValue);
 
       const ranking = Array.from(pointsByUser.entries()).sort((a, b) => b[1] - a[1]);
       const myIndex = ranking.findIndex(([uid]) => uid === userId);
-      setMyRank(myIndex >= 0 ? myIndex + 1 : null);
+      const myRankValue = myIndex >= 0 ? myIndex + 1 : null;
+      setMyRank(myRankValue);
 
       setLoading(false);
+      setCachedDashboardScores(userId, {
+        remainingCoins: Math.max(0, remaining),
+        teamScores: pts,
+        myPoints: myPointsValue,
+        myRank: myRankValue,
+      });
     };
     fetchData();
   }, [userId]);
