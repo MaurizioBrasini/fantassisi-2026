@@ -1005,11 +1005,12 @@ export default function AdminPage() {
                     <td style={{ padding: 8 }}>{u.email}</td>
                     <td style={{ padding: 8 }}>
                       {u.team || "-"}
-                      {u.status === "lista_attesa" && (
+                      {u.status === "lista_attesa" ? (
                         <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: "bold", background: "#ffc107", color: "#333" }}>ATTESA</span>
-                      )}
-                      {u.status === "ritirato" && (
+                      ) : u.status === "ritirato" ? (
                         <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: "bold", background: "#dc3545", color: "white" }}>RITIRATO</span>
+                      ) : (
+                        <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: "bold", background: "#28a745", color: "white" }}>ISCRITTO</span>
                       )}
                     </td>
                     <td style={{ padding: 8 }}>
