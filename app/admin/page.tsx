@@ -165,6 +165,8 @@ const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
   );
 };
 
+type UserSortCol = "name" | "email" | "team" | "status" | "role" | "site" | "school" | "year";
+
 export default function AdminPage() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -173,7 +175,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("all");
-  const [userSortBy, setUserSortBy] = useState<"name" | "email" | "team" | "role">("name");
+  const [userSortBy, setUserSortBy] = useState<UserSortCol>("name");
   const [userSortDir, setUserSortDir] = useState<"asc" | "desc">("asc");
   const [events, setEvents] = useState<any[]>([]);
   const [bonuses, setBonuses] = useState<any[]>([]);
@@ -351,12 +353,30 @@ export default function AdminPage() {
       } else if (userSortBy === "role") {
         valA = (a.role || "").toLowerCase();
         valB = (b.role || "").toLowerCase();
+      } else if (userSortBy === "status") {
+        // confermato < lista_attesa < ritirato (anche alfabetico)
+        valA = a.status || "confermato";
+        valB = b.status || "confermato";
+      } else if (userSortBy === "site") {
+        valA = (a.site || "").toLowerCase();
+        valB = (b.site || "").toLowerCase();
+      } else if (userSortBy === "school") {
+        valA = (a.school || "").toLowerCase();
+        valB = (b.school || "").toLowerCase();
+      } else if (userSortBy === "year") {
+        // ordine dei corsi (preiscrizione, primo, ...); chi non ha l'anno va in fondo
+        const rank = (y?: string) => {
+          const i = CONFIG_ISCRIZIONE.anni.findIndex((x) => x.value === y);
+          return String(i < 0 ? 99 : i).padStart(2, "0");
+        };
+        valA = rank(a.year);
+        valB = rank(b.year);
       }
       const cmp = valA.localeCompare(valB);
       return userSortDir === "asc" ? cmp : -cmp;
     });
 
-  const toggleUserSort = (col: "name" | "email" | "team" | "role") => {
+  const toggleUserSort = (col: UserSortCol) => {
     if (userSortBy === col) {
       setUserSortDir(userSortDir === "asc" ? "desc" : "asc");
     } else {
@@ -365,7 +385,7 @@ export default function AdminPage() {
     }
   };
 
-  const sortArrow = (col: "name" | "email" | "team" | "role") => {
+  const sortArrow = (col: UserSortCol) => {
     if (userSortBy !== col) return "";
     return userSortDir === "asc" ? " ▲" : " ▼";
   };
@@ -977,10 +997,11 @@ export default function AdminPage() {
                 <th onClick={() => toggleUserSort("name")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Nome{sortArrow("name")}</th>
                 <th onClick={() => toggleUserSort("email")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Email{sortArrow("email")}</th>
                 <th onClick={() => toggleUserSort("team")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Team{sortArrow("team")}</th>
+                <th onClick={() => toggleUserSort("status")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Stato{sortArrow("status")}</th>
                 <th onClick={() => toggleUserSort("role")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Ruolo{sortArrow("role")}</th>
-                <th style={{ textAlign: "left", padding: 8 }}>Sede</th>
-                <th style={{ textAlign: "left", padding: 8 }}>Scuola</th>
-                <th style={{ textAlign: "left", padding: 8 }}>Anno</th>
+                <th onClick={() => toggleUserSort("site")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Sede{sortArrow("site")}</th>
+                <th onClick={() => toggleUserSort("school")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Scuola{sortArrow("school")}</th>
+                <th onClick={() => toggleUserSort("year")} style={{ textAlign: "left", padding: 8, cursor: "pointer", userSelect: "none" }}>Anno{sortArrow("year")}</th>
                 <th style={{ textAlign: "center", padding: 8 }}>Azioni</th>
               </tr>
             </thead>
@@ -1005,6 +1026,8 @@ export default function AdminPage() {
                     <td style={{ padding: 8 }}>{u.email}</td>
                     <td style={{ padding: 8 }}>
                       {u.team || "-"}
+                    </td>
+                    <td style={{ padding: 8 }}>
                       {u.status === "lista_attesa" ? (
                         <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: "bold", background: "#ffc107", color: "#333" }}>ATTESA</span>
                       ) : u.status === "ritirato" ? (
