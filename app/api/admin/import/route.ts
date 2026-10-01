@@ -82,7 +82,14 @@ function assignTeam(iscrizioneRaw: string, anno: string): string | null {
   return null;
 }
 
-async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
+// Nel file capita una cella con più indirizzi ("a@x.it; b@y.it"): si tiene il primo
+// valido, così non nasce un utente con un'email finta che non riceverebbe mai il link.
+function firstValidEmail(raw: string): string {
+  const candidates = raw.toLowerCase().split(/[\s;,]+/).filter(Boolean);
+  return candidates.find((c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) || "";
+}
+
+async function parseRawExcel(file: File): Promise<{ records: Record<string, any>[]; emailScartate: string[] }> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
 
@@ -128,15 +135,20 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
 
   // Stessa email in più fogli (es. confermato e lista d'attesa): vince lo stato più "forte"
   const seen = new Map<string, Record<string, any>>();
+  const emailScartate: string[] = [];
   for (const row of [...allRows, ...ritirati]) {
-    const email = String(row["Indirizzo email"] || "").trim().toLowerCase();
-    if (!email) continue;
+    const rawEmail = String(row["Indirizzo email"] || "").trim();
+    const email = firstValidEmail(rawEmail);
+    if (!email) {
+      if (rawEmail) emailScartate.push(rawEmail);
+      continue;
+    }
     const prev = seen.get(email);
     if (prev && STATUS_PRIORITY[prev.__status as Status] >= STATUS_PRIORITY[row.__status as Status]) continue;
-    seen.set(email, row);
+    seen.set(email, { ...row, "Indirizzo email": email });
   }
 
-  return Array.from(seen.values()).map((row) => {
+  const records = Array.from(seen.values()).map((row) => {
     const status = row.__status as Status;
     const iscrizione = String(row["ISCRIZIONE"] || "").trim();
     const anno = String(row["ANNO DI FREQUENZA"] || "").trim();
@@ -182,6 +194,8 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
       auth_token: "",
     };
   });
+
+  return { records, emailScartate };
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -234,9 +248,12 @@ export async function POST(request: Request) {
   const isExcel = file.name.toLowerCase().endsWith(".xlsx") || file.name.toLowerCase().endsWith(".xls");
 
   let rawRecords: Record<string, any>[];
+  let emailScartate: string[] = [];
   try {
     if (isExcel) {
-      rawRecords = await parseRawExcel(file);
+      const parsed = await parseRawExcel(file);
+      rawRecords = parsed.records;
+      emailScartate = parsed.emailScartate;
     } else {
       const text = await file.text();
       rawRecords = parseCSV(text);
@@ -376,6 +393,10 @@ export async function POST(request: Request) {
   const nuovi = records.filter((r) => !existingTokens.has(r.email)).length;
   const attesa = records.filter((r) => r.status === "lista_attesa").length;
   return NextResponse.json({
-    message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe (${nuovi} nuovi, ${records.length - nuovi} già presenti; ${records.length - attesa} confermati, ${attesa} in lista d'attesa). Segnati come ritirati: ${ritirati}.`,
+    message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe (${nuovi} nuovi, ${records.length - nuovi} già presenti; ${records.length - attesa} confermati, ${attesa} in lista d'attesa). Segnati come ritirati: ${ritirati}.${
+      emailScartate.length > 0
+        ? ` ⚠️ Righe scartate per email non valida (${emailScartate.length}): ${emailScartate.slice(0, 10).join(", ")}`
+        : ""
+    }`,
   });
 }
