@@ -82,11 +82,28 @@ function assignTeam(iscrizioneRaw: string, anno: string): string | null {
   return null;
 }
 
+// Refusi di battitura frequenti nei domini delle email. Si corregge solo il dominio
+// (mai la parte prima della @) e solo per refusi inequivocabili.
+const DOMAIN_TYPOS: Record<string, string> = {
+  "gamil.com": "gmail.com", "gmal.com": "gmail.com", "gmai.com": "gmail.com",
+  "gmial.com": "gmail.com", "gnail.com": "gmail.com", "gmaill.com": "gmail.com",
+  "gmail.coml": "gmail.com", "gmail.con": "gmail.com", "gmail.co": "gmail.com",
+  "hotmial.com": "hotmail.com", "hotmal.com": "hotmail.com", "hotmail.con": "hotmail.com",
+  "hotmail.coml": "hotmail.com", "hotmail.itt": "hotmail.it",
+  "yahoo.con": "yahoo.com", "yaho.com": "yahoo.com", "yaho.it": "yahoo.it",
+  "libero.itt": "libero.it", "libero.con": "libero.it", "outlook.con": "outlook.com",
+};
+
 // Nel file capita una cella con più indirizzi ("a@x.it; b@y.it"): si tiene il primo
 // valido, così non nasce un utente con un'email finta che non riceverebbe mai il link.
+// Il dominio con un refuso noto viene corretto (es. gamil.com -> gmail.com).
 function firstValidEmail(raw: string): string {
   const candidates = raw.toLowerCase().split(/[\s;,]+/).filter(Boolean);
-  return candidates.find((c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) || "";
+  const valid = candidates.find((c) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c));
+  if (!valid) return "";
+  const at = valid.lastIndexOf("@");
+  const domain = valid.slice(at + 1);
+  return valid.slice(0, at + 1) + (DOMAIN_TYPOS[domain] ?? domain);
 }
 
 async function parseRawExcel(file: File): Promise<{ records: Record<string, any>[]; emailScartate: string[] }> {
