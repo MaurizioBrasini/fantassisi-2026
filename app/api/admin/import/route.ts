@@ -226,7 +226,10 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: existing } = await supabase.from("users").select("email, auth_token, pin");
+  const { data: existing } = await supabase.from("users").select("email, auth_token, pin, role");
+  // Il ruolo (student/staff/admin) di chi è già a sistema non si tocca mai col reimport:
+  // il file Excel non lo contiene e lo riporterebbe a "student".
+  const existingRoles = new Map((existing || []).map((u) => [u.email, u.role as string | null]));
   const existingTokens = new Map((existing || []).map((u) => [u.email, u.auth_token]));
   const existingPins = new Map((existing || []).map((u) => [u.email, u.pin]));
   const usedPins = new Set((existing || []).map((u) => u.pin).filter(Boolean) as string[]);
@@ -255,7 +258,11 @@ export async function POST(request: Request) {
     .map((r) => {
       const email = String(r.email).trim().toLowerCase();
       const team = r.team && validTeams.has(r.team) ? r.team : null;
-      const userRole = validRoles.has(r.role) ? r.role : "student";
+      const existingRole = existingRoles.get(email);
+      const userRole =
+        existingRole && validRoles.has(existingRole)
+          ? existingRole
+          : validRoles.has(r.role) ? r.role : "student";
       const year = r.year && validYears.has(r.year) ? r.year : null;
 
       // Validazione Team ↔ Anno
