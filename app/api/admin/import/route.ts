@@ -268,8 +268,9 @@ export async function POST(request: Request) {
 
   const filteredRaw = rawRecords.filter((r) => r.email && r.status !== "ritirato");
 
-  // Cancellati: si segnano come "ritirato" solo se sono già a sistema (restano a database,
-  // senza squadra); chi non c'è ancora non viene creato.
+  // Cancellati: si segnano come "ritirato" solo se sono già a sistema (restano a database
+  // con squadra e dati invariati); chi non c'è ancora non viene creato (il foglio non ha
+  // né scuola né anno, quindi non si potrebbe assegnare la squadra).
   const ritiratiEmails = Array.from(
     new Set(
       rawRecords
@@ -311,10 +312,9 @@ export async function POST(request: Request) {
           finalTeam = null;
         }
       }
-      // Chi è in lista d'attesa viene importato ma senza squadra: così non conta nei
-      // punteggi e non può essere votato. Quando verrà confermato basta reimportare il file.
+      // Lista d'attesa: importati con la squadra di competenza (da iscrizione/anno), come i
+      // confermati; lo stato serve solo a riconoscerli.
       const status: Status = r.status === "lista_attesa" ? "lista_attesa" : "confermato";
-      if (status === "lista_attesa") finalTeam = null;
 
       const token =
         existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -357,7 +357,7 @@ export async function POST(request: Request) {
     const batch = daRitirare.slice(i, i + BATCH_SIZE);
     const { error } = await supabase
       .from("users")
-      .update({ status: "ritirato", team: null, is_didatta: false })
+      .update({ status: "ritirato" })
       .in("email", batch);
     if (error) {
       errors.push(error.message);
