@@ -1203,7 +1203,7 @@ export default function AdminPage() {
               </select>
             ) : (
               <p style={{ marginTop: 8, padding: 8, background: "#f5f5f5", borderRadius: 6, fontSize: "0.85rem", color: "#666" }}>
-                Ruolo: Studente (solo un admin può assegnare ruoli diversi)
+                Ruolo: Partecipante (solo un admin può assegnare ruoli diversi)
               </p>
             )}
 
@@ -1286,7 +1286,7 @@ export default function AdminPage() {
               </select>
             ) : (
               <p style={{ marginTop: 8, padding: 8, background: "#f5f5f5", borderRadius: 6, fontSize: "0.85rem", color: "#666" }}>
-                Ruolo attuale: {userForm.role} (solo un admin può modificarlo)
+                Ruolo attuale: {userForm.role === "student" ? "partecipante" : userForm.role} (solo un admin può modificarlo)
               </p>
             )}
 
