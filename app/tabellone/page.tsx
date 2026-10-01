@@ -10,8 +10,8 @@ import { RoosterIcon, CowIcon } from "@/components/TeamIcons";
 import type { ScoreboardData } from "@/lib/scoreboard";
 
 const POLL_MS = 5000;
-const SLIDE_MS = 15000;
-const SLIDES = ["squadre", "classi", "sedi", "individuali"] as const;
+const SLIDE_MS = 10000;
+const SLIDES = ["squadre", "individuali", "sedi", "classi"] as const;
 type Slide = (typeof SLIDES)[number];
 
 const TITLES: Record<Slide, string> = {
