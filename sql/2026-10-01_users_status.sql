@@ -1,4 +1,4 @@
--- Stato iscrizione dell'utente: 'confermato' | 'lista_attesa'
+-- Stato iscrizione dell'utente: 'confermato' | 'lista_attesa' | 'ritirato'
 -- Gli utenti già presenti diventano 'confermato'. Da eseguire nello SQL Editor di Supabase
 -- PRIMA di importare il file Excel con i fogli confermati/lista d'attesa.
 alter table public.users

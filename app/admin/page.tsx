@@ -329,6 +329,7 @@ export default function AdminPage() {
         if (userRoleFilter === "Didatti&Docenti" && u.team !== "Didatti&Docenti") return false;
         if (userRoleFilter === "confermato" && (u.status || "confermato") !== "confermato") return false;
         if (userRoleFilter === "lista_attesa" && u.status !== "lista_attesa") return false;
+        if (userRoleFilter === "ritirato" && u.status !== "ritirato") return false;
       }
       if (!userSearch.trim()) return true;
       const q = userSearch.trim().toLowerCase();
@@ -946,6 +947,7 @@ export default function AdminPage() {
             <option value="Didatti&Docenti">Solo Didatti&amp;Docenti</option>
             <option value="confermato">Solo Confermati</option>
             <option value="lista_attesa">Solo Lista d'attesa</option>
+            <option value="ritirato">Solo Ritirati</option>
           </select>
           {isSuper && (
             <button
@@ -1005,6 +1007,9 @@ export default function AdminPage() {
                       {u.team || "-"}
                       {u.status === "lista_attesa" && (
                         <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: "bold", background: "#ffc107", color: "#333" }}>ATTESA</span>
+                      )}
+                      {u.status === "ritirato" && (
+                        <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: "bold", background: "#dc3545", color: "white" }}>RITIRATO</span>
                       )}
                     </td>
                     <td style={{ padding: 8 }}>

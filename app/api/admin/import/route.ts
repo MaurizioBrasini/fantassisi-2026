@@ -67,8 +67,8 @@ const DIDATTI_DOCENTI_L = lowerSet(DIDATTI_DOCENTI);
 const SEMPRE_MATRICOLE_L = lowerSet(SEMPRE_MATRICOLE);
 const SEMPRE_VETERANI_L = lowerSet(SEMPRE_VETERANI);
 
-type Status = "confermato" | "lista_attesa";
-const STATUS_PRIORITY: Record<Status, number> = { confermato: 2, lista_attesa: 1 };
+type Status = "confermato" | "lista_attesa" | "ritirato";
+const STATUS_PRIORITY: Record<Status, number> = { confermato: 3, lista_attesa: 2, ritirato: 1 };
 
 function assignTeam(iscrizioneRaw: string, anno: string): string | null {
   const iscrizione = iscrizioneRaw.trim().toLowerCase();
@@ -89,12 +89,22 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
   let headers: string[] | null = null;
   const sheetsData: { raw: any[][]; status: Status }[] = [];
 
+  const ritirati: Record<string, any>[] = [];
+
   for (const sheetName of workbook.SheetNames) {
-    // I fogli dei cancellati/ritirati vengono ignorati di proposito
-    if (/cancell|ritirat/i.test(sheetName)) continue;
     const sheet = workbook.Sheets[sheetName];
     const raw: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
     if (raw.length === 0) continue;
+    // Foglio cancellati/ritirati: ha solo COGNOME, NOME, EMAIL (formato diverso dagli altri)
+    if (/cancell|ritirat/i.test(sheetName)) {
+      const h = raw[0].map((c) => String(c).trim().toUpperCase());
+      const iEmail = h.indexOf("EMAIL");
+      if (iEmail < 0) continue;
+      for (const r of raw.slice(1)) {
+        ritirati.push({ __status: "ritirato", "Indirizzo email": r[iEmail] ?? "" });
+      }
+      continue;
+    }
     if (!headers && raw[0].some((cell) => String(cell).trim() === "ISCRIZIONE")) {
       headers = raw[0].map((h) => String(h).trim());
     }
@@ -118,7 +128,7 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
 
   // Stessa email in più fogli (es. confermato e lista d'attesa): vince lo stato più "forte"
   const seen = new Map<string, Record<string, any>>();
-  for (const row of allRows) {
+  for (const row of [...allRows, ...ritirati]) {
     const email = String(row["Indirizzo email"] || "").trim().toLowerCase();
     if (!email) continue;
     const prev = seen.get(email);
@@ -256,7 +266,17 @@ export async function POST(request: Request) {
   const validRoles = new Set(["student", "staff", "admin"]);
   const validYears = new Set(["preiscrizione", "primo", "secondo", "terzo", "quarto", "specializzato"]);
 
-  const filteredRaw = rawRecords.filter((r) => r.email);
+  const filteredRaw = rawRecords.filter((r) => r.email && r.status !== "ritirato");
+
+  // Cancellati: si segnano come "ritirato" solo se sono già a sistema (restano a database,
+  // senza squadra); chi non c'è ancora non viene creato.
+  const ritiratiEmails = Array.from(
+    new Set(
+      rawRecords
+        .filter((r) => r.email && r.status === "ritirato")
+        .map((r) => String(r.email).trim().toLowerCase())
+    )
+  ).filter((e) => existingTokens.has(e));
 
   // PIN a 4 cifre (fallback voto senza fotocamera): mai rigenerato per chi
   // ce l'ha già (sennò il PIN già stampato/mostrato smetterebbe di funzionare
@@ -330,9 +350,25 @@ export async function POST(request: Request) {
     }
   }
 
+  // Mai ritirare admin/staff, anche se per errore compaiono nel foglio dei cancellati
+  const daRitirare = ritiratiEmails.filter((e) => (existingRoles.get(e) || "student") === "student");
+  let ritirati = 0;
+  for (let i = 0; i < daRitirare.length; i += BATCH_SIZE) {
+    const batch = daRitirare.slice(i, i + BATCH_SIZE);
+    const { error } = await supabase
+      .from("users")
+      .update({ status: "ritirato", team: null, is_didatta: false })
+      .in("email", batch);
+    if (error) {
+      errors.push(error.message);
+    } else {
+      ritirati += batch.length;
+    }
+  }
+
   if (errors.length > 0) {
     return NextResponse.json(
-      { message: `Importati ${imported} su ${records.length}. Errori: ${errors.join(" | ")}` },
+      { message: `Importati ${imported} su ${records.length}, ritirati ${ritirati}. Errori: ${errors.join(" | ")}` },
       { status: 207 }
     );
   }
@@ -340,6 +376,6 @@ export async function POST(request: Request) {
   const nuovi = records.filter((r) => !existingTokens.has(r.email)).length;
   const attesa = records.filter((r) => r.status === "lista_attesa").length;
   return NextResponse.json({
-    message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe (${nuovi} nuovi, ${records.length - nuovi} già presenti; ${records.length - attesa} confermati, ${attesa} in lista d'attesa).`,
+    message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe (${nuovi} nuovi, ${records.length - nuovi} già presenti; ${records.length - attesa} confermati, ${attesa} in lista d'attesa). Segnati come ritirati: ${ritirati}.`,
   });
 }
