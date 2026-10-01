@@ -106,7 +106,9 @@ function firstValidEmail(raw: string): string {
   return valid.slice(0, at + 1) + (DOMAIN_TYPOS[domain] ?? domain);
 }
 
-async function parseRawExcel(file: File): Promise<{ records: Record<string, any>[]; emailScartate: string[] }> {
+async function parseRawExcel(
+  file: File
+): Promise<{ records: Record<string, any>[]; emailScartate: string[]; attesaGiaConfermata: string[] }> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
 
@@ -165,6 +167,30 @@ async function parseRawExcel(file: File): Promise<{ records: Record<string, any>
     seen.set(email, { ...row, "Indirizzo email": email });
   }
 
+  // Stessa persona in lista d'attesa con un'altra email e già tra i confermati: si tiene
+  // solo il confermato (altrimenti nascerebbe un secondo account). Vale solo per la
+  // lista d'attesa: due confermati con lo stesso nome potrebbero essere omonimi veri.
+  const nameKey = (row: Record<string, any>) =>
+    `${row["COGNOME"] || ""} ${row["NOME"] || ""}`
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z ]/g, " ")
+      .split(" ")
+      .filter(Boolean)
+      .sort()
+      .join(" ");
+  const confirmedNames = new Set(
+    Array.from(seen.values()).filter((r) => r.__status === "confermato").map(nameKey).filter(Boolean)
+  );
+  const attesaGiaConfermata: string[] = [];
+  for (const [email, row] of Array.from(seen.entries())) {
+    if (row.__status === "lista_attesa" && confirmedNames.has(nameKey(row))) {
+      seen.delete(email);
+      attesaGiaConfermata.push(`${String(row["COGNOME"] || "").trim()} ${String(row["NOME"] || "").trim()} <${email}>`);
+    }
+  }
+
   const records = Array.from(seen.values()).map((row) => {
     const status = row.__status as Status;
     const iscrizione = String(row["ISCRIZIONE"] || "").trim();
@@ -212,7 +238,7 @@ async function parseRawExcel(file: File): Promise<{ records: Record<string, any>
     };
   });
 
-  return { records, emailScartate };
+  return { records, emailScartate, attesaGiaConfermata };
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -266,11 +292,13 @@ export async function POST(request: Request) {
 
   let rawRecords: Record<string, any>[];
   let emailScartate: string[] = [];
+  let attesaGiaConfermata: string[] = [];
   try {
     if (isExcel) {
       const parsed = await parseRawExcel(file);
       rawRecords = parsed.records;
       emailScartate = parsed.emailScartate;
+      attesaGiaConfermata = parsed.attesaGiaConfermata;
     } else {
       const text = await file.text();
       rawRecords = parseCSV(text);
@@ -413,6 +441,10 @@ export async function POST(request: Request) {
     message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe (${nuovi} nuovi, ${records.length - nuovi} già presenti; ${records.length - attesa} confermati, ${attesa} in lista d'attesa). Segnati come ritirati: ${ritirati}.${
       emailScartate.length > 0
         ? ` ⚠️ Righe scartate per email non valida (${emailScartate.length}): ${emailScartate.slice(0, 10).join(", ")}`
+        : ""
+    }${
+      attesaGiaConfermata.length > 0
+        ? ` ℹ️ In lista d'attesa ma già confermati con un'altra email, non importati (${attesaGiaConfermata.length}): ${attesaGiaConfermata.slice(0, 10).join(", ")}`
         : ""
     }`,
   });
