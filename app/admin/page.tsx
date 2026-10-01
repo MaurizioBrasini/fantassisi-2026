@@ -961,7 +961,7 @@ export default function AdminPage() {
             <option value="all">Tutti i ruoli/team</option>
             <option value="admin">Solo Admin</option>
             <option value="staff">Solo Staff</option>
-            <option value="student">Solo Studenti</option>
+            <option value="student">Solo Partecipanti</option>
             <option value="Matricole">Solo Matricole</option>
             <option value="Veterani">Solo Veterani</option>
             <option value="Didatti&Docenti">Solo Didatti&amp;Docenti</option>
@@ -1037,7 +1037,7 @@ export default function AdminPage() {
                       )}
                     </td>
                     <td style={{ padding: 8 }}>
-                      <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.7rem", fontWeight: "bold", color: "white", background: u.role === "admin" ? "#dc3545" : u.role === "staff" ? "#6f42c1" : "#28a745" }}>{u.role}</span>
+                      <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.7rem", fontWeight: "bold", color: "white", background: u.role === "admin" ? "#dc3545" : u.role === "staff" ? "#6f42c1" : "#28a745" }}>{u.role === "student" ? "partecipante" : u.role}</span>
                     </td>
                     <td style={{ padding: 8 }}>{u.site || "-"}</td>
                     <td style={{ padding: 8 }}>{u.school || "-"}</td>
@@ -1197,7 +1197,7 @@ export default function AdminPage() {
             
             {isSuper ? (
               <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}>
-                <option value="student">Studente</option>
+                <option value="student">Partecipante</option>
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
               </select>
@@ -1280,7 +1280,7 @@ export default function AdminPage() {
 
             {isSuper ? (
               <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}>
-                <option value="student">Studente</option>
+                <option value="student">Partecipante</option>
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
               </select>
