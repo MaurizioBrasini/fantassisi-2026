@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   while (true) {
     let query = supabase
       .from("users")
-      .select("first_name, last_name, email, auth_token, team, site, year")
+      .select("first_name, last_name, email, auth_token, team, site, year, status")
       .range(from, from + 999);
     if (team) query = query.eq("team", team);
     const { data: page } = await query;
@@ -40,10 +40,10 @@ export async function GET(request: Request) {
       const link = `${BASE_URL}/api/auth?token=${u.auth_token}`;
       // Escape campi CSV
       const esc = (s: string) => `"${(s || "").replace(/"/g, '""')}"`;
-      return [esc(name), esc(u.email), esc(u.team || ""), esc(u.site || ""), esc(u.year || ""), esc(link)].join(",");
+      return [esc(name), esc(u.email), esc(u.team || ""), esc(u.site || ""), esc(u.year || ""), esc(u.status || "confermato"), esc(link)].join(",");
     });
 
-  const csv = ["Nome,Email,Team,Sede,Anno,Link personale", ...rows].join("\n");
+  const csv = ["Nome,Email,Team,Sede,Anno,Stato,Link personale", ...rows].join("\n");
   const filename = team ? `fantassisi_links_${team}.csv` : "fantassisi_links_tutti.csv";
 
   return new NextResponse(csv, {

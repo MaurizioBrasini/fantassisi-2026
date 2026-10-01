@@ -61,11 +61,21 @@ function splitSchoolSite(raw: string | undefined): { school: string | null; site
   return { school: null, site: value };
 }
 
-function assignTeam(iscrizione: string, anno: string): string | null {
-  if (DIDATTI_DOCENTI.has(iscrizione)) return "Didatti&Docenti";
-  if (SEMPRE_MATRICOLE.has(iscrizione)) return "Matricole";
-  if (SEMPRE_VETERANI.has(iscrizione)) return "Veterani";
-  if (iscrizione === "Allievo in corso") {
+// Confronto case-insensitive: nel file capita "docente" minuscolo
+const lowerSet = (s: Set<string>) => new Set(Array.from(s).map((v) => v.toLowerCase()));
+const DIDATTI_DOCENTI_L = lowerSet(DIDATTI_DOCENTI);
+const SEMPRE_MATRICOLE_L = lowerSet(SEMPRE_MATRICOLE);
+const SEMPRE_VETERANI_L = lowerSet(SEMPRE_VETERANI);
+
+type Status = "confermato" | "lista_attesa";
+const STATUS_PRIORITY: Record<Status, number> = { confermato: 2, lista_attesa: 1 };
+
+function assignTeam(iscrizioneRaw: string, anno: string): string | null {
+  const iscrizione = iscrizioneRaw.trim().toLowerCase();
+  if (DIDATTI_DOCENTI_L.has(iscrizione)) return "Didatti&Docenti";
+  if (SEMPRE_MATRICOLE_L.has(iscrizione)) return "Matricole";
+  if (SEMPRE_VETERANI_L.has(iscrizione)) return "Veterani";
+  if (iscrizione === "allievo in corso") {
     if (ANNI_MATRICOLE.has(anno)) return "Matricole";
     if (ANNI_VETERANI.has(anno)) return "Veterani";
   }
@@ -77,16 +87,18 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
   const workbook = XLSX.read(buffer, { type: "array" });
 
   let headers: string[] | null = null;
-  const sheetsData: any[][][] = [];
+  const sheetsData: { raw: any[][]; status: Status }[] = [];
 
   for (const sheetName of workbook.SheetNames) {
+    // I fogli dei cancellati/ritirati vengono ignorati di proposito
+    if (/cancell|ritirat/i.test(sheetName)) continue;
     const sheet = workbook.Sheets[sheetName];
     const raw: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
     if (raw.length === 0) continue;
     if (!headers && raw[0].some((cell) => String(cell).trim() === "ISCRIZIONE")) {
       headers = raw[0].map((h) => String(h).trim());
     }
-    sheetsData.push(raw);
+    sheetsData.push({ raw, status: /attesa/i.test(sheetName) ? "lista_attesa" : "confermato" });
   }
 
   if (!headers) {
@@ -94,24 +106,28 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
   }
 
   const allRows: Record<string, any>[] = [];
-  for (const raw of sheetsData) {
+  for (const { raw, status } of sheetsData) {
     const isHeaderRow = raw[0].some((cell) => String(cell).trim() === "ISCRIZIONE");
     const dataRows = isHeaderRow ? raw.slice(1) : raw;
     for (const r of dataRows) {
-      const obj: Record<string, any> = {};
+      const obj: Record<string, any> = { __status: status };
       headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
       allRows.push(obj);
     }
   }
 
+  // Stessa email in più fogli (es. confermato e lista d'attesa): vince lo stato più "forte"
   const seen = new Map<string, Record<string, any>>();
   for (const row of allRows) {
     const email = String(row["Indirizzo email"] || "").trim().toLowerCase();
-    if (!email || seen.has(email)) continue;
+    if (!email) continue;
+    const prev = seen.get(email);
+    if (prev && STATUS_PRIORITY[prev.__status as Status] >= STATUS_PRIORITY[row.__status as Status]) continue;
     seen.set(email, row);
   }
 
   return Array.from(seen.values()).map((row) => {
+    const status = row.__status as Status;
     const iscrizione = String(row["ISCRIZIONE"] || "").trim();
     const anno = String(row["ANNO DI FREQUENZA"] || "").trim();
     let { school, site } = splitSchoolSite(String(row["Scuola in cui sei iscritto"] || ""));
@@ -137,6 +153,7 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
           year: normalizedYear,
           role: "student",
           team: null,
+          status,
           auth_token: "",
         };
       }
@@ -151,6 +168,7 @@ async function parseRawExcel(file: File): Promise<Record<string, any>[]> {
       year: normalizedYear,
       role: "student",
       team: team,
+      status,
       auth_token: "",
     };
   });
@@ -273,6 +291,10 @@ export async function POST(request: Request) {
           finalTeam = null;
         }
       }
+      // Chi è in lista d'attesa viene importato ma senza squadra: così non conta nei
+      // punteggi e non può essere votato. Quando verrà confermato basta reimportare il file.
+      const status: Status = r.status === "lista_attesa" ? "lista_attesa" : "confermato";
+      if (status === "lista_attesa") finalTeam = null;
 
       const token =
         existingTokens.get(email) || r.auth_token || crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -288,6 +310,7 @@ export async function POST(request: Request) {
         // Chi arriva da roster come Didatti&Docenti può poi scegliere/cambiare/lasciare la
         // squadra liberamente (vedi /api/admin/enroll); un allievo vero non può mai farlo.
         is_didatta: finalTeam === "Didatti&Docenti",
+        status,
         auth_token: token,
         pin: existingPins.get(email) || pinByEmail.get(email) || null,
       };
@@ -314,7 +337,9 @@ export async function POST(request: Request) {
     );
   }
 
+  const nuovi = records.filter((r) => !existingTokens.has(r.email)).length;
+  const attesa = records.filter((r) => r.status === "lista_attesa").length;
   return NextResponse.json({
-    message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe.`,
+    message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe (${nuovi} nuovi, ${records.length - nuovi} già presenti; ${records.length - attesa} confermati, ${attesa} in lista d'attesa).`,
   });
 }

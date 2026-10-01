@@ -327,6 +327,8 @@ export default function AdminPage() {
         if (userRoleFilter === "Matricole" && u.team !== "Matricole") return false;
         if (userRoleFilter === "Veterani" && u.team !== "Veterani") return false;
         if (userRoleFilter === "Didatti&Docenti" && u.team !== "Didatti&Docenti") return false;
+        if (userRoleFilter === "confermato" && (u.status || "confermato") !== "confermato") return false;
+        if (userRoleFilter === "lista_attesa" && u.status !== "lista_attesa") return false;
       }
       if (!userSearch.trim()) return true;
       const q = userSearch.trim().toLowerCase();
@@ -942,6 +944,8 @@ export default function AdminPage() {
             <option value="Matricole">Solo Matricole</option>
             <option value="Veterani">Solo Veterani</option>
             <option value="Didatti&Docenti">Solo Didatti&amp;Docenti</option>
+            <option value="confermato">Solo Confermati</option>
+            <option value="lista_attesa">Solo Lista d'attesa</option>
           </select>
           {isSuper && (
             <button
@@ -997,7 +1001,12 @@ export default function AdminPage() {
                     )}
                     <td style={{ padding: 8 }}>{u.first_name} {u.last_name}</td>
                     <td style={{ padding: 8 }}>{u.email}</td>
-                    <td style={{ padding: 8 }}>{u.team || "-"}</td>
+                    <td style={{ padding: 8 }}>
+                      {u.team || "-"}
+                      {u.status === "lista_attesa" && (
+                        <span style={{ marginLeft: 6, padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: "bold", background: "#ffc107", color: "#333" }}>ATTESA</span>
+                      )}
+                    </td>
                     <td style={{ padding: 8 }}>
                       <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.7rem", fontWeight: "bold", color: "white", background: u.role === "admin" ? "#dc3545" : u.role === "staff" ? "#6f42c1" : "#28a745" }}>{u.role}</span>
                     </td>
