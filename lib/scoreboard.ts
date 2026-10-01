@@ -4,6 +4,7 @@
 // dei telefoni. Se cambia una regola in quelle pagine, va allineata qui.
 import { createClient } from "@supabase/supabase-js";
 import { CONFIG_ISCRIZIONE } from "./config";
+import { fetchTeamBoosts, addBoostsToScores } from "./boosts";
 
 export type TeamScores = { Matricole: number; Veterani: number };
 export type IndividualRow = { rank: number; name: string; team: string | null; points: number };
@@ -92,6 +93,9 @@ export async function computeScoreboard(): Promise<ScoreboardData> {
     if (ev.team_target === "Matricole") teams.Matricole += ev.points || 1;
     if (ev.team_target === "Veterani") teams.Veterani += ev.points || 1;
   }
+
+  // Bonus a tempo decisi dall'admin: contano solo nei punteggi di squadra.
+  addBoostsToScores(teams, await fetchTeamBoosts(supabase));
 
   // --- Individuali ---
   const pointsByUser = new Map<string, number>();

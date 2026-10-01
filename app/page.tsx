@@ -9,6 +9,7 @@ import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
+import { fetchTeamBoosts, addBoostsToScores } from "@/lib/boosts";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -302,6 +303,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
       }
 
+      addBoostsToScores(pts, await fetchTeamBoosts(supabase));
       setTeamScores(pts);
       setLoading(false);
       setCachedDashboardScores(userId, { remainingCoins: Math.max(0, remaining), teamScores: pts });
@@ -525,6 +527,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
         if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
       }
 
+      addBoostsToScores(pts, await fetchTeamBoosts(supabase));
       setTeamScores(pts);
       const myPointsValue = pointsByUser.get(userId) || 0;
       setMyPoints(myPointsValue);
