@@ -8,7 +8,7 @@ import { isBlocked, registerFailure, clearFailures } from "@/lib/rateLimit";
 // "Richiedi accesso": il partecipante dimostra chi è con la mail di iscrizione e le ultime
 // 4 cifre del suo telefono, e riceve la stessa sessione del link personale.
 // Solo partecipanti confermati: staff e admin entrano sempre dal loro link personale.
-const WINDOW_MS = 30 * 60 * 1000;
+const WINDOW_MS = 5 * 60 * 1000;
 const MAX_FAILS_PER_EMAIL = 5;
 const MAX_FAILS_PER_IP = 25;
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const emailKey = `email:${email}`;
   if (isBlocked(ipKey, MAX_FAILS_PER_IP) || isBlocked(emailKey, MAX_FAILS_PER_EMAIL)) {
     return NextResponse.json(
-      { message: "Troppi tentativi. Riprova tra circa mezz'ora oppure usa il link personale ricevuto dall'organizzazione." },
+      { message: "Troppi tentativi. Riprova tra 5 minuti oppure ricevi il link per mail qui sotto." },
       { status: 429 }
     );
   }
