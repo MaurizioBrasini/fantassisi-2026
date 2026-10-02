@@ -46,11 +46,11 @@ export async function POST(request: Request) {
   );
   const { data: user } = await supabase
     .from("users")
-    .select("first_name, email, auth_token, status")
+    .select("first_name, email, auth_token")
     .eq("email", email)
     .maybeSingle();
 
-  if (user && user.email && user.auth_token && user.status === "confermato") {
+  if (user && user.email && user.auth_token) {
     const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "fantassisi-2026.onrender.com";
     const proto = request.headers.get("x-forwarded-proto") || "https";
     const link = `${proto}://${host}/api/auth?token=${user.auth_token}`;

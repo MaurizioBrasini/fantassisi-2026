@@ -7,7 +7,7 @@ import { isBlocked, registerFailure, clearFailures } from "@/lib/rateLimit";
 
 // "Richiedi accesso": il partecipante dimostra chi è con la mail di iscrizione e le ultime
 // 4 cifre del suo telefono, e riceve la stessa sessione del link personale.
-// Solo partecipanti confermati: staff e admin entrano sempre dal loro link personale.
+// Per tutti i partecipanti (confermati, in lista d'attesa, ritirati): staff e admin entrano sempre dal loro link personale.
 const WINDOW_MS = 5 * 60 * 1000;
 const MAX_FAILS_PER_EMAIL = 5;
 const MAX_FAILS_PER_IP = 25;
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   );
   const { data: user } = await supabase
     .from("users")
-    .select("id, team, role, year, site, status, phone")
+    .select("id, team, role, year, site, phone")
     .eq("email", email)
     .maybeSingle();
 
@@ -62,7 +62,6 @@ export async function POST(request: Request) {
   const ok =
     !!user &&
     user.role === "student" &&
-    user.status === "confermato" &&
     expected !== "----" &&
     sameDigits(expected, last4);
 
