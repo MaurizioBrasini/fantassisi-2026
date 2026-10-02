@@ -1,27 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
-
-// Numero di classi realmente esistenti in una sede (somma su tutte le scuole
-// presenti), indipendente da quanti iscritti/voti risultano in ogni classe.
-function realClassCount(site: string): number {
-  const schools = CONFIG_ISCRIZIONE.scuolePerSede[site as keyof typeof CONFIG_ISCRIZIONE.scuolePerSede] || [];
-  return schools.reduce((sum, school) => {
-    const n = CONFIG_ISCRIZIONE.classiPerSedeScuola.eccezioni[`${site}||${school}`]
-      ?? CONFIG_ISCRIZIONE.classiPerSedeScuola.default;
-    return sum + n;
-  }, 0);
-}
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
-const VALID_YEARS = ["primo", "secondo", "terzo", "quarto"];
+import { getCookie } from "@/lib/clientCookies";
 
 type Row = { site: string; points: number; classCount: number; average: number };
 
@@ -30,94 +11,30 @@ export default function SiteRanking() {
   const [mySite, setMySite] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
-      const id = getCookie("user_id");
-      if (!id) {
+      if (!getCookie("user_id")) {
         setNoAccess(true);
         setLoading(false);
         return;
       }
 
-      // Scarica tutti gli utenti a blocchi da 1000
-      let allUsersRaw: { id: string; school: string; site: string; year: string }[] = [];
-      let from = 0;
-      while (true) {
-        const { data: page } = await supabase
-          .from("users")
-          .select("id, school, site, year")
-          .range(from, from + 999);
-        if (!page || page.length === 0) break;
-        allUsersRaw.push(...page);
-        if (page.length < 1000) break;
-        from += 1000;
-      }
-
-      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
-      let allVotes: { recipient_id: string; points: number }[] = [];
-      {
-        let voteFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("votes")
-            .select("recipient_id, points")
-            .range(voteFrom, voteFrom + 999);
-          if (!page || page.length === 0) break;
-          allVotes.push(...page);
-          if (page.length < 1000) break;
-          voteFrom += 1000;
+      try {
+        const res = await fetch("/api/standings?view=sedi", { cache: "no-store" });
+        if (res.status === 401) {
+          setNoAccess(true);
+        } else if (!res.ok) {
+          throw new Error(String(res.status));
+        } else {
+          const data = await res.json();
+          setRows(data.rows);
+          setMySite(data.mySite);
         }
+      } catch {
+        setLoadError(true);
       }
-
-      // 🔥 NUOVO: voti dai QR di classe (già hanno class_site direttamente sulla riga)
-      // Scarica anch'essi a blocchi da 1000
-      let allEventVotes: { class_site: string; points: number }[] = [];
-      {
-        let evFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("event_votes")
-            .select("class_site, points")
-            .eq("qr_type", "class")
-            .range(evFrom, evFrom + 999);
-          if (!page || page.length === 0) break;
-          allEventVotes.push(...page);
-          if (page.length < 1000) break;
-          evFrom += 1000;
-        }
-      }
-
-      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
-
-      const me = usersById.get(id);
-      if (me?.site) setMySite(me.site);
-
-      // Raccogliamo i punti per sede (voti individuali)
-      const pointsBySite = new Map<string, number>();
-      for (const v of allVotes || []) {
-        const recipient = usersById.get(v.recipient_id);
-        if (!recipient?.school || !recipient?.site || !recipient?.year || !VALID_YEARS.includes(recipient.year)) continue;
-        pointsBySite.set(recipient.site, (pointsBySite.get(recipient.site) || 0) + (v.points || 0));
-      }
-
-      // 🔥 NUOVO: aggiungiamo i punti dai QR di classe (event_votes)
-      for (const ev of allEventVotes || []) {
-        if (!ev.class_site) continue;
-        pointsBySite.set(ev.class_site, (pointsBySite.get(ev.class_site) || 0) + (ev.points || 0));
-      }
-
-      const sites = CONFIG_ISCRIZIONE.sedi;
-
-      const ranking: Row[] = sites.map((site) => {
-        const classCount = realClassCount(site);
-        const points = pointsBySite.get(site) || 0;
-        const average = classCount > 0 ? points / classCount : 0;
-        return { site, points, classCount, average };
-      });
-
-      ranking.sort((a, b) => b.average - a.average);
-      setRows(ranking);
       setLoading(false);
     };
 
@@ -135,6 +52,10 @@ export default function SiteRanking() {
 
   if (loading) {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
+  }
+
+  if (loadError) {
+    return <div style={{ textAlign: "center", padding: 40, color: "#666" }}>Non riesco a caricare la classifica. Ricarica la pagina.</div>;
   }
 
   const myIndex = rows.findIndex((r) => r.site === mySite);

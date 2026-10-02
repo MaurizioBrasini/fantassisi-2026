@@ -1,46 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { TEAM_COLORS } from "@/lib/teamColors";
+import { getCookie } from "@/lib/clientCookies";
 
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
-type Row = { id: string; name: string; team: string | null; points: number };
-
-// Funzione per calcolare i rank con pari merito (1, 2, 2, 3)
-function assignRanks(rows: Row[]): { rank: number }[] {
-  const result: { rank: number }[] = [];
-  let currentRank = 1;
-  let i = 0;
-  while (i < rows.length) {
-    const currentPoints = rows[i].points;
-    // Conta quanti hanno lo stesso punteggio
-    let j = i;
-    while (j < rows.length && rows[j].points === currentPoints) {
-      j++;
-    }
-    // Assegna lo stesso rank a tutti i pari merito
-    for (let k = i; k < j; k++) {
-      result.push({ rank: currentRank });
-    }
-    // Il prossimo rank salta di quanti elementi abbiamo processato
-    currentRank += (j - i);
-    i = j;
-  }
-  return result;
-}
+type Row = { id: string; name: string; team: string | null; points: number; rank: number };
 
 export default function IndividualRanking() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [ranks, setRanks] = useState<{ rank: number }[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,59 +24,18 @@ export default function IndividualRanking() {
       }
       setMyId(id);
 
-      // Scarica tutti gli utenti a blocchi da 1000
-      let allUsersRaw: { id: string; first_name: string; last_name: string; team: string | null }[] = [];
-      let from = 0;
-      while (true) {
-        const { data: page } = await supabase
-          .from("users")
-          .select("id, first_name, last_name, team")
-          .range(from, from + 999);
-        if (!page || page.length === 0) break;
-        allUsersRaw.push(...page);
-        if (page.length < 1000) break;
-        from += 1000;
-      }
-
-      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
-      let allVotes: { recipient_id: string; points: number }[] = [];
-      {
-        let voteFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("votes")
-            .select("recipient_id, points")
-            .range(voteFrom, voteFrom + 999);
-          if (!page || page.length === 0) break;
-          allVotes.push(...page);
-          if (page.length < 1000) break;
-          voteFrom += 1000;
+      try {
+        const res = await fetch("/api/standings?view=individuali", { cache: "no-store" });
+        if (res.status === 401) {
+          setNoAccess(true);
+        } else if (!res.ok) {
+          throw new Error(String(res.status));
+        } else {
+          setRows((await res.json()).rows);
         }
+      } catch {
+        setLoadError(true);
       }
-
-      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
-      const pointsByUser = new Map<string, number>();
-      for (const v of allVotes || []) {
-        pointsByUser.set(v.recipient_id, (pointsByUser.get(v.recipient_id) || 0) + (v.points || 0));
-      }
-
-      const ranking: Row[] = Array.from(pointsByUser.entries())
-        .map(([uid, points]) => {
-          const u = usersById.get(uid);
-          return {
-            id: uid,
-            name: u ? `${u.first_name || ""} ${u.last_name || ""}`.trim() : "—",
-            team: u?.team || null,
-            points,
-          };
-        })
-        .sort((a, b) => b.points - a.points);
-
-      // Calcola i rank con pari merito
-      const assignedRanks = assignRanks(ranking);
-
-      setRows(ranking);
-      setRanks(assignedRanks);
       setLoading(false);
     };
 
@@ -124,9 +55,11 @@ export default function IndividualRanking() {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
   }
 
-  const myIndex = rows.findIndex((r) => r.id === myId);
-  const myRow = myIndex >= 0 ? rows[myIndex] : null;
-  const myRank = myIndex >= 0 ? ranks[myIndex]?.rank : null;
+  if (loadError) {
+    return <div style={{ textAlign: "center", padding: 40, color: "#666" }}>Non riesco a caricare la classifica. Ricarica la pagina.</div>;
+  }
+
+  const myRow = rows.find((r) => r.id === myId) || null;
 
   const teamStyle = (team: string | null) => {
     if (team === "Matricole") return { background: "#FFEDE3", color: TEAM_COLORS.Matricole, borderColor: TEAM_COLORS.Matricole };
@@ -146,7 +79,7 @@ export default function IndividualRanking() {
       {myRow && (
         <div style={{ background: "#1E3A5F", color: "white", borderRadius: 14, padding: 16, marginBottom: 20, textAlign: "center" }}>
           <div style={{ fontSize: "0.8rem", opacity: 0.85 }}>La tua posizione</div>
-          <div style={{ fontWeight: 800, fontSize: "1.4rem" }}>{myRank}° posto</div>
+          <div style={{ fontWeight: 800, fontSize: "1.4rem" }}>{myRow.rank}° posto</div>
           <div style={{ fontSize: "0.9rem" }}>{myRow.name} · {myRow.points} punti</div>
         </div>
       )}
@@ -155,10 +88,9 @@ export default function IndividualRanking() {
         <p style={{ color: "#999", textAlign: "center" }}>Nessun voto ancora registrato.</p>
       ) : (
         <div>
-          {rows.map((r, i) => {
+          {rows.map((r) => {
             const style = teamStyle(r.team);
             const isMe = r.id === myId;
-            const rank = ranks[i]?.rank ?? i + 1;
             return (
               <div
                 key={r.id}
@@ -174,7 +106,7 @@ export default function IndividualRanking() {
                 }}
               >
                 <span style={{ color: style.color, fontWeight: isMe ? 800 : 600 }}>
-                  {rank}. {r.name}
+                  {r.rank}. {r.name}
                 </span>
                 <strong style={{ color: style.color }}>{r.points}</strong>
               </div>

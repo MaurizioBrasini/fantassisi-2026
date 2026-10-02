@@ -1,153 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
+import { getCookie } from "@/lib/clientCookies";
 
 function yearLabel(year: string | null): string {
   if (!year) return "";
   return CONFIG_ISCRIZIONE.anni.find((a) => a.value === year)?.label || year;
 }
 
-type Row = { key: string; school: string; site: string; year: string; points: number };
-
-// Funzione per calcolare i rank con pari merito (1, 2, 2, 3)
-function assignRanks(rows: Row[]): { rank: number }[] {
-  const result: { rank: number }[] = [];
-  let currentRank = 1;
-  let i = 0;
-  while (i < rows.length) {
-    const currentPoints = rows[i].points;
-    let j = i;
-    while (j < rows.length && rows[j].points === currentPoints) {
-      j++;
-    }
-    for (let k = i; k < j; k++) {
-      result.push({ rank: currentRank });
-    }
-    currentRank += (j - i);
-    i = j;
-  }
-  return result;
-}
+type Row = { key: string; school: string; site: string; year: string; points: number; rank: number };
 
 export default function ClassRanking() {
   const [rows, setRows] = useState<Row[]>([]);
-  const [ranks, setRanks] = useState<{ rank: number }[]>([]);
   const [myKey, setMyKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
-      const id = getCookie("user_id");
-      if (!id) {
+      if (!getCookie("user_id")) {
         setNoAccess(true);
         setLoading(false);
         return;
       }
 
-      // Scarica tutti gli utenti a blocchi da 1000
-      let allUsersRaw: { id: string; school: string; site: string; year: string; team: string }[] = [];
-      let from = 0;
-      while (true) {
-        const { data: page } = await supabase
-          .from("users")
-          .select("id, school, site, year, team")
-          .range(from, from + 999);
-        if (!page || page.length === 0) break;
-        allUsersRaw.push(...page);
-        if (page.length < 1000) break;
-        from += 1000;
-      }
-
-      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
-      let allVotes: { recipient_id: string; points: number }[] = [];
-      {
-        let voteFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("votes")
-            .select("recipient_id, points")
-            .range(voteFrom, voteFrom + 999);
-          if (!page || page.length === 0) break;
-          allVotes.push(...page);
-          if (page.length < 1000) break;
-          voteFrom += 1000;
+      try {
+        const res = await fetch("/api/standings?view=classi", { cache: "no-store" });
+        if (res.status === 401) {
+          setNoAccess(true);
+        } else if (!res.ok) {
+          throw new Error(String(res.status));
+        } else {
+          const data = await res.json();
+          setRows(data.rows);
+          setMyKey(data.myKey);
         }
+      } catch {
+        setLoadError(true);
       }
-
-      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
-
-      const me = usersById.get(id);
-      if (me?.school && me?.site && me?.year) {
-        setMyKey(`${me.school}||${me.site}||${me.year}`);
-      }
-
-      const pointsByClass = new Map<string, number>();
-      const classInfo = new Map<string, { school: string; site: string; year: string }>();
-
-      // 1. Punteggi dai voti individuali (tabella votes)
-      for (const v of allVotes || []) {
-        const recipient = usersById.get(v.recipient_id);
-        if (!recipient?.school || !recipient?.site || !recipient?.year) continue;
-        const key = `${recipient.school}||${recipient.site}||${recipient.year}`;
-        pointsByClass.set(key, (pointsByClass.get(key) || 0) + (v.points || 0));
-        if (!classInfo.has(key)) {
-          classInfo.set(key, { school: recipient.school, site: recipient.site, year: recipient.year });
-        }
-      }
-
-      // 🔥 MODIFICA: 2. Punteggi dai QR voto per classe (tabella event_votes)
-      // Scarica a blocchi da 1000 (Supabase tronca oltre)
-      let eventVotes: { class_school: string; class_site: string; class_year: string; points: number }[] = [];
-      {
-        let evFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("event_votes")
-            .select("class_school, class_site, class_year, points")
-            .eq("qr_type", "class")
-            .range(evFrom, evFrom + 999);
-          if (!page || page.length === 0) break;
-          eventVotes.push(...page);
-          if (page.length < 1000) break;
-          evFrom += 1000;
-        }
-      }
-
-      for (const ev of eventVotes || []) {
-        if (!ev.class_school || !ev.class_site || !ev.class_year) continue;
-        const key = `${ev.class_school}||${ev.class_site}||${ev.class_year}`;
-        pointsByClass.set(key, (pointsByClass.get(key) || 0) + (ev.points || 1));
-        if (!classInfo.has(key)) {
-          classInfo.set(key, {
-            school: ev.class_school,
-            site: ev.class_site,
-            year: ev.class_year,
-          });
-        }
-      }
-
-      const ranking: Row[] = Array.from(pointsByClass.entries())
-        .map(([key, points]) => {
-          const info = classInfo.get(key)!;
-          return { key, school: info.school, site: info.site, year: info.year, points };
-        })
-        .sort((a, b) => b.points - a.points);
-
-      // Calcola i rank con pari merito
-      const assignedRanks = assignRanks(ranking);
-
-      setRows(ranking);
-      setRanks(assignedRanks);
       setLoading(false);
     };
 
@@ -167,9 +61,12 @@ export default function ClassRanking() {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
   }
 
-  const myIndex = rows.findIndex((r) => r.key === myKey);
-  const myRow = myIndex >= 0 ? rows[myIndex] : null;
-  const myRank = myIndex >= 0 ? ranks[myIndex]?.rank : null;
+  if (loadError) {
+    return <div style={{ textAlign: "center", padding: 40, color: "#666" }}>Non riesco a caricare la classifica. Ricarica la pagina.</div>;
+  }
+
+  const myRow = rows.find((r) => r.key === myKey) || null;
+  const myRank = myRow ? myRow.rank : null;
 
   const teamColor = (year: string) => {
     const isVeterani = CONFIG_ISCRIZIONE.teamAnniValid['Veterani'].includes(year);
@@ -201,10 +98,10 @@ export default function ClassRanking() {
         <p style={{ color: "#999", textAlign: "center" }}>Nessun voto ancora registrato.</p>
       ) : (
         <div>
-          {rows.map((r, i) => {
+          {rows.map((r) => {
             const style = teamColor(r.year);
             const isMine = r.key === myKey;
-            const rank = ranks[i]?.rank ?? i + 1;
+            const rank = r.rank;
             return (
               <div
                 key={r.key}

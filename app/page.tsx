@@ -1,14 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { startOfTodayInRomeISO, getCachedDashboardScores, setCachedDashboardScores } from "@/lib/utils";
+import { getCachedDashboardScores, setCachedDashboardScores } from "@/lib/utils";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
-import { fetchTeamBoosts, addBoostsToScores } from "@/lib/boosts";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -195,6 +193,21 @@ function TeamSwitchBox({ currentTeam, allowLeave, onDone }: {
   );
 }
 
+// Mostrato al posto della dashboard se i punteggi non si caricano: meglio dirlo che mostrare zeri.
+function LoadError() {
+  return (
+    <div style={{ textAlign: "center", padding: 40, maxWidth: 480, margin: "0 auto" }}>
+      <p style={{ color: "#666" }}>Non riesco a caricare i punteggi. Controlla la connessione e riprova.</p>
+      <button
+        onClick={() => window.location.reload()}
+        style={{ padding: "12px 24px", background: "#FF6B35", color: "white", border: "none", borderRadius: 8, fontWeight: "bold", fontSize: 16 }}
+      >
+        Riprova
+      </button>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
 // Dashboard Didatti&Docenti (con pulsante Admin)
 // ─────────────────────────────────────────────
@@ -207,6 +220,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
   const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
   const [remainingCoins, setRemainingCoins] = useState(20);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -218,94 +232,17 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         return;
       }
 
-      let allUsersRaw: { id: string; team: string | null }[] = [];
-      let from = 0;
-      while (true) {
-        const { data: page } = await supabase
-          .from("users").select("id, team").range(from, from + 999);
-        if (!page || page.length === 0) break;
-        allUsersRaw.push(...page);
-        if (page.length < 1000) break;
-        from += 1000;
+      try {
+        const res = await fetch("/api/standings?view=dashboard", { cache: "no-store" });
+        if (!res.ok) throw new Error(String(res.status));
+        const d = await res.json();
+        setRemainingCoins(d.remainingCoins);
+        setTeamScores(d.teams);
+        setCachedDashboardScores(userId, { remainingCoins: d.remainingCoins, teamScores: d.teams });
+      } catch {
+        setLoadError(true);
       }
-
-      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
-      let allVotes: { voter_id: string; recipient_id: string; points: number; voted_at: string }[] = [];
-      {
-        let voteFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("votes")
-            .select("voter_id, recipient_id, points, voted_at")
-            .range(voteFrom, voteFrom + 999);
-          if (!page || page.length === 0) break;
-          allVotes.push(...page);
-          if (page.length < 1000) break;
-          voteFrom += 1000;
-        }
-      }
-
-      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
-      const votes = allVotes || [];
-
-      const startOfToday = startOfTodayInRomeISO();
-      const votesToday = votes.filter(
-        (v) => v.voter_id === userId && v.voted_at && v.voted_at >= startOfToday
-      ).length;
-
-      // Recupera i bonus riscattati oggi
-      const { data: bonusRedemptions } = await supabase
-        .from("bonus_redemptions")
-        .select("bonus_id")
-        .eq("user_id", userId)
-        .gte("redeemed_at", startOfToday);
-
-      const bonusIds = bonusRedemptions?.map(b => b.bonus_id) || [];
-      let totalBonus = 0;
-      if (bonusIds.length > 0) {
-        const { data: bonusData } = await supabase
-          .from("bonus_qr")
-          .select("amount")
-          .in("id", bonusIds);
-        totalBonus = bonusData?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
-      }
-
-      const remaining = 20 + totalBonus - votesToday;
-      setRemainingCoins(Math.max(0, remaining));
-
-      // 🔥 MODIFICA: Punteggi squadra da votes + event_votes
-      const pts = { Matricole: 0, Veterani: 0 };
-      for (const v of votes) {
-        const r = usersById.get(v.recipient_id);
-        if (r?.team === "Matricole") pts.Matricole += v.points || 0;
-        if (r?.team === "Veterani") pts.Veterani += v.points || 0;
-      }
-
-      // Aggiungi i voti da event_votes (QR voto), a blocchi da 1000
-      let eventVotes: { team_target: string | null; points: number }[] = [];
-      {
-        let evFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("event_votes")
-            .select("team_target, points")
-            .range(evFrom, evFrom + 999);
-          if (!page || page.length === 0) break;
-          eventVotes.push(...page);
-          if (page.length < 1000) break;
-          evFrom += 1000;
-        }
-      }
-
-      for (const ev of eventVotes || []) {
-        if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
-        if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
-      }
-
-      addBoostsToScores(pts, await fetchTeamBoosts(supabase));
-      setTeamScores(pts);
       setLoading(false);
-      setCachedDashboardScores(userId, { remainingCoins: Math.max(0, remaining), teamScores: pts });
     };
     fetchData();
   }, [userId]);
@@ -313,6 +250,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
   const isAdmin = userRole === "admin" || userRole === "staff";
 
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
+  if (loadError) return <LoadError />;
 
   return (
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
@@ -421,6 +359,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
   const [myRank, setMyRank] = useState<number | null>(null);
   const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -434,117 +373,30 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
         return;
       }
 
-      let allUsersRaw: { id: string; team: string | null }[] = [];
-      let from = 0;
-      while (true) {
-        const { data: page } = await supabase
-          .from("users").select("id, team").range(from, from + 999);
-        if (!page || page.length === 0) break;
-        allUsersRaw.push(...page);
-        if (page.length < 1000) break;
-        from += 1000;
+      try {
+        const res = await fetch("/api/standings?view=dashboard", { cache: "no-store" });
+        if (!res.ok) throw new Error(String(res.status));
+        const d = await res.json();
+        setRemainingCoins(d.remainingCoins);
+        setTeamScores(d.teams);
+        setMyPoints(d.myPoints);
+        setMyRank(d.myRank);
+        setCachedDashboardScores(userId, {
+          remainingCoins: d.remainingCoins,
+          teamScores: d.teams,
+          myPoints: d.myPoints,
+          myRank: d.myRank,
+        });
+      } catch {
+        setLoadError(true);
       }
-
-      // Scarica tutti i voti a blocchi da 1000 (Supabase tronca oltre)
-      let allVotes: { voter_id: string; recipient_id: string; points: number; voted_at: string }[] = [];
-      {
-        let voteFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("votes")
-            .select("voter_id, recipient_id, points, voted_at")
-            .range(voteFrom, voteFrom + 999);
-          if (!page || page.length === 0) break;
-          allVotes.push(...page);
-          if (page.length < 1000) break;
-          voteFrom += 1000;
-        }
-      }
-
-      const usersById = new Map(allUsersRaw.map((u) => [u.id, u]));
-      const votes = allVotes || [];
-
-      const startOfToday = startOfTodayInRomeISO();
-      const votesToday = votes.filter(
-        (v) => v.voter_id === userId && v.voted_at && v.voted_at >= startOfToday
-      ).length;
-
-      // Recupera i bonus riscattati oggi
-      const { data: bonusRedemptions } = await supabase
-        .from("bonus_redemptions")
-        .select("bonus_id")
-        .eq("user_id", userId)
-        .gte("redeemed_at", startOfToday);
-
-      const bonusIds = bonusRedemptions?.map(b => b.bonus_id) || [];
-      let totalBonus = 0;
-      if (bonusIds.length > 0) {
-        const { data: bonusData } = await supabase
-          .from("bonus_qr")
-          .select("amount")
-          .in("id", bonusIds);
-        totalBonus = bonusData?.reduce((sum, b) => sum + (b.amount || 0), 0) || 0;
-      }
-
-      const remaining = 20 + totalBonus - votesToday;
-      setRemainingCoins(Math.max(0, remaining));
-
-      const pointsByUser = new Map<string, number>();
-      // 🔥 MODIFICA: Punteggi squadra da votes + event_votes
-      const pts = { Matricole: 0, Veterani: 0 };
-
-      for (const v of votes) {
-        const r = usersById.get(v.recipient_id);
-        const p = v.points || 0;
-        if (!r) continue;
-        pointsByUser.set(v.recipient_id, (pointsByUser.get(v.recipient_id) || 0) + p);
-        if (r.team === "Matricole") pts.Matricole += p;
-        if (r.team === "Veterani") pts.Veterani += p;
-      }
-
-      // Aggiungi i voti da event_votes (QR voto), a blocchi da 1000
-      let eventVotes: { team_target: string | null; points: number }[] = [];
-      {
-        let evFrom = 0;
-        while (true) {
-          const { data: page } = await supabase
-            .from("event_votes")
-            .select("team_target, points")
-            .range(evFrom, evFrom + 999);
-          if (!page || page.length === 0) break;
-          eventVotes.push(...page);
-          if (page.length < 1000) break;
-          evFrom += 1000;
-        }
-      }
-
-      for (const ev of eventVotes || []) {
-        if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
-        if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
-      }
-
-      addBoostsToScores(pts, await fetchTeamBoosts(supabase));
-      setTeamScores(pts);
-      const myPointsValue = pointsByUser.get(userId) || 0;
-      setMyPoints(myPointsValue);
-
-      const ranking = Array.from(pointsByUser.entries()).sort((a, b) => b[1] - a[1]);
-      const myIndex = ranking.findIndex(([uid]) => uid === userId);
-      const myRankValue = myIndex >= 0 ? myIndex + 1 : null;
-      setMyRank(myRankValue);
-
       setLoading(false);
-      setCachedDashboardScores(userId, {
-        remainingCoins: Math.max(0, remaining),
-        teamScores: pts,
-        myPoints: myPointsValue,
-        myRank: myRankValue,
-      });
     };
     fetchData();
   }, [userId]);
 
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
+  if (loadError) return <LoadError />;
 
   const isAdmin = userRole === "admin" || userRole === "staff";
 
@@ -683,11 +535,8 @@ export default function Dashboard() {
       setUserId(id);
       setUserRole(role || "");
 
-      const { data: me } = await supabase
-        .from("users")
-        .select("first_name, last_name, team, year, is_didatta")
-        .eq("id", id)
-        .single();
+      const meRes = await fetch("/api/me", { cache: "no-store" });
+      const me = meRes.ok ? await meRes.json() : null;
 
       if (me) {
         setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
