@@ -155,6 +155,89 @@ const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
   );
 };
 
+type UserForm = {
+  email: string;
+  first_name: string;
+  last_name: string;
+  team: string;
+  role: string;
+  site: string;
+  school: string;
+  year: string;
+};
+
+const FIELD_STYLE = { width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" } as const;
+
+// Campi del form utente, identici in "Aggiungi" e "Modifica" (cambiano solo segnaposto, nota sul
+// ruolo e il campo extra dopo la squadra).
+function UserFormFields({ form, setForm, isSuper, validYears, suggestedSchools, emailPlaceholder, roleNote, afterTeam }: {
+  form: UserForm;
+  setForm: (f: UserForm) => void;
+  isSuper: boolean;
+  validYears: string[];
+  suggestedSchools: string[];
+  emailPlaceholder: string;
+  roleNote: string;
+  afterTeam?: React.ReactNode;
+}) {
+  return (
+    <>
+      <input type="email" placeholder={emailPlaceholder} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} style={FIELD_STYLE} />
+      <input type="text" placeholder="Nome" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} style={FIELD_STYLE} />
+      <input type="text" placeholder="Cognome" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} style={FIELD_STYLE} />
+
+      <select value={form.team} onChange={(e) => setForm({ ...form, team: e.target.value })} style={FIELD_STYLE}>
+        <option value="">Non specificato</option>
+        <option value="Matricole">🐓 Matricole</option>
+        <option value="Veterani">🐄 Veterani</option>
+        <option value="Didatti&Docenti">Didatti &amp; Docenti</option>
+      </select>
+
+      {afterTeam}
+
+      {isSuper ? (
+        <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} style={FIELD_STYLE}>
+          <option value="student">Partecipante</option>
+          <option value="staff">Staff</option>
+          <option value="admin">Admin</option>
+        </select>
+      ) : (
+        <p style={{ marginTop: 8, padding: 8, background: "#f5f5f5", borderRadius: 6, fontSize: "0.85rem", color: "#666" }}>{roleNote}</p>
+      )}
+
+      {/* Sede */}
+      <select value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value, school: "" })} style={FIELD_STYLE}>
+        <option value="">Non specificato</option>
+        {CONFIG_ISCRIZIONE.sedi.map((sede) => (
+          <option key={sede} value={sede}>{sede}</option>
+        ))}
+      </select>
+
+      {/* Scuola */}
+      <div style={{ marginTop: 8 }}>
+        <SchoolSelect value={form.school} onChange={(val: string) => setForm({ ...form, school: val })} suggested={suggestedSchools} site={form.site} />
+      </div>
+
+      {/* Anno - FILTRATO per team */}
+      <select value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} style={FIELD_STYLE}>
+        <option value="">Non specificato</option>
+        {CONFIG_ISCRIZIONE.anni
+          .filter((anno) => validYears.includes(anno.value))
+          .map((anno) => (
+            <option key={anno.value} value={anno.value}>{anno.label}</option>
+          ))}
+      </select>
+
+      {/* Avviso se anno non valido per il team */}
+      {form.team && form.year && !isYearValidForTeam(form.team, form.year) && (
+        <p style={{ color: "#dc3545", fontSize: "0.8rem", marginTop: 4 }}>
+          ⚠️ L'anno "{CONFIG_ISCRIZIONE.anni.find((a) => a.value === form.year)?.label}" non è valido per {form.team}.
+        </p>
+      )}
+    </>
+  );
+}
+
 type UserSortCol = "name" | "email" | "team" | "status" | "role" | "site" | "school" | "year";
 
 export default function AdminPage() {
@@ -201,7 +284,7 @@ export default function AdminPage() {
   const [previewPin, setPreviewPin] = useState<string | null>(null);
 
   // Form utente
-  const [userForm, setUserForm] = useState({ 
+  const [userForm, setUserForm] = useState<UserForm>({ 
     email: "", 
     first_name: "", 
     last_name: "", 
@@ -774,19 +857,6 @@ export default function AdminPage() {
     }
   };
 
-  const TeamSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <select 
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
-      style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
-    >
-      <option value="">Non specificato</option>
-      <option value="Matricole">🐓 Matricole</option>
-      <option value="Veterani">🐄 Veterani</option>
-      <option value="Didatti&Docenti">Didatti &amp; Docenti</option>
-    </select>
-  );
-
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Verifica credenziali...</div>;
   if (!isAdmin) return <div style={{ textAlign: "center", padding: 40 }}>Accesso negato.</div>;
 
@@ -1284,68 +1354,15 @@ export default function AdminPage() {
           <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 600, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
             <h2>➕ Aggiungi Utente</h2>
             
-            <input type="email" placeholder="Email *" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            
-            <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
-            
-            {isSuper ? (
-              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}>
-                <option value="student">Partecipante</option>
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-            ) : (
-              <p style={{ marginTop: 8, padding: 8, background: "#f5f5f5", borderRadius: 6, fontSize: "0.85rem", color: "#666" }}>
-                Ruolo: Partecipante (solo un admin può assegnare ruoli diversi)
-              </p>
-            )}
-
-            {/* Sede */}
-            <select
-              value={userForm.site}
-              onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: '' })}
-              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
-            >
-              <option value="">Non specificato</option>
-              {CONFIG_ISCRIZIONE.sedi.map((sede) => (
-                <option key={sede} value={sede}>{sede}</option>
-              ))}
-            </select>
-
-            {/* Scuola */}
-            <div style={{ marginTop: 8 }}>
-              <SchoolSelect
-                value={userForm.school}
-                onChange={(val: string) => setUserForm({ ...userForm, school: val })}
-                suggested={suggestedSchools}
-                site={userForm.site}
-              />
-            </div>
-
-            {/* Anno - FILTRATO per team */}
-            <select
-              value={userForm.year}
-              onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
-              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
-            >
-              <option value="">Non specificato</option>
-              {CONFIG_ISCRIZIONE.anni
-                .filter(anno => validYears.includes(anno.value))
-                .map((anno) => (
-                  <option key={anno.value} value={anno.value}>
-                    {anno.label}
-                  </option>
-                ))}
-            </select>
-
-            {/* Avviso se anno non valido per il team */}
-            {userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year) && (
-              <p style={{ color: "#dc3545", fontSize: "0.8rem", marginTop: 4 }}>
-                ⚠️ L'anno "{CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per {userForm.team}.
-              </p>
-            )}
+            <UserFormFields
+              form={userForm}
+              setForm={setUserForm}
+              isSuper={isSuper}
+              validYears={validYears}
+              suggestedSchools={suggestedSchools}
+              emailPlaceholder="Email *"
+              roleNote="Ruolo: Partecipante (solo un admin può assegnare ruoli diversi)"
+            />
 
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleAddUser} style={{ padding: "8px 16px", background: "#28a745", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Crea</button>
@@ -1362,73 +1379,21 @@ export default function AdminPage() {
             <h2>✏️ Modifica Utente</h2>
             <p style={{ color: "#999", fontSize: "0.8rem", marginBottom: 8 }}>{selectedUser.first_name} {selectedUser.last_name}</p>
             
-            <input type="email" placeholder="Email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            <input type="text" placeholder="Nome" value={userForm.first_name} onChange={(e) => setUserForm({ ...userForm, first_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            <input type="text" placeholder="Cognome" value={userForm.last_name} onChange={(e) => setUserForm({ ...userForm, last_name: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-
-            <TeamSelect value={userForm.team} onChange={(v) => setUserForm({ ...userForm, team: v })} />
-
-            <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: "0.85rem", color: "#444" }}>
-              <input type="checkbox" checked={editIsDidatta} onChange={(e) => setEditIsDidatta(e.target.checked)} />
-              Può scegliere/cambiare/lasciare la squadra (docente/staff registrato come Matricola/Veterano)
-            </label>
-
-            {isSuper ? (
-              <select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}>
-                <option value="student">Partecipante</option>
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-            ) : (
-              <p style={{ marginTop: 8, padding: 8, background: "#f5f5f5", borderRadius: 6, fontSize: "0.85rem", color: "#666" }}>
-                Ruolo attuale: {userForm.role === "student" ? "partecipante" : userForm.role} (solo un admin può modificarlo)
-              </p>
-            )}
-
-            {/* Sede */}
-            <select
-              value={userForm.site}
-              onChange={(e) => setUserForm({ ...userForm, site: e.target.value, school: '' })}
-              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
-            >
-              <option value="">Non specificato</option>
-              {CONFIG_ISCRIZIONE.sedi.map((sede) => (
-                <option key={sede} value={sede}>{sede}</option>
-              ))}
-            </select>
-
-            {/* Scuola */}
-            <div style={{ marginTop: 8 }}>
-              <SchoolSelect
-                value={userForm.school}
-                onChange={(val: string) => setUserForm({ ...userForm, school: val })}
-                suggested={editSuggestedSchools}
-                site={userForm.site}
-              />
-            </div>
-
-            {/* Anno - FILTRATO per team */}
-            <select
-              value={userForm.year}
-              onChange={(e) => setUserForm({ ...userForm, year: e.target.value })}
-              style={{ width: "100%", padding: 8, marginTop: 8, borderRadius: 6, border: "1px solid #ccc" }}
-            >
-              <option value="">Non specificato</option>
-              {CONFIG_ISCRIZIONE.anni
-                .filter(anno => editValidYears.includes(anno.value))
-                .map((anno) => (
-                  <option key={anno.value} value={anno.value}>
-                    {anno.label}
-                  </option>
-                ))}
-            </select>
-
-            {/* Avviso se anno non valido per il team */}
-            {userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year) && (
-              <p style={{ color: "#dc3545", fontSize: "0.8rem", marginTop: 4 }}>
-                ⚠️ L'anno "{CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per {userForm.team}.
-              </p>
-            )}
+            <UserFormFields
+              form={userForm}
+              setForm={setUserForm}
+              isSuper={isSuper}
+              validYears={editValidYears}
+              suggestedSchools={editSuggestedSchools}
+              emailPlaceholder="Email"
+              roleNote={`Ruolo attuale: ${userForm.role === "student" ? "partecipante" : userForm.role} (solo un admin può modificarlo)`}
+              afterTeam={
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: "0.85rem", color: "#444" }}>
+                  <input type="checkbox" checked={editIsDidatta} onChange={(e) => setEditIsDidatta(e.target.checked)} />
+                  Può scegliere/cambiare/lasciare la squadra (docente/staff registrato come Matricola/Veterano)
+                </label>
+              }
+            />
 
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleEditUser} style={{ padding: "8px 16px", background: "#ffc107", color: "black", border: "none", borderRadius: 8, cursor: "pointer" }}>Salva</button>

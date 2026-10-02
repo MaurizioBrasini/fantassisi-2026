@@ -7,6 +7,7 @@ import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
+import NoAccess from "@/components/NoAccess";
 import { getCookie, setCookie, logout } from "@/lib/clientCookies";
 
 // ─────────────────────────────────────────────
@@ -200,25 +201,37 @@ function LoadError() {
 }
 
 // ─────────────────────────────────────────────
-// Dashboard Didatti&Docenti (con pulsante Admin)
+// Parti condivise dalle due dashboard
 // ─────────────────────────────────────────────
-function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
-  userName: string;
-  userId: string;
-  userRole: string;
-  onEnrolled: (team: string, year?: string) => void;
-}) {
-  const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
-  const [remainingCoins, setRemainingCoins] = useState(20);
+type DashboardData = {
+  teamScores: { Matricole: number; Veterani: number };
+  remainingCoins: number;
+  myPoints: number;
+  myRank: number | null;
+};
+
+// Punteggi, coins e posizione arrivano dal server (/api/standings), con una cache di pochi secondi
+// nel telefono per i rimontaggi ravvicinati (tornare da /scan o dalle classifiche).
+function useDashboardData(userId: string) {
+  const [data, setData] = useState<DashboardData>({
+    teamScores: { Matricole: 0, Veterani: 0 },
+    remainingCoins: 20,
+    myPoints: 0,
+    myRank: null,
+  });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const load = async () => {
       const cached = getCachedDashboardScores(userId);
       if (cached) {
-        setRemainingCoins(cached.remainingCoins);
-        setTeamScores(cached.teamScores);
+        setData({
+          teamScores: cached.teamScores,
+          remainingCoins: cached.remainingCoins,
+          myPoints: cached.myPoints || 0,
+          myRank: cached.myRank ?? null,
+        });
         setLoading(false);
         return;
       }
@@ -227,101 +240,141 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
         const res = await fetch("/api/standings?view=dashboard", { cache: "no-store" });
         if (!res.ok) throw new Error(String(res.status));
         const d = await res.json();
-        setRemainingCoins(d.remainingCoins);
-        setTeamScores(d.teams);
-        setCachedDashboardScores(userId, { remainingCoins: d.remainingCoins, teamScores: d.teams });
+        setData({ teamScores: d.teams, remainingCoins: d.remainingCoins, myPoints: d.myPoints, myRank: d.myRank });
+        setCachedDashboardScores(userId, {
+          remainingCoins: d.remainingCoins,
+          teamScores: d.teams,
+          myPoints: d.myPoints,
+          myRank: d.myRank,
+        });
       } catch {
         setLoadError(true);
       }
       setLoading(false);
     };
-    fetchData();
+    load();
   }, [userId]);
 
-  const isAdmin = userRole === "admin" || userRole === "staff";
+  return { ...data, loading, loadError };
+}
 
-  if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
-  if (loadError) return <LoadError />;
+const PAGE_STYLE = { maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" } as const;
+const ACTION_LINK_STYLE = { display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" } as const;
+const CONTRIBUTION_LINK_STYLE = { flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" } as const;
 
+function TeamScoreboard({ teamScores, marginBottom }: { teamScores: { Matricole: number; Veterani: number }; marginBottom: number }) {
+  const side = (team: "Matricole" | "Veterani") => (
+    <div style={{ flex: 1, background: TEAM_COLORS[team], color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
+      <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{team}</div>
+      <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores[team]}</div>
+    </div>
+  );
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
-
-      <GameHeader />
-
+    <>
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <div style={{ flex: 1, background: TEAM_COLORS.Matricole, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Matricole</div>
-          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Matricole}</div>
-        </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom }}>
+        {side("Matricole")}
         <div style={{ width: 2, height: 50, background: "#1E3A5F" }} />
-        <div style={{ flex: 1, background: TEAM_COLORS.Veterani, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Veterani</div>
-          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Veterani}</div>
-        </div>
+        {side("Veterani")}
       </div>
+    </>
+  );
+}
 
-      <p style={{ textAlign: "center", color: "#666", marginBottom: 24 }}>
-        Ciao <strong>{userName || "Partecipante"}</strong> · Didatti&amp;Docenti
-      </p>
-
+function ContributionLinks() {
+  return (
+    <>
       <h2 style={{ fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 10 }}>Contributi</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        <Link href="/ranking/individuali" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>
-          Individuali
-        </Link>
-        <Link href="/ranking/sedi" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>
-          Per sede
-        </Link>
-        <Link href="/ranking/classi" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>
-          Per classe
-        </Link>
+        <Link href="/ranking/individuali" style={CONTRIBUTION_LINK_STYLE}>Individuali</Link>
+        <Link href="/ranking/sedi" style={CONTRIBUTION_LINK_STYLE}>Per sede</Link>
+        <Link href="/ranking/classi" style={CONTRIBUTION_LINK_STYLE}>Per classe</Link>
       </div>
+    </>
+  );
+}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>I miei CBT coins</div>
-          <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
-            <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{remainingCoins}</div>
-            <div style={{ fontSize: "0.7rem" }}>si ricaricano ogni giorno a mezzanotte</div>
-          </div>
-        </div>
-        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
-            Ricarica i CBT Coins
-          </div>
-          <Link href="/scan?mode=ricarica" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" }}>
-            ⚡ Ricarica
-          </Link>
+function CoinsAndRecharge({ remainingCoins }: { remainingCoins: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>I miei CBT coins</div>
+        <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
+          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{remainingCoins}</div>
+          <div style={{ fontSize: "0.7rem" }}>si ricaricano ogni giorno a mezzanotte</div>
         </div>
       </div>
-
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
-          Vota i colleghi
-        </div>
-        <Link href="/scan" style={{ display: "block", padding: 16, borderRadius: 60, textAlign: "center", fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", textDecoration: "none" }}>
-          🗳️ Vota
-        </Link>
+      <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>Ricarica i CBT Coins</div>
+        <Link href="/scan?mode=ricarica" style={ACTION_LINK_STYLE}>⚡ Ricarica</Link>
       </div>
+    </div>
+  );
+}
 
-      {/* Bottone arruolamento */}
-      <TeamSwitchBox currentTeam="Didatti&Docenti" allowLeave={false} onDone={onEnrolled} />
+function VoteButton() {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>Vota i colleghi</div>
+      <Link href="/scan" style={{ display: "block", padding: 16, borderRadius: 60, textAlign: "center", fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", textDecoration: "none" }}>
+        🗳️ Vota
+      </Link>
+    </div>
+  );
+}
 
+function AdminAndLogout({ isAdmin }: { isAdmin: boolean }) {
+  return (
+    <>
       {/* Pulsante Admin (visibile solo a admin/staff) */}
       {isAdmin && (
         <Link href="/admin" style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
           ⚙️ Admin
         </Link>
       )}
-
       <button
         onClick={logout}
         style={{ marginTop: 24, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline", width: "100%" }}
       >
         Esci
       </button>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Dashboard Didatti&Docenti (con pulsante Admin)
+// ─────────────────────────────────────────────
+function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
+  userName: string;
+  userId: string;
+  userRole: string;
+  onEnrolled: (team: string, year?: string) => void;
+}) {
+  const { teamScores, remainingCoins, loading, loadError } = useDashboardData(userId);
+  const isAdmin = userRole === "admin" || userRole === "staff";
+
+  if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
+  if (loadError) return <LoadError />;
+
+  return (
+    <div style={PAGE_STYLE}>
+      <GameHeader />
+      <TeamScoreboard teamScores={teamScores} marginBottom={20} />
+
+      <p style={{ textAlign: "center", color: "#666", marginBottom: 24 }}>
+        Ciao <strong>{userName || "Partecipante"}</strong> · Didatti&amp;Docenti
+      </p>
+
+      <ContributionLinks />
+      <CoinsAndRecharge remainingCoins={remainingCoins} />
+      <VoteButton />
+
+      {/* Bottone arruolamento */}
+      <TeamSwitchBox currentTeam="Didatti&Docenti" allowLeave={false} onDone={onEnrolled} />
+
+      <AdminAndLogout isAdmin={isAdmin} />
     </div>
   );
 }
@@ -338,46 +391,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
   isDidatta: boolean;
   onTeamChange: (team: string, year?: string) => void;
 }) {
-  const [remainingCoins, setRemainingCoins] = useState(20);
-  const [myPoints, setMyPoints] = useState(0);
-  const [myRank, setMyRank] = useState<number | null>(null);
-  const [teamScores, setTeamScores] = useState({ Matricole: 0, Veterani: 0 });
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const cached = getCachedDashboardScores(userId);
-      if (cached) {
-        setRemainingCoins(cached.remainingCoins);
-        setTeamScores(cached.teamScores);
-        setMyPoints(cached.myPoints || 0);
-        setMyRank(cached.myRank ?? null);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const res = await fetch("/api/standings?view=dashboard", { cache: "no-store" });
-        if (!res.ok) throw new Error(String(res.status));
-        const d = await res.json();
-        setRemainingCoins(d.remainingCoins);
-        setTeamScores(d.teams);
-        setMyPoints(d.myPoints);
-        setMyRank(d.myRank);
-        setCachedDashboardScores(userId, {
-          remainingCoins: d.remainingCoins,
-          teamScores: d.teams,
-          myPoints: d.myPoints,
-          myRank: d.myRank,
-        });
-      } catch {
-        setLoadError(true);
-      }
-      setLoading(false);
-    };
-    fetchData();
-  }, [userId]);
+  const { teamScores, remainingCoins, myPoints, myRank, loading, loadError } = useDashboardData(userId);
 
   if (loading) return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
   if (loadError) return <LoadError />;
@@ -385,34 +399,16 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
   const isAdmin = userRole === "admin" || userRole === "staff";
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
-
+    <div style={PAGE_STYLE}>
       <GameHeader />
-
-      <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <div style={{ flex: 1, background: TEAM_COLORS.Matricole, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Matricole</div>
-          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Matricole}</div>
-        </div>
-        <div style={{ width: 2, height: 50, background: "#1E3A5F" }} />
-        <div style={{ flex: 1, background: TEAM_COLORS.Veterani, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
-          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>Veterani</div>
-          <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{teamScores.Veterani}</div>
-        </div>
-      </div>
+      <TeamScoreboard teamScores={teamScores} marginBottom={28} />
 
       <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
         Ciao <strong>{userName || "Partecipante"}</strong> · <TeamIcon team={myTeam} size={16} /> {myTeam || "Team non assegnato"}
         {myClass && ` · ${CONFIG_ISCRIZIONE.anni.find((a) => a.value === myClass)?.label || myClass}`}
       </p>
 
-      <h2 style={{ fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 10 }}>Contributi</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        <Link href="/ranking/individuali" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>Individuali</Link>
-        <Link href="/ranking/sedi" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>Per sede</Link>
-        <Link href="/ranking/classi" style={{ flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" }}>Per classe</Link>
-      </div>
+      <ContributionLinks />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
@@ -430,57 +426,21 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
             Mostra il QR per ricevere voti
           </div>
-          <Link href="/myqr" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#A8D8A8", border: "2px solid #2E7D32", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" }}>
+          <Link href="/myqr" style={{ ...ACTION_LINK_STYLE, background: "#A8D8A8", border: "2px solid #2E7D32" }}>
             Il mio QR
           </Link>
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>I miei CBT coins</div>
-          <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
-            <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{remainingCoins}</div>
-            <div style={{ fontSize: "0.7rem" }}>si ricaricano ogni giorno a mezzanotte</div>
-          </div>
-        </div>
-        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
-            Ricarica i CBT Coins
-          </div>
-          <Link href="/scan?mode=ricarica" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" }}>
-            ⚡ Ricarica
-          </Link>
-        </div>
-      </div>
-
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
-          Vota i colleghi
-        </div>
-        <Link href="/scan" style={{ display: "block", padding: 16, borderRadius: 60, textAlign: "center", fontWeight: 700, background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", textDecoration: "none" }}>
-          🗳️ Vota
-        </Link>
-      </div>
+      <CoinsAndRecharge remainingCoins={remainingCoins} />
+      <VoteButton />
 
       {/* Solo chi è (o è stato) Didatti&Docenti può cambiare squadra o uscirne */}
       {isDidatta && (
         <TeamSwitchBox currentTeam={myTeam} allowLeave onDone={onTeamChange} />
       )}
 
-      {isAdmin && (
-        <Link href="/admin" style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
-          ⚙️ Admin
-        </Link>
-      )}
-
-      <button
-        onClick={logout}
-        style={{ marginTop: 24, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline", width: "100%" }}
-      >
-        Esci
-      </button>
+      <AdminAndLogout isAdmin={isAdmin} />
     </div>
   );
 }
@@ -527,17 +487,7 @@ export default function Dashboard() {
     init();
   }, []);
 
-  if (noAccess) {
-    return (
-      <div style={{ textAlign: "center", padding: 40, maxWidth: 500, margin: "0 auto" }}>
-        <h2 style={{ color: "#1E3A5F" }}>Accesso non valido</h2>
-        <p style={{ color: "#666" }}>Usa il link personale che ti è stato inviato per entrare nell'app.</p>
-        <p style={{ color: "#666" }}>
-          Non lo trovi? <a href="/accedi" style={{ color: "#FF6B35", fontWeight: "bold" }}>Richiedi l'accesso</a>
-        </p>
-      </div>
-    );
-  }
+  if (noAccess) return <NoAccess />;
 
   if (loading || !userId) {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;

@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 
+// Dopo l'accesso si torna dove si era (es. a un voto da QR): solo percorsi interni al sito.
+function safeNext(): string {
+  const next = new URLSearchParams(window.location.search).get("next") || "";
+  return next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
+}
+
 export default function AccediPage() {
   const [email, setEmail] = useState("");
   const [last4, setLast4] = useState("");
@@ -45,7 +51,7 @@ export default function AccediPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        window.location.href = "/";
+        window.location.href = safeNext();
         return;
       }
       setError(data.message || "Qualcosa è andato storto. Riprova.");

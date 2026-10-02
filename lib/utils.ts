@@ -2,38 +2,34 @@
 // reset "di oggi") devono seguire la mezzanotte italiana, non quella UTC (scarto di 1-2h).
 // Ritorna l'inizio della giornata corrente in Europe/Rome, come istante UTC (ISO string),
 // utilizzabile direttamente in un filtro .gte("voted_at", ...).
-export function startOfTodayInRomeISO(): string {
-  const now = new Date();
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Rome",
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-  const parts = dtf.formatToParts(now).reduce((acc, p) => {
+const ROME_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Europe/Rome",
+  hour12: false,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+// Scarto (in millisecondi) di Roma rispetto a UTC all'istante dato: +1h d'inverno, +2h d'estate.
+// Si ricava leggendo l'istante come orario di Roma e rimettendolo in UTC: la differenza è l'offset.
+function romeOffsetMs(at: Date): { offsetMs: number; year: number; month: number; day: number } {
+  const parts = ROME_FORMAT.formatToParts(at).reduce((acc, p) => {
     acc[p.type] = p.value;
     return acc;
   }, {} as Record<string, string>);
+  const [year, month, day] = [Number(parts.year), Number(parts.month), Number(parts.day)];
+  const romeAsUTC = Date.UTC(year, month - 1, day, Number(parts.hour), Number(parts.minute), Number(parts.second));
+  // I secondi interi: il formato di Roma non ha i millisecondi, e lasciarli sporcherebbe l'offset.
+  return { offsetMs: romeAsUTC - Math.floor(at.getTime() / 1000) * 1000, year, month, day };
+}
 
-  // Istante UTC che corrisponde a "adesso" quando letto come orario di Roma:
-  // la differenza rispetto a `now` è esattamente l'offset di Roma in quel momento.
-  const romeNowAsUTC = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second)
-  );
-  const romeOffsetMs = romeNowAsUTC - now.getTime();
-
+export function startOfTodayInRomeISO(): string {
   // Mezzanotte di oggi, calendario di Roma, poi riportata a istante UTC sottraendo l'offset.
-  const romeMidnightUTC = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
-  return new Date(romeMidnightUTC - romeOffsetMs).toISOString();
+  const { offsetMs, year, month, day } = romeOffsetMs(new Date());
+  return new Date(Date.UTC(year, month - 1, day) - offsetMs).toISOString();
 }
 
 // ─────────────────────────────────────────────
@@ -105,31 +101,7 @@ export function invalidateCachedDashboardScores(userId: string): void {
 // senza dover calcolare a mano l'offset UTC+1/UTC+2 del giorno in questione.
 export function romeLocalToUTCISO(year: number, month: number, day: number, hour: number, minute: number): string {
   const approx = new Date(Date.UTC(year, month - 1, day, hour, minute));
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Europe/Rome",
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-  const parts = dtf.formatToParts(approx).reduce((acc, p) => {
-    acc[p.type] = p.value;
-    return acc;
-  }, {} as Record<string, string>);
-
-  const romeAsUTC = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second)
-  );
-  const offsetMs = romeAsUTC - approx.getTime();
-  return new Date(Date.UTC(year, month - 1, day, hour, minute) - offsetMs).toISOString();
+  return new Date(approx.getTime() - romeOffsetMs(approx).offsetMs).toISOString();
 }
 
 // Genera `count` PIN a 4 cifre univoci (mai usati prima, mai ripetuti tra loro),

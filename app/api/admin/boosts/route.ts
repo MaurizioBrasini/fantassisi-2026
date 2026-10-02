@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { accruedBoostPoints } from "@/lib/boosts";
+import { deleteById } from "@/lib/adminCrud";
 
 const MAX_POINTS = 10000;
 const MAX_MINUTES = 3 * 24 * 60; // tutta la durata dell'evento
@@ -94,21 +95,4 @@ export async function PATCH(request: Request) {
 }
 
 // DELETE: elimina un bonus, togliendo anche i punti già maturati — solo admin
-export async function DELETE(request: Request) {
-  const requester = await requireRole("admin");
-  if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-  if (!id) {
-    return NextResponse.json({ message: "ID mancante" }, { status: 400 });
-  }
-
-  const { error } = await getSupabaseAdmin().from("team_boosts").delete().eq("id", id);
-  if (error) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
-  }
-  return NextResponse.json({ success: true });
-}
+export const DELETE = (request: Request) => deleteById(request, "team_boosts");

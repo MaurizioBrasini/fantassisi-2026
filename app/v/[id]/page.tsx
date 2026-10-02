@@ -2,11 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
+import { getCookie } from "@/lib/clientCookies";
 
 // Pagina aperta scansionando il QR personale di qualcuno con la fotocamera
 // NATIVA del telefono (non quella in-pagina) — il QR ora contiene questo
@@ -66,7 +62,19 @@ export default function VotePage({ params }: { params: { id: string } }) {
     return <div style={{ textAlign: "center", padding: 40 }}>Registrazione voto...</div>;
   }
   if (status === "noaccess") {
-    return box("Accesso non valido", "Usa il link personale che ti è stato inviato per entrare nell'app, poi riprova a scansionare.", "#1E3A5F");
+    // Sessione persa: si rientra da /accedi e si torna direttamente a questo voto.
+    return (
+      <div style={{ maxWidth: 420, margin: "0 auto", padding: 20, textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
+        <h2 style={{ color: "#1E3A5F" }}>Devi prima entrare</h2>
+        <p style={{ color: "#666" }}>Per votare serve l&apos;accesso all&apos;app. Entra con la tua mail e il telefono: poi il voto viene registrato.</p>
+        <Link
+          href={`/accedi?next=${encodeURIComponent(`/v/${params.id}`)}`}
+          style={{ display: "inline-block", marginTop: 16, padding: "12px 24px", background: "#FF6B35", color: "white", borderRadius: 8, fontWeight: 700, textDecoration: "none" }}
+        >
+          ENTRA E VOTA
+        </Link>
+      </div>
+    );
   }
   if (status === "self") {
     return box("Non puoi votare te stesso", "Questo è il tuo QR personale.", "#1E3A5F");

@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 import { startOfTodayInRomeISO } from "@/lib/utils";
+import { DAILY_COINS } from "@/lib/coins";
 
 export async function POST(request: Request) {
   const voterId = getVerifiedUserId();
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
     .eq("voter_id", voterId)
     .gte("voted_at", startOfTodayInRomeISO());
 
-  if ((votesToday || 0) >= 20) {
+  if ((votesToday || 0) >= DAILY_COINS) {
     return NextResponse.json({ error: "Crediti giornalieri esauriti" }, { status: 400 });
   }
 

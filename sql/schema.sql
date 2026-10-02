@@ -1,96 +1,246 @@
--- =============================================
--- FANTASSISI 2026 – SCHEMA DATABASE
--- =============================================
+-- =============================================================================
+-- FANTASSISI 2026 - SCHEMA DEL DATABASE (letto dal database reale il 2 ottobre 2026)
+--
+-- Solo DOCUMENTAZIONE: descrive com'e' fatto oggi il database su Supabase. Non va eseguito da
+-- zero: le modifiche si fanno a mano nell'SQL Editor (vedi anche le migrazioni datate in questa
+-- cartella). Il file precedente non corrispondeva piu' al database reale ed e' stato sostituito.
+--
+-- Accesso: il browser NON legge il database. Le tabelle hanno RLS attiva e i ruoli anon e
+-- authenticated non hanno nessun permesso; il sito legge e scrive dal server con la chiave
+-- service role. Il ruolo claude_agent ha solo lettura (policy "agent read").
+-- =============================================================================
 
--- Tabella utenti
-CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  first_name TEXT,
-  last_name TEXT,
-  email TEXT UNIQUE,
-  school TEXT,
-  site TEXT,
-  year TEXT,
-  role TEXT CHECK (role IN ('student', 'staff', 'admin')) DEFAULT 'student',
-  team TEXT CHECK (team IN ('Matricole', 'Veterani')),
-  auth_token TEXT UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- ---------------------------------------------------------------------------
+-- users
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.users (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  first_name text,
+  last_name text,
+  email text,
+  school text,
+  site text,
+  year text,
+  role text DEFAULT 'student'::text,
+  team text,
+  auth_token text,
+  created_at timestamp with time zone DEFAULT now(),
+  is_didatta boolean NOT NULL DEFAULT false,
+  pin text,
+  status text NOT NULL DEFAULT 'confermato'::text,
+  phone text,
+  CONSTRAINT users_auth_token_key UNIQUE (auth_token),
+  CONSTRAINT users_email_key UNIQUE (email),
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_role_check CHECK ((role = ANY (ARRAY['student'::text, 'staff'::text, 'admin'::text]))),
+  CONSTRAINT users_team_check CHECK ((team = ANY (ARRAY['Matricole'::text, 'Veterani'::text, 'Didatti&Docenti'::text])))
 );
+CREATE UNIQUE INDEX idx_users_pin_unique ON public.users USING btree (pin) WHERE (pin IS NOT NULL);
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.users FOR SELECT TO claude_agent USING (true);
 
--- Tabella voti tra persone
-CREATE TABLE IF NOT EXISTS votes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  voter_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  recipient_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  points INT,
-  voted_at TIMESTAMPTZ DEFAULT now()
+-- ---------------------------------------------------------------------------
+-- votes
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.votes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  voter_id uuid,
+  recipient_id uuid,
+  points integer,
+  voted_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT votes_pkey PRIMARY KEY (id),
+  CONSTRAINT votes_recipient_id_fkey FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT votes_voter_id_fkey FOREIGN KEY (voter_id) REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE UNIQUE INDEX idx_one_vote_per_day ON public.votes USING btree (voter_id, recipient_id, date_from_timestamp(voted_at));
+CREATE INDEX idx_votes_recipient ON public.votes USING btree (recipient_id);
+CREATE INDEX idx_votes_voted_at ON public.votes USING btree (voted_at);
+CREATE INDEX idx_votes_voter ON public.votes USING btree (voter_id);
+ALTER TABLE public.votes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.votes FOR SELECT TO claude_agent USING (true);
 
--- Tabella eventi votabili
-CREATE TABLE IF NOT EXISTS votable_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title TEXT,
-  event_type TEXT CHECK (event_type IN ('presentation', 'song')),
-  team_target TEXT CHECK (team_target IN ('Matricole', 'Veterani')),
-  location TEXT,
-  start_time TIMESTAMPTZ,
-  end_time TIMESTAMPTZ,
-  qr_code TEXT UNIQUE,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- ---------------------------------------------------------------------------
+-- event_votes
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.event_votes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  event_id uuid,
+  voted_at timestamp with time zone DEFAULT now(),
+  points integer DEFAULT 1,
+  team_target text,
+  class_school text,
+  class_site text,
+  class_year text,
+  qr_type text,
+  CONSTRAINT event_votes_pkey PRIMARY KEY (id),
+  CONSTRAINT event_votes_event_id_fkey FOREIGN KEY (event_id) REFERENCES votable_events(id) ON DELETE CASCADE,
+  CONSTRAINT event_votes_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE INDEX idx_event_votes_user ON public.event_votes USING btree (user_id);
+CREATE UNIQUE INDEX idx_one_event_vote_per_user ON public.event_votes USING btree (user_id, event_id);
+ALTER TABLE public.event_votes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.event_votes FOR SELECT TO claude_agent USING (true);
 
--- Tabella voti evento
-CREATE TABLE IF NOT EXISTS event_votes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  event_id UUID REFERENCES votable_events(id) ON DELETE CASCADE,
-  voted_at TIMESTAMPTZ DEFAULT now()
+-- ---------------------------------------------------------------------------
+-- votable_events
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.votable_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text,
+  event_type text,
+  team_target text,
+  location text,
+  start_time timestamp with time zone,
+  end_time timestamp with time zone,
+  qr_code text,
+  created_at timestamp with time zone DEFAULT now(),
+  qr_type text DEFAULT 'team'::text,
+  active boolean DEFAULT true,
+  class_school text,
+  class_site text,
+  class_year text,
+  pin text,
+  CONSTRAINT votable_events_qr_code_key UNIQUE (qr_code),
+  CONSTRAINT votable_events_pkey PRIMARY KEY (id),
+  CONSTRAINT votable_events_event_type_check CHECK ((event_type = ANY (ARRAY['presentation'::text, 'song'::text]))),
+  CONSTRAINT votable_events_qr_type_check CHECK ((qr_type = ANY (ARRAY['team'::text, 'class'::text]))),
+  CONSTRAINT votable_events_team_target_check CHECK ((team_target = ANY (ARRAY['Matricole'::text, 'Veterani'::text])))
 );
+CREATE UNIQUE INDEX votable_events_pin_key ON public.votable_events USING btree (pin) WHERE (pin IS NOT NULL);
+ALTER TABLE public.votable_events ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.votable_events FOR SELECT TO claude_agent USING (true);
 
--- Tabella QR bonus
-CREATE TABLE IF NOT EXISTS bonus_qr (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  code TEXT UNIQUE,
-  title TEXT,
-  amount INT DEFAULT 5,
-  valid_from TIMESTAMPTZ,
-  valid_to TIMESTAMPTZ,
-  max_uses_per_user INT DEFAULT 1,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- ---------------------------------------------------------------------------
+-- bonus_qr
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.bonus_qr (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  code text,
+  title text,
+  amount integer DEFAULT 5,
+  valid_from timestamp with time zone,
+  valid_to timestamp with time zone,
+  max_uses_per_user integer DEFAULT 1,
+  created_at timestamp with time zone DEFAULT now(),
+  active boolean DEFAULT true,
+  pin text,
+  CONSTRAINT bonus_qr_code_key UNIQUE (code),
+  CONSTRAINT bonus_qr_pkey PRIMARY KEY (id)
 );
+CREATE UNIQUE INDEX bonus_qr_pin_key ON public.bonus_qr USING btree (pin) WHERE (pin IS NOT NULL);
+ALTER TABLE public.bonus_qr ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.bonus_qr FOR SELECT TO claude_agent USING (true);
 
--- Tabella riscatti bonus
-CREATE TABLE IF NOT EXISTS bonus_redemptions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  bonus_id UUID REFERENCES bonus_qr(id) ON DELETE CASCADE,
-  redeemed_at TIMESTAMPTZ DEFAULT now()
+-- ---------------------------------------------------------------------------
+-- bonus_redemptions
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.bonus_redemptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid,
+  bonus_id uuid,
+  redeemed_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT bonus_redemptions_pkey PRIMARY KEY (id),
+  CONSTRAINT bonus_redemptions_bonus_id_fkey FOREIGN KEY (bonus_id) REFERENCES bonus_qr(id) ON DELETE CASCADE,
+  CONSTRAINT bonus_redemptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE INDEX idx_bonus_redemptions_user ON public.bonus_redemptions USING btree (user_id);
+ALTER TABLE public.bonus_redemptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.bonus_redemptions FOR SELECT TO claude_agent USING (true);
 
--- Tabella admin
-CREATE TABLE IF NOT EXISTS admins (
-  user_id UUID REFERENCES users(id) PRIMARY KEY,
-  is_super BOOLEAN DEFAULT false,
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ DEFAULT now()
+-- ---------------------------------------------------------------------------
+-- team_boosts
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.team_boosts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  team text NOT NULL,
+  total_points integer NOT NULL,
+  start_at timestamp with time zone NOT NULL DEFAULT now(),
+  end_at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  created_by uuid,
+  CONSTRAINT team_boosts_pkey PRIMARY KEY (id),
+  CONSTRAINT team_boosts_team_check CHECK ((team = ANY (ARRAY['Matricole'::text, 'Veterani'::text]))),
+  CONSTRAINT team_boosts_total_points_check CHECK ((total_points > 0))
 );
+ALTER TABLE public.team_boosts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.team_boosts FOR SELECT TO claude_agent USING (true);
 
--- Indici
-CREATE INDEX IF NOT EXISTS idx_votes_voter ON votes(voter_id);
-CREATE INDEX IF NOT EXISTS idx_votes_recipient ON votes(recipient_id);
-CREATE INDEX IF NOT EXISTS idx_votes_voted_at ON votes(voted_at);
-CREATE INDEX IF NOT EXISTS idx_event_votes_user ON event_votes(user_id);
-CREATE INDEX IF NOT EXISTS idx_bonus_redemptions_user ON bonus_redemptions(user_id);
+-- ---------------------------------------------------------------------------
+-- admins
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.admins (
+  user_id uuid NOT NULL,
+  is_super boolean DEFAULT false,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT admins_pkey PRIMARY KEY (user_id),
+  CONSTRAINT admins_created_by_fkey FOREIGN KEY (created_by) REFERENCES users(id),
+  CONSTRAINT admins_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id)
+);
+ALTER TABLE public.admins ENABLE ROW LEVEL SECURITY;
 
--- RLS
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE event_votes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bonus_redemptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
+-- ---------------------------------------------------------------------------
+-- Funzioni (le RPC di reset vivono qui, non nel repository: modificarle dall'SQL Editor)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.date_from_timestamp(timestamp with time zone)
+ RETURNS date
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  SELECT $1::date;
+$function$;
 
--- Policy
-CREATE POLICY "Users can read all users" ON users FOR SELECT USING (true);
-CREATE POLICY "Users can insert votes" ON votes FOR INSERT WITH CHECK (auth.uid() = voter_id);
-CREATE POLICY "Users can insert event votes" ON event_votes FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can insert bonus redemptions" ON bonus_redemptions FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE OR REPLACE FUNCTION public.reset_full()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  DELETE FROM votes WHERE true;
+  DELETE FROM event_votes WHERE true;
+  DELETE FROM bonus_redemptions WHERE true;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.reset_scores()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  DELETE FROM votes WHERE true;
+  DELETE FROM event_votes WHERE true;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.reset_today()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  DELETE FROM votes 
+  WHERE voted_at >= CURRENT_DATE;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.reset_votes_on_date()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  DELETE FROM votes WHERE (voted_at AT TIME ZONE 'Europe/Rome')::date = (now() AT TIME ZONE 'Europe/Rome')::date;
+  DELETE FROM event_votes WHERE (voted_at AT TIME ZONE 'Europe/Rome')::date = (now() AT TIME ZONE 'Europe/Rome')::date;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.voted_date_utc(ts timestamp with time zone)
+ RETURNS date
+ LANGUAGE sql
+ IMMUTABLE
+AS $function$
+  SELECT (ts AT TIME ZONE 'UTC')::date;
+$function$;
+

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { TeamIcon } from "@/components/TeamIcons";
 import { getCookie } from "@/lib/clientCookies";
+import NoAccess from "@/components/NoAccess";
 
 export default function MyQRPage() {
   const router = useRouter();
@@ -139,9 +140,7 @@ export default function MyQRPage() {
     }
   };
 
-  if (noAccess) {
-    return <div style={{ textAlign: "center", padding: 40 }}>Accesso non valido. Usa il link personale che ti è stato inviato.</div>;
-  }
+  if (noAccess) return <NoAccess />;
 
   if (loading) {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;

@@ -3,6 +3,7 @@ import { getVerifiedUserId } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getStandings, dashboardRank } from "@/lib/standings";
 import { startOfTodayInRomeISO } from "@/lib/utils";
+import { DAILY_COINS } from "@/lib/coins";
 
 // Punteggi e classifiche per le pagine dell'app: i telefoni ricevono solo il risultato già
 // calcolato (e in cache per pochi secondi), invece di scaricare tutte le tabelle a ogni apertura.
@@ -11,7 +12,6 @@ import { startOfTodayInRomeISO } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const DAILY_COINS = 20;
 const NO_STORE = { "Cache-Control": "no-store" };
 
 // CBT coin rimasti oggi (giornata italiana): 20 + bonus riscattati oggi - voti dati oggi.

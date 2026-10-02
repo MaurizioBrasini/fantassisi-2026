@@ -1,6 +1,7 @@
-import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { actionResponse, redeemBonusQr } from "@/lib/qrActions";
 
 export async function POST(request: Request) {
   const userId = getVerifiedUserId();
@@ -9,56 +10,19 @@ export async function POST(request: Request) {
   }
 
   // Il bonus si indica con il suo id oppure con il codice ("BONUS:...") letto dalla fotocamera.
-  const { bonusId: bodyBonusId, code } = await request.json();
-  if (!bodyBonusId && !code) {
+  const { bonusId, code } = await request.json();
+  if (!bonusId && !code) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
-
-  // Carica il bonus e verifica che sia attivo
-  const { data: bonus } = await (bodyBonusId
-    ? supabase.from("bonus_qr").select("*").eq("id", bodyBonusId)
+  const { data: bonus } = await (bonusId
+    ? supabase.from("bonus_qr").select("*").eq("id", bonusId)
     : supabase.from("bonus_qr").select("*").eq("code", String(code))
   ).maybeSingle();
-
   if (!bonus) {
     return NextResponse.json({ error: "Bonus non valido" }, { status: 404 });
   }
-  const bonusId = bonus.id;
 
-  if (bonus.active === false) {
-    return NextResponse.json({ error: "Questo QR bonus non è più attivo" }, { status: 403 });
-  }
-
-  // Verifica validità temporale se impostata
-  const now = new Date();
-  if (bonus.valid_from && new Date(bonus.valid_from) > now) {
-    return NextResponse.json({ error: "Questo bonus non è ancora attivo" }, { status: 403 });
-  }
-  if (bonus.valid_to && new Date(bonus.valid_to) < now) {
-    return NextResponse.json({ error: "Questo bonus è scaduto" }, { status: 403 });
-  }
-
-  // Verifica quante volte l'utente ha già riscattato questo bonus (rispetta max_uses_per_user, non solo "mai/sempre")
-  const { count: redemptionCount } = await supabase
-    .from("bonus_redemptions")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("bonus_id", bonusId);
-
-  const maxUses = bonus.max_uses_per_user ?? 1;
-  if ((redemptionCount || 0) >= maxUses) {
-    return NextResponse.json({ error: "Hai già riscattato questo bonus il numero massimo di volte consentito" }, { status: 409 });
-  }
-
-  const { error } = await supabase
-    .from("bonus_redemptions")
-    .insert({ user_id: userId, bonus_id: bonusId });
-
-  if (error) {
-    return NextResponse.json({ error: "Errore nel riscatto del bonus" }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true, amount: bonus.amount, title: bonus.title });
+  return actionResponse(await redeemBonusQr(supabase, userId, bonus));
 }
