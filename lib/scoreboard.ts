@@ -3,10 +3,9 @@
 import { CONFIG_ISCRIZIONE } from "./config";
 import { getStandings, type TeamScores } from "./standings";
 
-export type { TeamScores };
-export type IndividualRow = { rank: number; name: string; team: string | null; points: number };
-export type ClassRow = { rank: number; school: string; site: string; yearLabel: string; points: number };
-export type SiteRow = { rank: number; site: string; points: number; classCount: number; average: number };
+type IndividualRow = { rank: number; name: string; team: string | null; points: number };
+type ClassRow = { rank: number; school: string; site: string; yearLabel: string; points: number };
+type SiteRow = { rank: number; site: string; points: number; classCount: number; average: number };
 export type ScoreboardData = {
   teams: TeamScores;
   individuals: IndividualRow[];

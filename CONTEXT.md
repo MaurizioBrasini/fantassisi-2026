@@ -24,7 +24,7 @@ Esiste inoltre un **ruolo admin/staff** separato, con accesso a un pannello di g
 | Componente | Dettaglio |
 |---|---|
 | Framework | Next.js 14, App Router |
-| Database/Auth | Supabase (Postgres). Autenticazione tramite cookie `user_role`, non tramite Supabase Auth standard |
+| Database/Auth | Supabase (Postgres), **letto e scritto solo dal server** con la chiave service role (`lib/supabaseAdmin.ts`). Nessuna Supabase Auth: l'identità è un cookie di sessione firmato (vedi sezione 11) |
 | Funzioni server-side sensibili | RPC Postgres `SECURITY DEFINER` |
 | Repository | GitHub |
 | Deploy | Render |
@@ -90,6 +90,8 @@ Tre viste:
 - Per individuo
 - Per sede (pesata sul numero reale di classi per sede — non è una semplice somma, tiene conto del numero di classi per normalizzare sedi di dimensioni diverse)
 - Per classe
+
+**Il calcolo dei punteggi è unico**, in `lib/standings.ts` (cache di processo di 5 secondi), ed è usato da `/api/standings` (dashboard e le tre classifiche dell'app) e dal tabellone pubblico `/tabellone` (`lib/scoreboard.ts`). I telefoni non scaricano più le tabelle: ricevono il risultato. Una regola di punteggio si cambia solo lì.
 
 **Le classifiche sommano correttamente sia `votes` che `event_votes`.** In una sessione precedente esisteva un bug per cui una delle due tabelle non veniva conteggiata in una vista specifica: è stato risolto e va tenuto d'occhio in fase di beta, perché è il tipo di errore che si nota solo quando i numeri non tornano rispetto ai voti effettivamente dati.
 
@@ -172,3 +174,24 @@ Questi pattern sono stati stabiliti per risolvere problemi specifici già incont
 - Che il reset (giornaliero/totale/completo) non lasci stati intermedi inconsistenti se lanciato mentre ci sono voti in corso
 - Comportamento del bottone di installazione su iOS reale (Safari e Chrome-iOS)
 - Comportamento sotto carico concorrente (1.200+ utenti potenziali, anche se il beta test sarà su un sottoinsieme ridotto)
+
+
+---
+
+## 11. Accessi, dati e sicurezza (aggiornato 2 ottobre 2026)
+
+**Come entra una persona**
+- **Link personale** `/api/auth?token=<auth_token>`: imposta la sessione. I token sono casuali (16 caratteri esadecimali). Staff e admin entrano solo da qui.
+- **`/accedi`** (partecipanti): mail di iscrizione + ultime 4 cifre del telefono (`users.phone`, formato `+39…`, caricato dal file Excel dal campo TELEFONO). Errori: messaggio generico; blocco di 5 minuti dopo 5 tentativi sbagliati per mail (25 per IP), in memoria (`lib/rateLimit.ts`).
+- **"Ricevi il link per mail"** (stessa pagina, `/api/auth/send-link-request`): manda il link personale solo alla mail registrata, risposta identica se la mail esiste o no.
+- **Sessione**: cookie firmato httpOnly `session_sig` (HMAC con `SESSION_SECRET`, non cambiarlo: disconnette tutti), 40 giorni, rinnovato a ogni apertura da `/api/me`. I cookie `user_id`/`user_team`/… servono solo a mostrare l'interfaccia. **Esci** = `/api/auth/logout`.
+
+**Il browser non legge il database.** Nessuna pagina importa un client Supabase. Le pagine chiamano API sotto `app/api` (`/api/me`, `/api/standings`, `/api/admin/data`, …) che usano `getSupabaseAdmin()` (chiave service role). Il 2 ottobre 2026 sono stati revocati i permessi `anon`/`authenticated` su tutte le tabelle e tolte le policy aperte; resta solo la sola lettura del ruolo di controllo `claude_agent`. **Non reintrodurre letture dal browser** e non riaprire le policy.
+
+**Helper condivisi (`lib/`)**: `supabaseAdmin` (client unico), `fetchAll` (lettura a pagine da 1000 *sempre ordinata*, con errore esplicito), `pins` (PIN unici su utenti, eventi e bonus), `urls` (indirizzo dell'app e link personale), `config` (squadre, anni, `isYearValidForTeam`), `phone` (normalizzazione telefoni), `standings` (punteggi), `clientCookies` (cookie lato browser, logout).
+
+**Email**: Resend, mittente `info@eventi.psiconet.it` (dominio dedicato, DKIM/SPF su Aruba), `RESEND_REPLY_TO` per reply-to e intestazione di disiscrizione. Variabili su Render: `RESEND_API_KEY`, `RESEND_FROM`, `RESEND_REPLY_TO`, `SESSION_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL`. La chiave pubblica di Supabase non serve più.
+
+**Banner di installazione**: `components/InstallButton.tsx`, montato una sola volta in `app/layout.tsx`; uno script in `<head>` salva l'evento `beforeinstallprompt` in `window.__fantInstallPrompt`. Nascosto sulle pagine del tabellone e sull'admin.
+
+**Reimport Excel**: legge tutti gli utenti esistenti a pagine e non rigenera mai token/PIN; si ferma senza scrivere se PIN o token risultano duplicati. Azzera comunque squadra/arruolamento dal roster: usarlo solo con un file nuovo.

@@ -13,7 +13,7 @@ function getSecret(): string {
   return secret;
 }
 
-export function signUserId(userId: string): string {
+function signUserId(userId: string): string {
   const sig = crypto.createHmac("sha256", getSecret()).update(userId).digest("hex");
   return `${userId}.${sig}`;
 }
@@ -30,8 +30,6 @@ function verifySignedToken(token: string | undefined): string | null {
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   return userId;
 }
-
-export const SESSION_COOKIE_NAME = SESSION_COOKIE;
 
 type SessionUser = {
   id: string;
@@ -66,7 +64,7 @@ export function applySessionCookies(response: NextResponse, user: SessionUser): 
   response.cookies.set("user_role", user.role || "student", cookieOptions);
 
   // Cookie firmato httpOnly: unica fonte attendibile di identità/autorizzazione lato server
-  response.cookies.set(SESSION_COOKIE_NAME, signUserId(user.id), { ...cookieOptions, httpOnly: true });
+  response.cookies.set(SESSION_COOKIE, signUserId(user.id), { ...cookieOptions, httpOnly: true });
 
   if (user.year) {
     response.cookies.set("user_class", user.year, cookieOptions);
@@ -94,7 +92,7 @@ type VerifiedUser = {
 };
 
 /** Rilegge sempre ruolo/team correnti dal DB: mai fidarsi di valori letti dai cookie. */
-export async function getVerifiedUser(): Promise<VerifiedUser | null> {
+async function getVerifiedUser(): Promise<VerifiedUser | null> {
   const userId = getVerifiedUserId();
   if (!userId) return null;
 

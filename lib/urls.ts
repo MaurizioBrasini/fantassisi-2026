@@ -1,6 +1,6 @@
 // Indirizzo pubblico dell'app e link personale di accesso: un solo posto per entrambi.
 // NEXT_PUBLIC_APP_URL (facoltativa) permette di cambiare dominio senza toccare il codice.
-export const APP_BASE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://fantassisi-2026.onrender.com").replace(/\/+$/, "");
+const APP_BASE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://fantassisi-2026.onrender.com").replace(/\/+$/, "");
 
 export function personalLink(authToken: string): string {
   return `${APP_BASE_URL}/api/auth?token=${authToken}`;

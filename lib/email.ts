@@ -1,4 +1,4 @@
-export function buildInviteEmail(
+function buildInviteEmail(
   firstName: string | null,
   link: string,
   replyTo?: string

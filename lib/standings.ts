@@ -10,9 +10,9 @@ import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetchAll";
 
 export type TeamScores = { Matricole: number; Veterani: number };
-export type IndividualRow = { id: string; name: string; team: string | null; points: number; rank: number };
-export type ClassRow = { key: string; school: string; site: string; year: string; points: number; rank: number };
-export type SiteRow = { site: string; points: number; classCount: number; average: number };
+type IndividualRow = { id: string; name: string; team: string | null; points: number; rank: number };
+type ClassRow = { key: string; school: string; site: string; year: string; points: number; rank: number };
+type SiteRow = { site: string; points: number; classCount: number; average: number };
 
 export type Standings = {
   teams: TeamScores;

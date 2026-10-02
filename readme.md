@@ -13,8 +13,13 @@
 ## 🛠️ Tecnologie
 
 - Next.js 14 + PWA
-- Supabase (PostgreSQL)
+- Supabase (PostgreSQL), letto e scritto solo dal server
 - Render (hosting)
+- Resend (email) da `info@eventi.psiconet.it`
+
+## 🔐 Accesso
+
+Ogni partecipante ha un link personale; in alternativa può entrare da `/accedi` con la mail di iscrizione e le ultime 4 cifre del telefono. Dettagli tecnici in `CONTEXT.md`, sezione 11.
 
 ## 🚀 Deploy
 
