@@ -1,3 +1,7 @@
+-- STORICA (1 ottobre 2026): la tabella esiste gia'. NON rieseguire la parte finale: la policy di
+-- lettura pubblica qui sotto e' stata rimossa il 2 ottobre perche' le tabelle non devono essere
+-- leggibili dal browser. Lo stato attuale e' in sql/schema.sql.
+--
 -- Bonus a tempo per le squadre (bilanciamento del punteggio). Da eseguire nello SQL Editor
 -- di Supabase PRIMA di usare il pannello "Bonus squadra" in admin. Finché la tabella non
 -- esiste, dashboard e tabellone funzionano come prima (nessun bonus).

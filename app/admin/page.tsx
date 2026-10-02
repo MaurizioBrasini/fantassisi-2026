@@ -605,7 +605,7 @@ export default function AdminPage() {
     if (!isSuper) { setMessage("❌ Solo admin possono assegnare bonus"); return; }
     const points = Number(boostForm.points);
     const minutes = Number(boostForm.minutes);
-    if (!confirm(`Far entrare ${points} punti a ${boostForm.team} gradualmente in ${minutes} minuti, a partire da ora?`)) return;
+    if (!confirm(`Assegnare ${points} punti a partecipanti ${boostForm.team} scelti a caso (da 1 a 4 ciascuno), distribuiti nell'arco di ${minutes} minuti a partire da ora?`)) return;
     const res = await fetch("/api/admin/boosts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -613,7 +613,7 @@ export default function AdminPage() {
     });
     const data = await res.json();
     if (!res.ok) setMessage("❌ " + data.message);
-    else { setMessage("✅ Bonus avviato"); loadData(); }
+    else { setMessage("✅ " + (data.message || "Bonus avviato")); loadData(); }
   };
 
   const handleStopBoost = async (id: string) => {
@@ -911,7 +911,7 @@ export default function AdminPage() {
         <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
           <h2 style={{ marginTop: 0 }}>⚖️ Bonus squadra</h2>
           <p style={{ color: "#666", fontSize: "0.85rem", marginTop: 0 }}>
-            Fa entrare punti a una squadra in modo graduale (es. 100 punti in 60 minuti). Conta solo nel punteggio di squadra, non in individuali, classi e sedi.
+            Assegna punti a partecipanti della squadra scelti a caso, da 1 a 4 ciascuno, in momenti casuali dell&apos;intervallo (es. 100 punti in 60 minuti). Salgono squadra, individuali, classi e sedi, senza che si veda da dove arrivano.
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <select value={boostForm.team} onChange={(e) => setBoostForm({ ...boostForm, team: e.target.value })} style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc" }}>
@@ -943,8 +943,11 @@ export default function AdminPage() {
                   const fmt = (iso: string) => new Date(iso).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
                   return (
                     <tr key={b.id} style={{ borderBottom: "1px solid #eee" }}>
-                      <td style={{ padding: 8 }}>{b.team}</td>
-                      <td style={{ padding: 8 }}>{accruedBoostPoints(b, nowMs)} / {b.total_points}</td>
+                      <td style={{ padding: 8 }}>
+                        {b.team}
+                        <span style={{ color: "#999", fontSize: "0.7rem" }}>{b.distributed ? " · a persone" : " · solo squadra"}</span>
+                      </td>
+                      <td style={{ padding: 8 }}>{b.accrued ?? accruedBoostPoints(b, nowMs)} / {b.total_points}</td>
                       <td style={{ padding: 8 }}>{fmt(b.start_at)} → {fmt(b.end_at)}</td>
                       <td style={{ padding: 8, textAlign: "center" }}>
                         <span style={{ padding: "2px 8px", borderRadius: 4, background: running ? "#ffc107" : "#28a745", color: running ? "#333" : "white", fontSize: "0.75rem" }}>

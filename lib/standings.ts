@@ -5,7 +5,7 @@
 // individuale, classi, sedi) e nel tabellone: ogni pagina scaricava tutte le tabelle a ogni
 // apertura. Ora i telefoni ricevono solo il risultato.
 import { CONFIG_ISCRIZIONE } from "./config";
-import { fetchTeamBoosts, addBoostsToScores, type TeamBoost } from "./boosts";
+import { fetchTeamBoosts, fetchMaturedAllocations, addBoostsToScores, type TeamBoost } from "./boosts";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetchAll";
 
@@ -56,8 +56,18 @@ function realClassCount(site: string): number {
 }
 
 /** Calcolo puro dei punteggi dai dati grezzi (separato dalla lettura per poterlo verificare). */
-export function buildStandings(users: UserRow[], votes: VoteRow[], eventVotes: EventVoteRow[], boosts: TeamBoost[]): Standings {
+export function buildStandings(
+  users: UserRow[],
+  voteRows: VoteRow[],
+  eventVotes: EventVoteRow[],
+  boosts: TeamBoost[],
+  allocations: { user_id: string; points: number }[] = []
+): Standings {
   const usersById = new Map(users.map((u) => [u.id, u]));
+  // I punti dei bonus assegnati a persone contano come voti ricevuti da quella persona.
+  const votes = allocations.length
+    ? voteRows.concat(allocations.map((a) => ({ recipient_id: a.user_id, points: a.points })))
+    : voteRows;
 
   // Squadre: voti ricevuti da Matricole/Veterani + QR di squadra/classe + bonus a tempo.
   const teams: TeamScores = { Matricole: 0, Veterani: 0 };
@@ -122,13 +132,14 @@ export function buildStandings(users: UserRow[], votes: VoteRow[], eventVotes: E
 
 async function computeStandings(): Promise<Standings> {
   const supabase = getSupabaseAdmin();
-  const [users, votes, eventVotes, boosts] = await Promise.all([
+  const [users, votes, eventVotes, boosts, allocations] = await Promise.all([
     fetchAllRows<UserRow>(supabase, "users", "id, first_name, last_name, team, school, site, year"),
     fetchAllRows<VoteRow>(supabase, "votes", "recipient_id, points"),
     fetchAllRows<EventVoteRow>(supabase, "event_votes", "team_target, qr_type, class_school, class_site, class_year, points"),
     fetchTeamBoosts(supabase),
+    fetchMaturedAllocations(supabase),
   ]);
-  return buildStandings(users, votes, eventVotes, boosts);
+  return buildStandings(users, votes, eventVotes, boosts, allocations);
 }
 
 // Cache di processo di pochi secondi, condivisa da tutti i client: il database viene letto al
