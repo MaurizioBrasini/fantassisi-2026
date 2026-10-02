@@ -7,16 +7,7 @@ import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
-function setCookieClient(name: string, value: string) {
-  const maxAge = 60 * 60 * 24 * 40; // come i cookie di sessione del server (lib/session.ts)
-  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax`;
-}
+import { getCookie, setCookie, logout } from "@/lib/clientCookies";
 
 // ─────────────────────────────────────────────
 // Box scelta/cambio squadra, con sede+classe facoltative.
@@ -62,7 +53,7 @@ function TeamSwitchBox({ currentTeam, allowLeave, onDone }: {
     });
     const data = await res.json();
     if (res.ok) {
-      setCookieClient("user_team", targetTeam);
+      setCookie("user_team", targetTeam);
       reset();
       onDone(targetTeam, data.year || "");
     } else {
@@ -326,14 +317,7 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
       )}
 
       <button
-        onClick={() => {
-          document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_team=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_class=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_site=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          window.location.href = "/";
-        }}
+        onClick={logout}
         style={{ marginTop: 24, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline", width: "100%" }}
       >
         Esci
@@ -492,14 +476,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
       )}
 
       <button
-        onClick={() => {
-          document.cookie = "user_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_team=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_class=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          document.cookie = "user_site=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          window.location.href = "/";
-        }}
+        onClick={logout}
         style={{ marginTop: 24, background: "none", border: "none", color: "#999", fontSize: "0.8rem", cursor: "pointer", textDecoration: "underline", width: "100%" }}
       >
         Esci

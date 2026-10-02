@@ -2,14 +2,9 @@
 
 import { Suspense, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { supabase } from "@/lib/supabase";
 import { useRouter, useSearchParams } from "next/navigation";
 import { invalidateCachedDashboardScores } from "@/lib/utils";
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
+import { getCookie } from "@/lib/clientCookies";
 
 // Il QR personale ora contiene un link (/v/<id>) invece del solo id: se lo
 // scansioniamo o incolliamo qui dentro, estraiamo l'id per riusare la stessa
@@ -149,50 +144,11 @@ function ScanPageInner() {
 
     // ----- EVENTO (legacy) -----
     if (decodedText.startsWith("EVENT:")) {
-      const { data: event } = await supabase
-        .from("votable_events")
-        .select("*")
-        .eq("qr_code", decodedText)
-        .single();
-      if (!event) {
-        alert("Evento non trovato");
-        router.push("/");
-        return;
-      }
-
-      // 🔥 NUOVA LOGICA: distingue QR voto puro vs evento con orario
-      const isVoteQR = event.qr_type && ['team', 'site', 'class'].includes(event.qr_type);
-
-      if (isVoteQR) {
-        // QR voto puro: controlla solo active
-        if (event.active !== true) {
-          alert("Evento non attivo");
-          router.push("/");
-          return;
-        }
-      } else {
-        // Evento normale con orario: controlla active E orari
-        if (event.active === false) {
-          alert("Evento non attivo");
-          router.push("/");
-          return;
-        }
-        if (event.start_time && event.end_time) {
-          const now = new Date();
-          const start = new Date(event.start_time);
-          const end = new Date(event.end_time);
-          if (now < start || now > end) {
-            alert("Evento non attivo in questo momento");
-            router.push("/");
-            return;
-          }
-        }
-      }
-
+      // Il server riconosce l'evento dal codice e controlla se è attivo (e nell'orario).
       const res = await fetch("/api/event-vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId: event.id }),
+        body: JSON.stringify({ qrCode: decodedText }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -202,29 +158,17 @@ function ScanPageInner() {
       }
 
       invalidateCachedDashboardScores(userId);
-      // 🔥 MODIFICA: usa il messaggio personalizzato dall'API
-      alert(data.message || `✅ Votato! +1 punto per i ${event.team_target}`);
+      alert(data.message || `✅ Votato! +${data.points ?? 1} punti`);
       router.push("/");
       return;
     }
 
     // ----- BONUS (legacy) -----
     if (decodedText.startsWith("BONUS:")) {
-      const { data: bonus } = await supabase
-        .from("bonus_qr")
-        .select("*")
-        .eq("code", decodedText)
-        .single();
-      if (!bonus) {
-        alert("Bonus non valido");
-        router.push("/");
-        return;
-      }
-
       const res = await fetch("/api/bonus-redeem", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bonusId: bonus.id }),
+        body: JSON.stringify({ code: decodedText }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -234,7 +178,7 @@ function ScanPageInner() {
       }
 
       invalidateCachedDashboardScores(userId);
-      alert(`⚡ +${bonus.amount} CBTcoin extra!`);
+      alert(`⚡ +${data.amount} CBTcoin extra!`);
       router.push("/");
       return;
     }

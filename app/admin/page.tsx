@@ -1,18 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { CONFIG_ISCRIZIONE, isYearValidForTeam } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { accruedBoostPoints } from "@/lib/boosts";
 import { personalLink } from "@/lib/urls";
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
+import { getCookie } from "@/lib/clientCookies";
 
 function teamFromYear(year: string): string {
   return CONFIG_ISCRIZIONE.teamAnniValid['Matricole'].includes(year) ? "Matricole" : "Veterani";
@@ -73,13 +68,6 @@ async function downloadQR(code: string, label: string, pin?: string | null) {
   link.href = finalUrl;
   link.download = `QR_${label.replace(/\s+/g, "_")}.png`;
   link.click();
-}
-
-// Verifica se l'anno è valido per il team
-function isYearValidForTeam(team: string, year: string): boolean {
-  if (!year) return true;
-  const validYears = CONFIG_ISCRIZIONE.teamAnniValid[team] || CONFIG_ISCRIZIONE.teamAnniValid[''];
-  return validYears.includes(year);
 }
 
 // Componente per la selezione della scuola con input custom
@@ -301,15 +289,13 @@ export default function AdminPage() {
   }, [selectedUser?.team]);
 
   const loadData = async () => {
-    const allUsersData: any[] = [];
-    let from = 0;
-    while (true) {
-      const { data: page } = await supabase.from("users").select("*").range(from, from + 999);
-      if (!page || page.length === 0) break;
-      allUsersData.push(...page);
-      if (page.length < 1000) break;
-      from += 1000;
+    // Tutti i dati del pannello arrivano dal server, solo per admin e staff (/api/admin/data).
+    const res = await fetch("/api/admin/data", { cache: "no-store" });
+    if (!res.ok) {
+      setMessage("❌ Non riesco a caricare i dati del pannello. Ricarica la pagina.");
+      return;
     }
+    const { users: allUsersData, events: ev, bonuses: bn, boosts: tb } = await res.json();
     setUsers(allUsersData);
 
     // Classi disponibili per QR classe
@@ -324,13 +310,8 @@ export default function AdminPage() {
       `${a.school} ${a.site} ${a.year}`.localeCompare(`${b.school} ${b.site} ${b.year}`)
     ));
 
-    const { data: ev } = await supabase.from("votable_events").select("*").order("created_at", { ascending: false });
     setEvents(ev || []);
-
-    const { data: bn } = await supabase.from("bonus_qr").select("*").order("created_at", { ascending: false });
     setBonuses(bn || []);
-
-    const { data: tb } = await supabase.from("team_boosts").select("*").order("created_at", { ascending: false });
     setBoosts(tb || []);
   };
 
@@ -765,8 +746,8 @@ export default function AdminPage() {
     if (!isSuper) { setMessage("❌ Solo admin possono nominare staff"); return; }
     const email = adminEmail.trim();
     if (!email) { setMessage("❌ Inserisci un'email"); return; }
-    const { data: user, error: selError } = await supabase.from("users").select("*").eq("email", email).single();
-    if (selError || !user) { setMessage("❌ Utente non trovato"); return; }
+    const user = users.find((u) => u.email === email);
+    if (!user) { setMessage("❌ Utente non trovato"); return; }
     const res = await fetch("/api/admin/users", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

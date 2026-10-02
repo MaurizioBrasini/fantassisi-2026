@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { TeamIcon } from "@/components/TeamIcons";
-
-function getCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
+import { getCookie } from "@/lib/clientCookies";
 
 export default function MyQRPage() {
   const router = useRouter();
@@ -32,11 +27,8 @@ export default function MyQRPage() {
         return;
       }
 
-      const { data: user } = await supabase
-        .from("users")
-        .select("first_name, last_name, team, pin")
-        .eq("id", userId)
-        .single();
+      const meRes = await fetch("/api/me", { cache: "no-store" });
+      const user = meRes.ok ? await meRes.json() : null;
 
       if (user) {
         setUserInfo({

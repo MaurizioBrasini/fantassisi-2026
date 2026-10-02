@@ -41,6 +41,15 @@ type SessionUser = {
   site: string | null;
 };
 
+const SESSION_COOKIE_NAMES = [SESSION_COOKIE, "user_id", "user_team", "user_role", "user_class", "user_site"];
+
+/** Cancella tutti i cookie di sessione, compreso quello firmato httpOnly (solo il server può farlo). */
+export function clearSessionCookies(response: NextResponse): void {
+  for (const name of SESSION_COOKIE_NAMES) {
+    response.cookies.set(name, "", { path: "/", maxAge: 0 });
+  }
+}
+
 /** Imposta i cookie di sessione (identici per ogni modo di accesso: link personale, richiesta accesso). */
 export function applySessionCookies(response: NextResponse, user: SessionUser): void {
   const cookieOptions = {
