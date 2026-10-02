@@ -319,7 +319,22 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: existing } = await supabase.from("users").select("email, auth_token, pin, role, phone");
+  // Supabase restituisce al massimo 1000 righe per richiesta: con più utenti bisogna paginare,
+  // altrimenti chi sta oltre la millesima riga sembra "nuovo" e perde token e PIN.
+  const existing: { email: string; auth_token: string; pin: string | null; role: string | null; phone: string | null }[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data: page, error: pageError } = await supabase
+      .from("users")
+      .select("email, auth_token, pin, role, phone")
+      .order("email")
+      .range(from, from + PAGE - 1);
+    if (pageError) {
+      return NextResponse.json({ message: "Errore nel leggere gli utenti esistenti: " + pageError.message }, { status: 500 });
+    }
+    existing.push(...(page || []));
+    if (!page || page.length < PAGE) break;
+  }
   // Il ruolo (student/staff/admin) di chi è già a sistema non si tocca mai col reimport:
   // il file Excel non lo contiene e lo riporterebbe a "student".
   const existingRoles = new Map((existing || []).map((u) => [u.email, u.role as string | null]));
