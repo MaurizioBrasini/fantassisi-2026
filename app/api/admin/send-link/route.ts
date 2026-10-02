@@ -10,7 +10,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
-  const { userId } = await request.json();
+  // renewed: true = mail "nuovo link" dopo la sostituzione del token, con il motivo di sicurezza.
+  const { userId, renewed } = await request.json();
   if (!userId) {
     return NextResponse.json({ message: "ID utente mancante" }, { status: 400 });
   }
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Utente senza email" }, { status: 400 });
   }
 
-  const result = await sendInviteEmail(user.email, user.first_name, personalLink(user.auth_token));
+  const result = await sendInviteEmail(user.email, user.first_name, personalLink(user.auth_token), renewed === true);
 
   if (!result.ok) {
     console.error("Errore Resend:", result.error);

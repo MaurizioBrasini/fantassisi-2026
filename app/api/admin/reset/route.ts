@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 
 export async function POST(request: Request) {
-  const user = await requireRole("admin", "staff");
+  const user = await requireRole("admin");
   if (!user) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }

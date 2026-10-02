@@ -5,7 +5,7 @@ import { fetchAllRows } from "@/lib/fetchAll";
 import { personalLink } from "@/lib/urls";
 
 export async function GET(request: Request) {
-  const requester = await requireRole("admin", "staff");
+  const requester = await requireRole("admin");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
