@@ -5,6 +5,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { useRouter, useSearchParams } from "next/navigation";
 import { invalidateCachedDashboardScores } from "@/lib/utils";
 import { getCookie } from "@/lib/clientCookies";
+import { PermissionsHelp, NativeCameraHelp, detectInAppBrowser } from "@/components/CameraHelp";
 
 // Il QR personale ora contiene un link (/v/<id>) invece del solo id: se lo
 // scansioniamo o incolliamo qui dentro, estraiamo l'id per riusare la stessa
@@ -15,35 +16,7 @@ function extractCode(raw: string): string {
   return match ? match[1] : raw.trim();
 }
 
-// Rilevamento (parziale: molte app tipo WhatsApp non si distinguono in modo
-// affidabile) del browser "in-app" di alcuni social, che spesso non può
-// proprio accedere alla fotocamera — in quel caso mostriamo un avviso mirato.
-function detectInAppBrowser(): string | null {
-  if (typeof navigator === "undefined") return null;
-  const ua = navigator.userAgent || "";
-  if (/FBAN|FBAV/i.test(ua)) return "Facebook";
-  if (/Instagram/i.test(ua)) return "Instagram";
-  if (/\bLine\//i.test(ua)) return "LINE";
-  return null;
-}
-
 type CameraInfo = { id: string; label: string };
-
-// Screenshot reali del passaggio (da mettere in public/help/, vedi nota in
-// fondo al file). Finché il file non esiste l'immagine si nasconde da sola
-// (onError) e resta solo il testo: nessun rischio di icona "immagine rotta".
-function StepImg({ src, alt }: { src: string; alt: string }) {
-  return (
-    <img
-      src={src}
-      alt={alt}
-      style={{ display: "block", maxWidth: "100%", borderRadius: 8, margin: "6px 0 12px", border: "1px solid #eee" }}
-      onError={(e) => {
-        (e.currentTarget as HTMLImageElement).style.display = "none";
-      }}
-    />
-  );
-}
 
 // Riconosce etichette di fotocamera anteriore/posteriore anche quando il
 // dispositivo le riporta in italiano o in altre lingue (non solo inglese) —
@@ -582,61 +555,12 @@ function ScanPageInner() {
                   📸 Usa la fotocamera del telefono
                 </button>
               </div>
+              <a href="/guida" style={{ display: "block", marginTop: 10, textAlign: "center", fontSize: "0.8rem", color: "#FF6B35", fontWeight: 600 }}>
+                📖 Apri la guida completa con le foto
+              </a>
 
-              {helpChoice === "permessi" && (
-                <div style={{ marginTop: 12, background: "#fff8e1", borderRadius: 12, padding: 16, fontSize: "0.82rem", color: "#333", lineHeight: 1.5, textAlign: "left" }}>
-                  {inAppBrowser && (
-                    <p style={{ fontWeight: 700, color: "#dc3545", marginTop: 0 }}>
-                      Sembra che tu abbia aperto questo link da {inAppBrowser}: il suo browser interno spesso blocca la fotocamera. Tocca i tre puntini o l'icona di condivisione in alto e scegli "Apri nel browser" (Chrome/Safari), poi riprova.
-                    </p>
-                  )}
-                  <p style={{ fontWeight: 700, marginTop: 0 }}>Hai aperto questo link da WhatsApp, Gmail o un'altra app?</p>
-                  <p>È la causa più comune: quei browser "interni" spesso non possono accedere alla fotocamera. Tocca i tre puntini (⋮) o l'icona di condivisione in alto e scegli "Apri nel browser", poi riprova da lì.</p>
-
-                  <p style={{ fontWeight: 700 }}>📱 iPhone (Safari) — passo 1</p>
-                  <p>In alto, a sinistra dell'indirizzo del sito, tocca "AA" (a volte è uno scudo):</p>
-                  <StepImg src="/help/ios-1-aa.png" alt="Icona AA nella barra degli indirizzi di Safari" />
-
-                  <p style={{ fontWeight: 700 }}>Passo 2</p>
-                  <p>Nel menu che si apre, tocca "Impostazioni sito web":</p>
-                  <StepImg src="/help/ios-2-impostazioni.png" alt="Voce Impostazioni sito web nel menu AA" />
-
-                  <p style={{ fontWeight: 700 }}>Passo 3</p>
-                  <p>Tocca "Fotocamera" e scegli "Consenti", poi ricarica la pagina:</p>
-                  <StepImg src="/help/ios-3-consenti.png" alt="Impostazione Fotocamera su Consenti" />
-
-                  <p style={{ fontWeight: 700, color: "#dc3545" }}>Non vedi "Fotocamera" nel menu, o hai già provato senza risultato?</p>
-                  <p>Il blocco allora è un livello più su, nell'app Impostazioni del telefono (non dentro Safari):</p>
-                  <p>1. Impostazioni → Safari → Fotocamera → Consenti.<br />
-                  2. Se non basta: Impostazioni → Privacy e sicurezza → Fotocamera → controlla che l'interruttore accanto a "Safari" sia acceso (verde).</p>
-                  <p style={{ color: "#666", fontSize: "0.78rem" }}>(Su iPhone, usando Chrome invece di Safari, il permesso si trova come su Android: tocca il lucchetto accanto all'indirizzo.)</p>
-
-                  <p style={{ fontWeight: 700 }}>🤖 Android (Chrome / Edge) — passo 1</p>
-                  <p>Tocca il lucchetto accanto all'indirizzo, in alto:</p>
-                  <StepImg src="/help/android-1-lucchetto.png" alt="Icona lucchetto nella barra degli indirizzi" />
-
-                  <p style={{ fontWeight: 700 }}>Passo 2</p>
-                  <p>Tocca "Autorizzazioni" (o "Impostazioni sito"):</p>
-                  <StepImg src="/help/android-2-autorizzazioni.png" alt="Voce Autorizzazioni nel menu del lucchetto" />
-
-                  <p style={{ fontWeight: 700 }}>Passo 3</p>
-                  <p>Scorri fino a "Fotocamera" (su Chrome ed Edge non è sempre la prima voce) e scegli "Consenti", poi ricarica la pagina:</p>
-                  <StepImg src="/help/android-3-fotocamera.png" alt="Permesso Fotocamera impostato su Consenti" />
-
-                  <p style={{ fontWeight: 700 }}>Samsung Internet</p>
-                  <p>Menu (⋮) → Impostazioni → Siti web e download → Autorizzazioni sito → Fotocamera → cerca questo sito → Consenti.</p>
-
-                  <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il PIN qui sotto: {isRicarica ? "ricarica" : "vota"} comunque, senza bisogno della fotocamera.</p>
-                </div>
-              )}
-
-              {helpChoice === "fotocamera" && (
-                <div style={{ marginTop: 12, background: "#e8f5e9", border: "2px solid #2E7D32", borderRadius: 12, padding: 16, fontSize: "0.85rem", color: "#333", lineHeight: 1.5, textAlign: "left" }}>
-                  <p style={{ margin: 0 }}>
-                    Apri la <strong>fotocamera normale del telefono</strong> (quella di sempre, per le foto — non serve questa app) e inquadra {isRicarica ? "il QR della ricarica" : "il QR della persona che vuoi votare"}. Si apre da sola una pagina che {isRicarica ? "accredita i CBTcoin" : "registra il voto"}, senza chiedere nessun permesso.
-                  </p>
-                </div>
-              )}
+              {helpChoice === "permessi" && <PermissionsHelp inAppBrowser={inAppBrowser} isRicarica={isRicarica} />}
+              {helpChoice === "fotocamera" && <NativeCameraHelp isRicarica={isRicarica} />}
             </div>
           )}
         </div>
