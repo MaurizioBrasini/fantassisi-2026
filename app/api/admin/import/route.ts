@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { generateUniquePins } from "@/lib/utils";
+import { normalizePhone } from "@/lib/phone";
 import * as XLSX from "xlsx";
 
 const BRANDS = ["CCMA", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
@@ -213,6 +214,7 @@ async function parseRawExcel(
           first_name: String(row["NOME"] || "").trim() || null,
           last_name: String(row["COGNOME"] || "").trim() || null,
           email: String(row["Indirizzo email"] || "").trim().toLowerCase(),
+          phone: normalizePhone(row["TELEFONO"]),
           school: school || null,
           site: site || null,
           year: normalizedYear,
@@ -228,6 +230,7 @@ async function parseRawExcel(
       first_name: String(row["NOME"] || "").trim() || null,
       last_name: String(row["COGNOME"] || "").trim() || null,
       email: String(row["Indirizzo email"] || "").trim().toLowerCase(),
+      phone: normalizePhone(row["TELEFONO"]),
       school: school || null,
       site: site || null,
       year: normalizedYear,
@@ -316,12 +319,13 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data: existing } = await supabase.from("users").select("email, auth_token, pin, role");
+  const { data: existing } = await supabase.from("users").select("email, auth_token, pin, role, phone");
   // Il ruolo (student/staff/admin) di chi è già a sistema non si tocca mai col reimport:
   // il file Excel non lo contiene e lo riporterebbe a "student".
   const existingRoles = new Map((existing || []).map((u) => [u.email, u.role as string | null]));
   const existingTokens = new Map((existing || []).map((u) => [u.email, u.auth_token]));
   const existingPins = new Map((existing || []).map((u) => [u.email, u.pin]));
+  const existingPhones = new Map((existing || []).map((u) => [u.email, u.phone as string | null]));
   const usedPins = new Set((existing || []).map((u) => u.pin).filter(Boolean) as string[]);
 
   const validTeams = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
@@ -384,6 +388,8 @@ export async function POST(request: Request) {
         email,
         first_name: r.first_name || null,
         last_name: r.last_name || null,
+        // Il telefono del file vince; se la cella è vuota o non valida si tiene quello già a sistema.
+        phone: r.phone || existingPhones.get(email) || null,
         school: r.school || null,
         site: r.site || null,
         year: year,
