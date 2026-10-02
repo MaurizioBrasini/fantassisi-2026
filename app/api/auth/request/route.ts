@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { applySessionCookies } from "@/lib/session";
 import { phoneLast4 } from "@/lib/phone";
@@ -48,10 +48,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
   const { data: user } = await supabase
     .from("users")
     .select("id, team, role, year, site, phone")

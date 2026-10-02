@@ -1,30 +1,13 @@
 // app/api/admin/users/route.ts
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { randomUUID } from "crypto";
-import { generateUniquePins } from "@/lib/utils";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { generateUnusedPin } from "@/lib/pins";
+import { personalLink } from "@/lib/urls";
+import { VALID_TEAMS, VALID_YEARS, isYearValidForTeam } from "@/lib/config";
 
 const PROTECTED_EMAIL = "mabras69@gmail.com";
-const VALID_TEAMS = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
-const VALID_ANNI = ["preiscrizione", "primo", "secondo", "terzo", "quarto", "specializzato"];
-
-// Vincoli Team ↔ Anno (FILTRO OBBLIGATORIO)
-const TEAM_ANNI_VALID: Record<string, string[]> = {
-  'Matricole': ['preiscrizione', 'primo', 'secondo'],
-  'Veterani': ['terzo', 'quarto', 'specializzato'],
-  'Didatti&Docenti': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'],
-};
-
-function isValidYearForTeam(team: string | null, year: string | null): boolean {
-  if (!year) return true;
-  const validYears = team ? TEAM_ANNI_VALID[team] || [] : VALID_ANNI;
-  return validYears.includes(year);
-}
 
 // GET: Lista utenti (con paginazione e ricerca)
 export async function GET(request: Request) {
@@ -39,7 +22,7 @@ export async function GET(request: Request) {
   const search = searchParams.get("search") || "";
   const offset = (page - 1) * limit;
 
-  let query = supabase
+  let query = getSupabaseAdmin()
     .from("users")
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false });
@@ -84,13 +67,13 @@ export async function POST(request: Request) {
   }
 
   // Validazione Team ↔ Anno
-  if (team && year && !isValidYearForTeam(team, year)) {
-    const yearLabel = VALID_ANNI.includes(year) ? year : year;
-    return NextResponse.json({ 
-      message: `⚠️ L'anno "${yearLabel}" non è valido per il team "${team}"` 
+  if (team && year && !isYearValidForTeam(team, year)) {
+    return NextResponse.json({
+      message: `⚠️ L'anno "${year}" non è valido per il team "${team}"`
     }, { status: 400 });
   }
 
+  const supabase = getSupabaseAdmin();
   const { data: existing } = await supabase
     .from("users")
     .select("id")
@@ -104,12 +87,10 @@ export async function POST(request: Request) {
   const authToken = randomUUID();
 
   // Stringa vuota → null, valore non valido → null
-  const teamValue = team && VALID_TEAMS.has(team) ? team : null;
-  const yearValue = year && VALID_ANNI.includes(year) ? year : null;
+  const teamValue = team && VALID_TEAMS.includes(team) ? team : null;
+  const yearValue = year && VALID_YEARS.includes(year) ? year : null;
 
-  const { data: existingPinsRows } = await supabase.from("users").select("pin");
-  const usedPins = new Set((existingPinsRows || []).map((u) => u.pin).filter(Boolean) as string[]);
-  const [pin] = generateUniquePins(1, usedPins);
+  const pin = await generateUnusedPin();
 
   const { data, error } = await supabase
     .from("users")
@@ -140,7 +121,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     message: "✅ Utente creato!",
     user: data,
-    link: `https://fantassisi-2026.onrender.com/api/auth?token=${authToken}`,
+    link: personalLink(authToken),
   });
 }
 
@@ -160,13 +141,13 @@ export async function PUT(request: Request) {
   }
 
   // Validazione Team ↔ Anno
-  if (team && year && !isValidYearForTeam(team, year)) {
-    const yearLabel = VALID_ANNI.includes(year) ? year : year;
-    return NextResponse.json({ 
-      message: `⚠️ L'anno "${yearLabel}" non è valido per il team "${team}"` 
+  if (team && year && !isYearValidForTeam(team, year)) {
+    return NextResponse.json({
+      message: `⚠️ L'anno "${year}" non è valido per il team "${team}"`
     }, { status: 400 });
   }
 
+  const supabase = getSupabaseAdmin();
   const { data: userToUpdate } = await supabase
     .from("users")
     .select("email")
@@ -188,7 +169,7 @@ export async function PUT(request: Request) {
 
   // Stringa vuota → null, valore non valido → null
   if (team !== undefined) {
-    updateData.team = team && VALID_TEAMS.has(team) ? team : null;
+    updateData.team = team && VALID_TEAMS.includes(team) ? team : null;
   }
   if (site !== undefined) {
     updateData.site = site || null;
@@ -197,7 +178,7 @@ export async function PUT(request: Request) {
     updateData.school = school || null;
   }
   if (year !== undefined) {
-    updateData.year = year && VALID_ANNI.includes(year) ? year : null;
+    updateData.year = year && VALID_YEARS.includes(year) ? year : null;
   }
   // Permette di correggere manualmente chi è docente/staff ma è stato registrato
   // come Matricola/Veterano prima che esistesse il cambio squadra (o comunque non
@@ -240,6 +221,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
   }
 
+  const supabase = getSupabaseAdmin();
   const { data: userToDelete } = await supabase
     .from("users")
     .select("email")

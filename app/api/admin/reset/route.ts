@@ -1,5 +1,5 @@
 // app/api/admin/reset/route.ts
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 
@@ -18,10 +18,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
 
   const functionMap = {
     scores: "reset_scores",

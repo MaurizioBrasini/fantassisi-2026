@@ -1,12 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { accruedBoostPoints } from "@/lib/boosts";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 const MAX_POINTS = 10000;
 const MAX_MINUTES = 3 * 24 * 60; // tutta la durata dell'evento
@@ -34,7 +29,7 @@ export async function POST(request: Request) {
   const start = new Date();
   const end = new Date(start.getTime() + Math.round(m * 60_000));
 
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseAdmin()
     .from("team_boosts")
     .insert({
       team,
@@ -65,6 +60,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: "ID mancante" }, { status: 400 });
   }
 
+  const supabase = getSupabaseAdmin();
   const { data: boost, error: readErr } = await supabase
     .from("team_boosts")
     .select("*")
@@ -110,7 +106,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "ID mancante" }, { status: 400 });
   }
 
-  const { error } = await supabase.from("team_boosts").delete().eq("id", id);
+  const { error } = await getSupabaseAdmin().from("team_boosts").delete().eq("id", id);
   if (error) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }

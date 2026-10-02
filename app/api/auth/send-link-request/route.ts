@@ -1,6 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { sendInviteEmail } from "@/lib/email";
+import { personalLink } from "@/lib/urls";
 import { isBlocked, registerFailure } from "@/lib/rateLimit";
 
 // "Ricevi il link per mail": il partecipante che non riesce a entrare chiede di rimandare il link
@@ -40,10 +41,7 @@ export async function POST(request: Request) {
   registerFailure(ipKey, IP_WINDOW_MS);
   registerFailure(emailKey, EMAIL_WINDOW_MS);
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
   const { data: user } = await supabase
     .from("users")
     .select("first_name, email, auth_token")
@@ -51,10 +49,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (user && user.email && user.auth_token) {
-    const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "fantassisi-2026.onrender.com";
-    const proto = request.headers.get("x-forwarded-proto") || "https";
-    const link = `${proto}://${host}/api/auth?token=${user.auth_token}`;
-    const result = await sendInviteEmail(user.email, user.first_name, link);
+    const result = await sendInviteEmail(user.email, user.first_name, personalLink(user.auth_token));
     if (!result.ok) {
       console.error("Errore invio link su richiesta:", result.error);
       return NextResponse.json(

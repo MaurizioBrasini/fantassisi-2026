@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 import { startOfTodayInRomeISO } from "@/lib/utils";
@@ -14,10 +14,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
 
   // Fallback per chi non riesce a scansionare: PIN a 4 cifre stampato sotto
   // il proprio QR, risolto qui allo stesso id del destinatario.

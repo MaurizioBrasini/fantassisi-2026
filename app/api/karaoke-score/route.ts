@@ -1,17 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { KARAOKE_START_ISO, KARAOKE_END_ISO } from "@/lib/karaoke";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { fetchAllRows } from "@/lib/fetchAll";
 
 // Pagina pubblica /tabellone-karaoke la interroga ogni 2s per tutta la
 // finestra della sfida: mai cache Next su questa route, deve leggere
 // sempre lo stato corrente.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // Mappa utente -> squadra: serve solo per attribuire i voti individuali (la
 // tabella `votes` ha solo recipient_id, non il team). Non cambia quasi mai
@@ -25,62 +21,33 @@ async function getUsersTeamMap(): Promise<Map<string, string | null>> {
   if (usersCache && Date.now() - usersCache.at < USERS_CACHE_TTL_MS) {
     return usersCache.map;
   }
-  const map = new Map<string, string | null>();
-  let from = 0;
-  while (true) {
-    const { data: page } = await supabase.from("users").select("id, team").range(from, from + 999);
-    if (!page || page.length === 0) break;
-    for (const u of page) map.set(u.id, u.team);
-    if (page.length < 1000) break;
-    from += 1000;
-  }
+  const users = await fetchAllRows<{ id: string; team: string | null }>(getSupabaseAdmin(), "users", "id, team");
+  const map = new Map(users.map((u) => [u.id, u.team] as const));
   usersCache = { at: Date.now(), map };
   return map;
 }
 
+const inKaraokeWindow = (query: any) => query.gte("voted_at", KARAOKE_START_ISO).lt("voted_at", KARAOKE_END_ISO);
+
 export async function GET() {
-  const usersById = await getUsersTeamMap();
+  const supabase = getSupabaseAdmin();
+  const [usersById, votes, eventVotes] = await Promise.all([
+    getUsersTeamMap(),
+    // Voti individuali (QR/PIN personale) caduti nella finestra della sfida.
+    fetchAllRows<{ recipient_id: string; points: number }>(supabase, "votes", "recipient_id, points", { filter: inKaraokeWindow }),
+    // Voti da QR evento/squadra/classe, stessa finestra (già hanno team_target).
+    fetchAllRows<{ team_target: string | null; points: number }>(supabase, "event_votes", "team_target, points", { filter: inKaraokeWindow }),
+  ]);
+
   const pts = { Matricole: 0, Veterani: 0 };
-
-  // Voti individuali (QR/PIN personale) caduti nella finestra della sfida.
-  {
-    let from = 0;
-    while (true) {
-      const { data: page } = await supabase
-        .from("votes")
-        .select("recipient_id, points")
-        .gte("voted_at", KARAOKE_START_ISO)
-        .lt("voted_at", KARAOKE_END_ISO)
-        .range(from, from + 999);
-      if (!page || page.length === 0) break;
-      for (const v of page) {
-        const team = usersById.get(v.recipient_id);
-        if (team === "Matricole") pts.Matricole += v.points || 0;
-        if (team === "Veterani") pts.Veterani += v.points || 0;
-      }
-      if (page.length < 1000) break;
-      from += 1000;
-    }
+  for (const v of votes) {
+    const team = usersById.get(v.recipient_id);
+    if (team === "Matricole") pts.Matricole += v.points || 0;
+    if (team === "Veterani") pts.Veterani += v.points || 0;
   }
-
-  // Voti da QR evento/squadra/classe, stessa finestra (già hanno team_target).
-  {
-    let from = 0;
-    while (true) {
-      const { data: page } = await supabase
-        .from("event_votes")
-        .select("team_target, points")
-        .gte("voted_at", KARAOKE_START_ISO)
-        .lt("voted_at", KARAOKE_END_ISO)
-        .range(from, from + 999);
-      if (!page || page.length === 0) break;
-      for (const ev of page) {
-        if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
-        if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
-      }
-      if (page.length < 1000) break;
-      from += 1000;
-    }
+  for (const ev of eventVotes) {
+    if (ev.team_target === "Matricole") pts.Matricole += ev.points || 1;
+    if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
   }
 
   const now = Date.now();

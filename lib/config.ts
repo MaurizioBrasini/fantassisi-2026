@@ -83,3 +83,14 @@ export const CONFIG_ISCRIZIONE = {
     } as Record<string, number>
   }
 };
+
+// Valori ammessi per squadra e anno: unica fonte, usata da import, API admin, iscrizione e pannello.
+export const VALID_TEAMS: readonly string[] = ['Matricole', 'Veterani', 'Didatti&Docenti'];
+export const VALID_YEARS: readonly string[] = CONFIG_ISCRIZIONE.anni.map((a) => a.value).filter(Boolean);
+
+/** L'anno è compatibile con la squadra? Senza anno sì; senza squadra vale qualunque anno. */
+export function isYearValidForTeam(team: string | null | undefined, year: string | null | undefined): boolean {
+  if (!year) return true;
+  const allowed = (CONFIG_ISCRIZIONE.teamAnniValid as Record<string, string[]>)[team || ''] ?? [];
+  return allowed.includes(year);
+}

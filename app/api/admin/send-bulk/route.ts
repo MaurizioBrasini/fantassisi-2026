@@ -1,12 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendInviteEmail } from "@/lib/email";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { personalLink } from "@/lib/urls";
 
 const DELAY_BETWEEN_SENDS_MS = 200; // margine di sicurezza sui rate limit di Resend
 const MAX_RECIPIENTS_PER_CALL = 500; // oltre questa soglia va introdotta una coda asincrona
@@ -32,7 +28,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: users, error } = await supabase
+  const { data: users, error } = await getSupabaseAdmin()
     .from("users")
     .select("id, first_name, email, auth_token")
     .in("id", userIds);
@@ -50,8 +46,7 @@ export async function POST(request: Request) {
       skipped.push(`${user.first_name || user.id} (nessuna email)`);
       continue;
     }
-    const link = `https://fantassisi-2026.onrender.com/api/auth?token=${user.auth_token}`;
-    const result = await sendInviteEmail(user.email, user.first_name, link);
+    const result = await sendInviteEmail(user.email, user.first_name, personalLink(user.auth_token));
     if (result.ok) {
       sent.push(user.email);
     } else {

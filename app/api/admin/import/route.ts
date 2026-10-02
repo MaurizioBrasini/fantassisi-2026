@@ -1,8 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { generateUniquePins } from "@/lib/utils";
 import { normalizePhone } from "@/lib/phone";
+import { fetchAllRows } from "@/lib/fetchAll";
+import { fetchUsedPins } from "@/lib/pins";
+import { VALID_TEAMS, VALID_YEARS, isYearValidForTeam } from "@/lib/config";
 import * as XLSX from "xlsx";
 
 const BRANDS = ["CCMA", "APC ROMANIA", "SICC", "AIPC", "IGB", "APC", "SPC"];
@@ -28,13 +31,6 @@ const YEAR_MAP: Record<string, string> = {
   "2° ANNO 2026": "secondo",
   "3° ANNO 2026": "terzo",
   "4° ANNO 2026": "quarto",
-};
-
-// Vincoli Team ↔ Anno (FILTRO OBBLIGATORIO)
-const TEAM_ANNI_VALID: Record<string, string[]> = {
-  'Matricole': ['preiscrizione', 'primo', 'secondo'],
-  'Veterani': ['terzo', 'quarto', 'specializzato'],
-  'Didatti&Docenti': ['preiscrizione', 'primo', 'secondo', 'terzo', 'quarto', 'specializzato'],
 };
 
 function normalizeYear(raw: string): string | null {
@@ -202,30 +198,7 @@ async function parseRawExcel(
       school = school || fallback.school;
       site = site || fallback.site;
     }
-    const normalizedYear = normalizeYear(anno);
-    const team = assignTeam(iscrizione, anno);
-    
-    // Validazione Team ↔ Anno
-    if (team && normalizedYear) {
-      const validYears = TEAM_ANNI_VALID[team] || [];
-      if (!validYears.includes(normalizedYear)) {
-        // Se non valido, resetta il team
-        return {
-          first_name: String(row["NOME"] || "").trim() || null,
-          last_name: String(row["COGNOME"] || "").trim() || null,
-          email: String(row["Indirizzo email"] || "").trim().toLowerCase(),
-          phone: normalizePhone(row["TELEFONO"]),
-          school: school || null,
-          site: site || null,
-          year: normalizedYear,
-          role: "student",
-          team: null,
-          status,
-          auth_token: "",
-        };
-      }
-    }
-    
+    // La compatibilità squadra ↔ anno si controlla più sotto, per Excel e CSV insieme.
     return {
       first_name: String(row["NOME"] || "").trim() || null,
       last_name: String(row["COGNOME"] || "").trim() || null,
@@ -233,9 +206,9 @@ async function parseRawExcel(
       phone: normalizePhone(row["TELEFONO"]),
       school: school || null,
       site: site || null,
-      year: normalizedYear,
+      year: normalizeYear(anno),
       role: "student",
-      team: team,
+      team: assignTeam(iscrizione, anno),
       status,
       auth_token: "",
     };
@@ -314,14 +287,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Il file è vuoto o non valido" }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
 
-  // Supabase restituisce al massimo 1000 righe per richiesta: con più utenti bisogna paginare,
-  // altrimenti chi sta oltre la millesima riga sembra "nuovo" e perde token e PIN.
-  const existing: {
+  // Lettura completa e ordinata di chi è già a sistema (vedi lib/fetchAll.ts): chi non venisse
+  // letto sembrerebbe "nuovo" e perderebbe token e PIN. Se la lettura fallisce l'import si ferma
+  // qui, prima di scrivere qualsiasi cosa.
+  let existing: {
     email: string;
     auth_token: string;
     pin: string | null;
@@ -329,42 +300,22 @@ export async function POST(request: Request) {
     phone: string | null;
     first_name: string | null;
     last_name: string | null;
-  }[] = [];
-  const PAGE = 1000;
-  for (let from = 0; ; from += PAGE) {
-    const { data: page, error: pageError } = await supabase
-      .from("users")
-      .select("email, auth_token, pin, role, phone, first_name, last_name")
-      .order("email")
-      .range(from, from + PAGE - 1);
-    if (pageError) {
-      return NextResponse.json({ message: "Errore nel leggere gli utenti esistenti: " + pageError.message }, { status: 500 });
-    }
-    existing.push(...(page || []));
-    if (!page || page.length < PAGE) break;
-  }
-  // Controllo di sicurezza: se la lettura è incompleta non si scrive niente, altrimenti gli
-  // utenti non letti verrebbero trattati come nuovi e perderebbero token e PIN.
-  const { count: totalUsers, error: countError } = await supabase
-    .from("users")
-    .select("id", { count: "exact", head: true });
-  if (countError || totalUsers === null || existing.length !== totalUsers) {
-    return NextResponse.json(
-      { message: `Import annullato: letti ${existing.length} utenti su ${totalUsers ?? "?"}. Non è stato modificato nulla, riprova.` },
-      { status: 500 }
-    );
+  }[];
+  let usedPins: Set<string>;
+  try {
+    existing = await fetchAllRows(supabase, "users", "email, auth_token, pin, role, phone, first_name, last_name", { orderBy: "email" });
+    usedPins = await fetchUsedPins(); // anche i PIN di eventi e bonus: lo spazio PIN è unico
+  } catch (e: any) {
+    return NextResponse.json({ message: `Import annullato, non è stato modificato nulla. ${e.message}` }, { status: 500 });
   }
   // Il ruolo (student/staff/admin) di chi è già a sistema non si tocca mai col reimport:
   // il file Excel non lo contiene e lo riporterebbe a "student".
-  const existingRoles = new Map((existing || []).map((u) => [u.email, u.role as string | null]));
-  const existingTokens = new Map((existing || []).map((u) => [u.email, u.auth_token]));
-  const existingPins = new Map((existing || []).map((u) => [u.email, u.pin]));
-  const existingPhones = new Map((existing || []).map((u) => [u.email, u.phone as string | null]));
-  const usedPins = new Set((existing || []).map((u) => u.pin).filter(Boolean) as string[]);
+  const existingRoles = new Map(existing.map((u) => [u.email, u.role]));
+  const existingTokens = new Map(existing.map((u) => [u.email, u.auth_token]));
+  const existingPins = new Map(existing.map((u) => [u.email, u.pin]));
+  const existingPhones = new Map(existing.map((u) => [u.email, u.phone]));
 
-  const validTeams = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
   const validRoles = new Set(["student", "staff", "admin"]);
-  const validYears = new Set(["preiscrizione", "primo", "secondo", "terzo", "quarto", "specializzato"]);
 
   const filteredRaw = rawRecords.filter((r) => r.email && r.status !== "ritirato");
 
@@ -396,22 +347,16 @@ export async function POST(request: Request) {
   const records = filteredRaw
     .map((r) => {
       const email = String(r.email).trim().toLowerCase();
-      const team = r.team && validTeams.has(r.team) ? r.team : null;
+      const team = r.team && VALID_TEAMS.includes(r.team) ? r.team : null;
       const existingRole = existingRoles.get(email);
       const userRole =
         existingRole && validRoles.has(existingRole)
           ? existingRole
           : validRoles.has(r.role) ? r.role : "student";
-      const year = r.year && validYears.has(r.year) ? r.year : null;
+      const year = r.year && VALID_YEARS.includes(r.year) ? r.year : null;
 
-      // Validazione Team ↔ Anno
-      let finalTeam = team;
-      if (team && year) {
-        const validYearsForTeam = TEAM_ANNI_VALID[team] || [];
-        if (!validYearsForTeam.includes(year)) {
-          finalTeam = null;
-        }
-      }
+      // Validazione Team ↔ Anno: se l'anno non è compatibile la squadra resta da assegnare
+      const finalTeam = team && isYearValidForTeam(team, year) ? team : null;
       // Lista d'attesa: importati con la squadra di competenza (da iscrizione/anno), come i
       // confermati; lo stato serve solo a riconoscerli.
       const status: Status = r.status === "lista_attesa" ? "lista_attesa" : "confermato";

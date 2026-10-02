@@ -7,6 +7,7 @@ import QRCode from "qrcode";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { accruedBoostPoints } from "@/lib/boosts";
+import { personalLink } from "@/lib/urls";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
@@ -1157,7 +1158,7 @@ export default function AdminPage() {
                     <td style={{ padding: 8 }}>{yearLabel}</td>
                     <td style={{ textAlign: "center", padding: 8 }}>
                       <button onClick={() => openEditModal(u)} style={{ padding: "4px 8px", marginRight: 4, background: "#ffc107", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Modifica">✏️</button>
-                      <button onClick={() => { navigator.clipboard.writeText(`https://fantassisi-2026.onrender.com/api/auth?token=${u.auth_token}`); showToast(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
+                      <button onClick={() => { navigator.clipboard.writeText(personalLink(u.auth_token)); showToast(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
                       <button onClick={() => handleSendLink(u.id, `${u.first_name} ${u.last_name}`, u.email)} style={{ padding: "4px 8px", marginRight: 4, background: "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Invia link via email">✉️</button>
                       {isSuper && (
                         <button onClick={() => handleDeleteUser(u.id, `${u.first_name} ${u.last_name}`)} disabled={isProtected} style={{ padding: "4px 8px", background: isProtected ? "#ccc" : "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: isProtected ? "not-allowed" : "pointer", fontSize: "0.8rem", opacity: isProtected ? 0.5 : 1 }}>

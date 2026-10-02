@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type { NextResponse } from "next/server";
 
 const SESSION_COOKIE = "session_sig";
@@ -89,10 +89,7 @@ export async function getVerifiedUser(): Promise<VerifiedUser | null> {
   const userId = getVerifiedUserId();
   if (!userId) return null;
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from("users")
     .select("id, email, first_name, last_name, team, role, site, school, year")

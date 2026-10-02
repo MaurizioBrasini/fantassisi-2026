@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 
@@ -13,10 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
 
   // Carica il bonus e verifica che sia attivo
   const { data: bonus } = await supabase

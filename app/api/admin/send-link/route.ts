@@ -1,12 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendInviteEmail } from "@/lib/email";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { personalLink } from "@/lib/urls";
 
 export async function POST(request: Request) {
   const requester = await requireRole("admin", "staff");
@@ -19,7 +15,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "ID utente mancante" }, { status: 400 });
   }
 
-  const { data: user, error } = await supabase
+  const { data: user, error } = await getSupabaseAdmin()
     .from("users")
     .select("first_name, last_name, email, auth_token")
     .eq("id", userId)
@@ -33,8 +29,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Utente senza email" }, { status: 400 });
   }
 
-  const link = `https://fantassisi-2026.onrender.com/api/auth?token=${user.auth_token}`;
-  const result = await sendInviteEmail(user.email, user.first_name, link);
+  const result = await sendInviteEmail(user.email, user.first_name, personalLink(user.auth_token));
 
   if (!result.ok) {
     console.error("Errore Resend:", result.error);

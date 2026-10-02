@@ -2,9 +2,10 @@
 // i calcoli delle pagine dell'app (dashboard + /ranking/individuali, /classi,
 // /sedi) in un'unica lettura lato server, così lo schermo vede gli stessi numeri
 // dei telefoni. Se cambia una regola in quelle pagine, va allineata qui.
-import { createClient } from "@supabase/supabase-js";
 import { CONFIG_ISCRIZIONE } from "./config";
 import { fetchTeamBoosts, addBoostsToScores } from "./boosts";
+import { getSupabaseAdmin } from "./supabaseAdmin";
+import { fetchAllRows } from "./fetchAll";
 
 export type TeamScores = { Matricole: number; Veterani: number };
 export type IndividualRow = { rank: number; name: string; team: string | null; points: number };
@@ -20,25 +21,6 @@ export type ScoreboardData = {
 
 const TOP_N = 10;
 const VALID_YEARS = ["primo", "secondo", "terzo", "quarto"];
-
-function getClient() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-}
-
-// Legge una tabella intera a blocchi da 1000 (Supabase tronca oltre), ordinando
-// per id così le pagine non si sovrappongono né saltano righe.
-async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
-  const out: T[] = [];
-  let from = 0;
-  while (true) {
-    const { data: page } = await build(from, from + 999);
-    if (!page || page.length === 0) break;
-    out.push(...page);
-    if (page.length < 1000) break;
-    from += 1000;
-  }
-  return out;
-}
 
 // Rank con pari merito (1, 2, 2, 4), come nelle pagine dell'app.
 function withRanks<T extends { points: number }>(rows: T[]): (T & { rank: number })[] {
@@ -66,17 +48,15 @@ function realClassCount(site: string): number {
 }
 
 export async function computeScoreboard(): Promise<ScoreboardData> {
-  const supabase = getClient();
+  const supabase = getSupabaseAdmin();
 
   const [users, votes, eventVotes] = await Promise.all([
-    fetchAll<{ id: string; first_name: string | null; last_name: string | null; team: string | null; school: string | null; site: string | null; year: string | null }>(
-      (from, to) => supabase.from("users").select("id, first_name, last_name, team, school, site, year").order("id").range(from, to)
+    fetchAllRows<{ id: string; first_name: string | null; last_name: string | null; team: string | null; school: string | null; site: string | null; year: string | null }>(
+      supabase, "users", "id, first_name, last_name, team, school, site, year"
     ),
-    fetchAll<{ recipient_id: string; points: number }>(
-      (from, to) => supabase.from("votes").select("recipient_id, points").order("id").range(from, to)
-    ),
-    fetchAll<{ team_target: string | null; qr_type: string | null; class_school: string | null; class_site: string | null; class_year: string | null; points: number }>(
-      (from, to) => supabase.from("event_votes").select("team_target, qr_type, class_school, class_site, class_year, points").order("id").range(from, to)
+    fetchAllRows<{ recipient_id: string; points: number }>(supabase, "votes", "recipient_id, points"),
+    fetchAllRows<{ team_target: string | null; qr_type: string | null; class_school: string | null; class_site: string | null; class_year: string | null; points: number }>(
+      supabase, "event_votes", "team_target, qr_type, class_school, class_site, class_year, points"
     ),
   ]);
 

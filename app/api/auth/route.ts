@@ -1,14 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { applySessionCookies } from "@/lib/session";
+import { requestOrigin } from "@/lib/urls";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || "fantassisi-2026.onrender.com";
-  const proto = request.headers.get("x-forwarded-proto") || "https";
-  const baseUrl = `${proto}://${host}`;
+  const baseUrl = requestOrigin(request);
 
   if (!token) {
     return NextResponse.json(
@@ -17,10 +16,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
 
   const { data: user, error } = await supabase
     .from("users")

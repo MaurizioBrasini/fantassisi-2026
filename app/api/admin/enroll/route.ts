@@ -1,9 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
-
-const VALID_TEAMS = new Set(["Matricole", "Veterani", "Didatti&Docenti"]);
+import { CONFIG_ISCRIZIONE, VALID_TEAMS } from "@/lib/config";
 
 export async function POST(request: Request) {
   const userId = getVerifiedUserId();
@@ -13,14 +11,11 @@ export async function POST(request: Request) {
   }
 
   const { team, site, school, year } = await request.json();
-  if (!VALID_TEAMS.has(team)) {
+  if (!VALID_TEAMS.includes(team)) {
     return NextResponse.json({ error: "Team non valido" }, { status: 400 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  const supabase = getSupabaseAdmin();
 
   // Non ci si fida del cookie: si rilegge sempre lo stato reale dal DB
   const { data: user } = await supabase
