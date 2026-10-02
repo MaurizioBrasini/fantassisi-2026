@@ -51,7 +51,7 @@ Si ramifica in due componenti in base al ruolo:
 - Ranking individuale
 - Ranking per sede
 - Ranking per classe
-- Sistema **CBT coins**: 20 monete al giorno, usate per votare tra pari
+- Sistema **CBT coins**: 20 monete al giorno che, dal primo giorno di gioco, **si accumulano** (quelle non usate restano) e si spendono liberamente per votare colleghi e QR; i QR "Ricarica" ne aggiungono altri (vedi sezione 11)
 - Scanner QR (fotocamera posteriore) per votare un collega tramite il suo QR personale
 - QR personale mostrabile per farsi votare
 - Riscatto di bonus coins tramite QR generati dall'admin
@@ -195,3 +195,9 @@ Questi pattern sono stati stabiliti per risolvere problemi specifici già incont
 **Banner di installazione**: `components/InstallButton.tsx`, montato una sola volta in `app/layout.tsx`; uno script in `<head>` salva l'evento `beforeinstallprompt` in `window.__fantInstallPrompt`. Nascosto sulle pagine del tabellone e sull'admin.
 
 **Reimport Excel**: legge tutti gli utenti esistenti a pagine e non rigenera mai token/PIN; si ferma senza scrivere se PIN o token risultano duplicati. Azzera comunque squadra/arruolamento dal roster: usarlo solo con un file nuovo.
+
+**CBT coins** (`lib/coins.ts`): saldo = 20 × giorni di gioco + bonus riscattati − voti dati (colleghi + QR). Dal primo giorno di gioco (16 ottobre 2026, modificabile con la variabile `COINS_START_DATE` su Render, formato AAAA-MM-GG) i coins non usati si accumulano; prima di quella data valgono 20 al giorno senza accumulo. Lo stesso saldo si usa per mostrare il numero in dashboard e per bloccare il voto quando è a zero. Un voto vale 2 punti se tra Matricole e Veterani, 1 altrimenti. Restano: un solo voto alla stessa persona al giorno (indice `idx_one_vote_per_day`) e un solo voto per QR per persona.
+
+**Bonus squadra a persone** (`lib/boosts.ts`, pannello admin): l'admin sceglie squadra, punti e minuti; il server sceglie partecipanti confermati della squadra a caso e dà a ciascuno da 1 a 4 punti (mai di più per intervento), in momenti casuali dell'intervallo (tabella `boost_allocations`, vedi `sql/2026-10-02_boost_allocations.sql`). I punti contano come voti ricevuti: squadra, individuali, classi e sedi. Se la tabella non esiste ancora il pannello ricade sul vecchio bonus "solo squadra". Eliminare un bonus toglie anche le sue assegnazioni; "Ferma" tiene quelle già scattate.
+
+**Guida fotocamera**: componente `components/CameraHelp.tsx`, usato nella pagina di scansione ("Non funziona?") e nella pagina pubblica `/guida`; le immagini (Android/Chrome) sono in `public/help/`. Per iPhone non ci sono schermate, solo testo.
