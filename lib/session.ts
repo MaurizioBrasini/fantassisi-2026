@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
+import type { NextResponse } from "next/server";
 
 const SESSION_COOKIE = "session_sig";
 
@@ -31,6 +32,39 @@ function verifySignedToken(token: string | undefined): string | null {
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;
+
+type SessionUser = {
+  id: string;
+  team: string | null;
+  role: string | null;
+  year: string | null;
+  site: string | null;
+};
+
+/** Imposta i cookie di sessione (identici per ogni modo di accesso: link personale, richiesta accesso). */
+export function applySessionCookies(response: NextResponse, user: SessionUser): void {
+  const cookieOptions = {
+    maxAge: 60 * 60 * 24 * 14,
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+  };
+
+  // Cookie di sola visualizzazione (usati dal client per la UI, MAI per autorizzare azioni server-side)
+  response.cookies.set("user_id", user.id, cookieOptions);
+  response.cookies.set("user_team", user.team || "", cookieOptions);
+  response.cookies.set("user_role", user.role || "student", cookieOptions);
+
+  // Cookie firmato httpOnly: unica fonte attendibile di identità/autorizzazione lato server
+  response.cookies.set(SESSION_COOKIE_NAME, signUserId(user.id), { ...cookieOptions, httpOnly: true });
+
+  if (user.year) {
+    response.cookies.set("user_class", user.year, cookieOptions);
+  }
+  if (user.site) {
+    response.cookies.set("user_site", user.site, cookieOptions);
+  }
+}
 
 /** Ritorna l'user_id verificato dal cookie firmato, oppure null. Non fidarsi mai di cookie non firmati per autorizzazione. */
 export function getVerifiedUserId(): string | null {
