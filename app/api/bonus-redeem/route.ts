@@ -8,23 +8,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { bonusId } = await request.json();
-  if (!bonusId) {
+  // Il bonus si indica con il suo id oppure con il codice ("BONUS:...") letto dalla fotocamera.
+  const { bonusId: bodyBonusId, code } = await request.json();
+  if (!bodyBonusId && !code) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
 
   // Carica il bonus e verifica che sia attivo
-  const { data: bonus } = await supabase
-    .from("bonus_qr")
-    .select("*")
-    .eq("id", bonusId)
-    .single();
+  const { data: bonus } = await (bodyBonusId
+    ? supabase.from("bonus_qr").select("*").eq("id", bodyBonusId)
+    : supabase.from("bonus_qr").select("*").eq("code", String(code))
+  ).maybeSingle();
 
   if (!bonus) {
-    return NextResponse.json({ error: "Bonus non trovato" }, { status: 404 });
+    return NextResponse.json({ error: "Bonus non valido" }, { status: 404 });
   }
+  const bonusId = bonus.id;
 
   if (bonus.active === false) {
     return NextResponse.json({ error: "Questo QR bonus non è più attivo" }, { status: 403 });

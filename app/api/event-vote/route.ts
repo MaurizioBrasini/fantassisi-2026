@@ -10,8 +10,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { eventId } = await request.json();
-  if (!eventId) {
+  // Il QR si indica con l'id dell'evento oppure con il suo codice ("EVENT:...") letto dalla fotocamera.
+  const { eventId: bodyEventId, qrCode } = await request.json();
+  if (!bodyEventId && !qrCode) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
   }
 
@@ -19,15 +20,29 @@ export async function POST(request: Request) {
 
   // Carica evento e votante in parallelo
   const [{ data: event }, { data: voter }] = await Promise.all([
-    supabase.from("votable_events").select("*").eq("id", eventId).single(),
+    (bodyEventId
+      ? supabase.from("votable_events").select("*").eq("id", bodyEventId)
+      : supabase.from("votable_events").select("*").eq("qr_code", String(qrCode))
+    ).maybeSingle(),
     supabase.from("users").select("team").eq("id", userId).single(),
   ]);
 
   if (!event) {
     return NextResponse.json({ error: "Evento non trovato" }, { status: 404 });
   }
-  if (event.active === false) {
+  const eventId = event.id;
+
+  // QR voto puro (squadra/sede/classe): conta solo "attivo". Evento normale: attivo e, se ha
+  // un orario, dentro la finestra.
+  const isVoteQR = ["team", "site", "class"].includes(event.qr_type);
+  if (isVoteQR ? event.active !== true : event.active === false) {
     return NextResponse.json({ error: "Questo QR non è più attivo" }, { status: 403 });
+  }
+  if (!isVoteQR && event.start_time && event.end_time) {
+    const now = Date.now();
+    if (now < Date.parse(event.start_time) || now > Date.parse(event.end_time)) {
+      return NextResponse.json({ error: "Evento non attivo in questo momento" }, { status: 403 });
+    }
   }
 
   // Verifica CBT coins rimanenti oggi (giornata italiana, non UTC)
