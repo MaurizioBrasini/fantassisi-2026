@@ -321,12 +321,20 @@ export async function POST(request: Request) {
 
   // Supabase restituisce al massimo 1000 righe per richiesta: con più utenti bisogna paginare,
   // altrimenti chi sta oltre la millesima riga sembra "nuovo" e perde token e PIN.
-  const existing: { email: string; auth_token: string; pin: string | null; role: string | null; phone: string | null }[] = [];
+  const existing: {
+    email: string;
+    auth_token: string;
+    pin: string | null;
+    role: string | null;
+    phone: string | null;
+    first_name: string | null;
+    last_name: string | null;
+  }[] = [];
   const PAGE = 1000;
   for (let from = 0; ; from += PAGE) {
     const { data: page, error: pageError } = await supabase
       .from("users")
-      .select("email, auth_token, pin, role, phone")
+      .select("email, auth_token, pin, role, phone, first_name, last_name")
       .order("email")
       .range(from, from + PAGE - 1);
     if (pageError) {
@@ -334,6 +342,17 @@ export async function POST(request: Request) {
     }
     existing.push(...(page || []));
     if (!page || page.length < PAGE) break;
+  }
+  // Controllo di sicurezza: se la lettura è incompleta non si scrive niente, altrimenti gli
+  // utenti non letti verrebbero trattati come nuovi e perderebbero token e PIN.
+  const { count: totalUsers, error: countError } = await supabase
+    .from("users")
+    .select("id", { count: "exact", head: true });
+  if (countError || totalUsers === null || existing.length !== totalUsers) {
+    return NextResponse.json(
+      { message: `Import annullato: letti ${existing.length} utenti su ${totalUsers ?? "?"}. Non è stato modificato nulla, riprova.` },
+      { status: 500 }
+    );
   }
   // Il ruolo (student/staff/admin) di chi è già a sistema non si tocca mai col reimport:
   // il file Excel non lo contiene e lo riporterebbe a "student".
@@ -419,6 +438,61 @@ export async function POST(request: Request) {
       };
     });
 
+  // Controlli prima di scrivere: un PIN o un token ripetuto farebbe fallire i blocchi a metà
+  // e lascerebbe l'import incompleto. Meglio fermarsi prima, senza toccare nulla.
+  const pinOwner = new Map<string, string>();
+  const tokenOwner = new Map<string, string>();
+  for (const r of records) {
+    for (const [value, owners, label] of [
+      [r.pin, pinOwner, "PIN"],
+      [r.auth_token, tokenOwner, "token"],
+    ] as const) {
+      if (!value) continue;
+      const other = owners.get(value);
+      if (other && other !== r.email) {
+        return NextResponse.json(
+          { message: `Import annullato: ${label} duplicato tra ${other} e ${r.email}. Non è stato modificato nulla.` },
+          { status: 409 }
+        );
+      }
+      owners.set(value, r.email);
+    }
+  }
+  const recordEmails = new Set(records.map((r) => r.email));
+  for (const u of existing) {
+    if (recordEmails.has(u.email)) continue;
+    const clashPin = u.pin ? pinOwner.get(u.pin) : undefined;
+    if (clashPin) {
+      return NextResponse.json(
+        { message: `Import annullato: il PIN di ${clashPin} coincide con quello di un altro utente. Non è stato modificato nulla.` },
+        { status: 409 }
+      );
+    }
+  }
+
+  // Nuovi iscritti con lo stesso nome e cognome di uno già a sistema (altra email): si importano,
+  // ma vengono segnalati perché potrebbero essere doppioni (o omonimi veri).
+  const normName = (first: string | null, last: string | null) =>
+    `${last || ""} ${first || ""}`
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z ]/g, " ")
+      .split(" ")
+      .filter(Boolean)
+      .sort()
+      .join(" ");
+  const namesInDb = new Map<string, string[]>();
+  for (const u of existing) {
+    const k = normName(u.first_name, u.last_name);
+    if (k) namesInDb.set(k, [...(namesInDb.get(k) || []), u.email]);
+  }
+  const possibiliDoppioni = records
+    .filter((r) => !existingTokens.has(r.email))
+    .map((r) => ({ r, same: namesInDb.get(normName(r.first_name, r.last_name)) || [] }))
+    .filter((x) => x.same.length > 0)
+    .map((x) => `${x.r.last_name || ""} ${x.r.first_name || ""} <${x.r.email}> ≈ <${x.same[0]}>`);
+
   const BATCH_SIZE = 200;
   let imported = 0;
   const errors: string[] = [];
@@ -462,6 +536,10 @@ export async function POST(request: Request) {
     message: `✅ Importati/aggiornati ${imported} utenti su ${records.length} righe (${nuovi} nuovi, ${records.length - nuovi} già presenti; ${records.length - attesa} confermati, ${attesa} in lista d'attesa). Segnati come ritirati: ${ritirati}.${
       emailScartate.length > 0
         ? ` ⚠️ Righe scartate per email non valida (${emailScartate.length}): ${emailScartate.slice(0, 10).join(", ")}`
+        : ""
+    }${
+      possibiliDoppioni.length > 0
+        ? ` ⚠️ Nuovi iscritti con lo stesso nome di uno già presente (${possibiliDoppioni.length}), controlla se sono doppioni: ${possibiliDoppioni.slice(0, 10).join("; ")}`
         : ""
     }${
       attesaGiaConfermata.length > 0
