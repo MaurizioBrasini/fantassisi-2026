@@ -1,7 +1,29 @@
-export function buildInviteEmail(firstName: string | null, link: string): { subject: string; html: string } {
+export function buildInviteEmail(
+  firstName: string | null,
+  link: string,
+  replyTo?: string
+): { subject: string; html: string; text: string } {
   const name = firstName || "Partecipante";
+  const footerText = replyTo
+    ? `Ricevi questa email perché sei iscritto/a a FantAssisi 2026. Per non riceverne altre, rispondi a questo messaggio scrivendo "disiscrivimi" (${replyTo}).`
+    : `Ricevi questa email perché sei iscritto/a a FantAssisi 2026. Per non riceverne altre, rispondi a questo messaggio scrivendo "disiscrivimi".`;
   return {
     subject: "Le tue credenziali per FantAssisi",
+    text: [
+      `Cara/o ${name},`,
+      "",
+      `il link qui sotto contiene la tua "chiave di accesso" personale a FantAssisi, l'app del Forum di Assisi. Conservala e non condividerla.`,
+      "",
+      link,
+      "",
+      `Una volta entrato/a, clicca per scaricare l'app sul tuo telefonino e scegli se vuoi "arruolarti" e con quale delle due squadre.`,
+      "",
+      "A breve faremo un collaudo con il gruppo organizzatore del Forum: ti aspettiamo!",
+      "Grazie mille e a presto.",
+      "",
+      "--",
+      footerText,
+    ].join("\n"),
     html: `
       <p>Cara/o ${name},</p>
       <p>il link qui sotto contiene la tua "chiave di accesso" personale a <strong>FantAssisi</strong>, l'app del Forum di Assisi. Conservala e non condividerla.</p>
@@ -15,6 +37,7 @@ export function buildInviteEmail(firstName: string | null, link: string): { subj
       <p>Una volta entrato/a, clicca per scaricare l'app sul tuo telefonino e scegli se vuoi "arruolarti" e con quale delle due squadre.</p>
       <p>A breve faremo un collaudo con il gruppo organizzatore del Forum: ti aspettiamo!</p>
       <p>Grazie mille e a presto.</p>
+      <p style="color: #777; font-size: 12px;">${footerText}</p>
     `,
   };
 }
@@ -27,7 +50,18 @@ export async function sendInviteEmail(to: string, firstName: string | null, link
     return { ok: false, error: "API Key Resend non configurata" };
   }
 
-  const { subject, html } = buildInviteEmail(firstName, link);
+  // Indirizzo reale che legge le risposte; abilita anche la disiscrizione via mailto.
+  const replyTo = process.env.RESEND_REPLY_TO;
+
+  const { subject, html, text } = buildInviteEmail(firstName, link, replyTo);
+
+  const payload: Record<string, unknown> = { from, to, subject, html, text };
+  if (replyTo) {
+    payload.reply_to = replyTo;
+    payload.headers = {
+      "List-Unsubscribe": `<mailto:${replyTo}?subject=disiscrivimi>`,
+    };
+  }
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -35,7 +69,7 @@ export async function sendInviteEmail(to: string, firstName: string | null, link
       "Content-Type": "application/json",
       Authorization: `Bearer ${resendApiKey}`,
     },
-    body: JSON.stringify({ from, to, subject, html }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
