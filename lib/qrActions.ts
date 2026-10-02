@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CONFIG_ISCRIZIONE } from "./config";
-import { DAILY_COINS, countVotesToday } from "./coins";
+import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "./coins";
 
 // Le due azioni che si fanno con un QR/PIN di evento o di bonus. Prima esistevano due copie
 // (una in /api/event-vote e /api/bonus-redeem, una in /api/qr/redeem): ora c'è un solo codice,
@@ -53,13 +53,13 @@ export async function castEventVote(supabase: SupabaseClient, userId: string, ev
     }
   }
 
-  const [{ data: voter }, today, { data: existing }] = await Promise.all([
+  const [{ data: voter }, coins, { data: existing }] = await Promise.all([
     supabase.from("users").select("team").eq("id", userId).single(),
-    countVotesToday(supabase, userId),
+    getCoinBalance(supabase, userId),
     supabase.from("event_votes").select("id").eq("user_id", userId).eq("event_id", event.id).maybeSingle(),
   ]);
 
-  if (today.normal + today.event >= DAILY_COINS) return fail(400, "CBT coins esauriti per oggi");
+  if (coins.remaining <= 0) return fail(400, OUT_OF_COINS_MESSAGE);
   if (existing) return fail(409, "Hai già votato questo QR");
 
   // 2 punti se il votante è della squadra opposta a quella del QR, 1 altrimenti.

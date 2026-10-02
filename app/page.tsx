@@ -301,7 +301,7 @@ function CoinsAndRecharge({ remainingCoins }: { remainingCoins: number }) {
         <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>I miei CBT coins</div>
         <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
           <div style={{ fontWeight: 800, fontSize: "1.6rem" }}>{remainingCoins}</div>
-          <div style={{ fontSize: "0.7rem" }}>si ricaricano ogni giorno a mezzanotte</div>
+          <div style={{ fontSize: "0.7rem" }}>ogni giorno ne ricevi 20, quelli non usati restano</div>
         </div>
       </div>
       <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />

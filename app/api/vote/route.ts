@@ -1,8 +1,7 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
-import { startOfTodayInRomeISO } from "@/lib/utils";
-import { DAILY_COINS } from "@/lib/coins";
+import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "@/lib/coins";
 
 export async function POST(request: Request) {
   const voterId = getVerifiedUserId();
@@ -67,14 +66,8 @@ export async function POST(request: Request) {
     points = 2;
   }
 
-  const { count: votesToday } = await supabase
-    .from("votes")
-    .select("id", { count: "exact", head: true })
-    .eq("voter_id", voterId)
-    .gte("voted_at", startOfTodayInRomeISO());
-
-  if ((votesToday || 0) >= DAILY_COINS) {
-    return NextResponse.json({ error: "Crediti giornalieri esauriti" }, { status: 400 });
+  if ((await getCoinBalance(supabase, voterId)).remaining <= 0) {
+    return NextResponse.json({ error: OUT_OF_COINS_MESSAGE }, { status: 400 });
   }
 
   const { error } = await supabase
