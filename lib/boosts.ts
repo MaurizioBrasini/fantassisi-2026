@@ -1,9 +1,10 @@
 import { fetchAllRows } from "./fetchAll";
 
 // Bonus squadra decisi dall'admin per riequilibrare la sfida. Due modi, scelti alla creazione:
-//  - "distribuito" (predefinito): i punti vanno a partecipanti scelti a caso della squadra, da 1 a
-//    MAX_POINTS_PER_PERSON ciascuno, in momenti casuali dell'intervallo. Contano come se fossero
-//    voti: squadra, individuali, classi e sedi (tabella boost_allocations).
+//  - "distribuito" (predefinito): imita i voti veri. Circa il 20-25% dei punti va solo alla squadra
+//    (come i voti ai QR di squadra), il resto a partecipanti scelti a caso della squadra, da 1 a
+//    MAX_POINTS_PER_PERSON ciascuno, in momenti casuali dell'intervallo. I punti alle persone
+//    contano come voti: squadra, individuali, classi e sedi (tabella boost_allocations).
 //  - solo squadra (il vecchio modo): i punti maturano linearmente e contano solo nel punteggio di
 //    squadra. Resta per i bonus già creati e se la tabella boost_allocations non esiste ancora.
 export type TeamBoost = {
@@ -29,14 +30,17 @@ export async function fetchTeamBoosts(client: { from: (table: string) => any }):
   }
 }
 
-// Punti assegnati a persone che sono già "maturati" (il loro momento è passato). Come sopra: se la
-// tabella manca, nessun punto.
+/** Punti di un bonus già scattati: a una persona (user_id) o solo alla squadra (user_id nullo). */
+export type MaturedAllocation = { user_id: string | null; team: string | null; points: number };
+
+// Punti dei bonus distribuiti che sono già "maturati" (il loro momento è passato). Come sopra: se
+// la tabella manca, nessun punto.
 export async function fetchMaturedAllocations(
   client: { from: (table: string) => any },
   nowMs: number = Date.now()
-): Promise<{ user_id: string; points: number }[]> {
+): Promise<MaturedAllocation[]> {
   try {
-    return await fetchAllRows<{ user_id: string; points: number }>(client, "boost_allocations", "user_id, points", {
+    return await fetchAllRows<MaturedAllocation>(client, "boost_allocations", "user_id, team, points", {
       filter: (q) => q.lte("at", new Date(nowMs).toISOString()),
     });
   } catch {
@@ -70,39 +74,62 @@ export function addBoostsToScores(
   return pts;
 }
 
+/** Una riga del piano: a una persona, oppure solo alla squadra (user_id nullo). */
+export type PlannedAllocation = { user_id: string | null; points: number; at: string };
+
+/** Quota dei punti che va solo alla squadra: tra il 20% e il 25%, come i voti ai QR di squadra. */
+const TEAM_ONLY_SHARE = { min: 0.2, max: 0.25 };
+
 /**
- * Sceglie a chi dare i punti di un intervento: persone a caso tra quelle date, da 1 a
- * MAX_POINTS_PER_PERSON punti ciascuna (l'ultima prende il resto), ognuna in un momento casuale tra
- * `startMs` e `endMs`. Se i punti non bastano a coprire il totale con quelle persone,
- * `leftover` dice quanti ne restano fuori.
+ * Pianifica un bonus che imita i voti veri.
+ *  - Circa il 20-25% dei punti va solo alla squadra, a pezzi da 1-2 punti.
+ *  - Il resto va a persone scelte a caso tra quelle date, da 1 a MAX_POINTS_PER_PERSON punti
+ *    ciascuna in totale per questo intervento (l'ultima prende il resto), nessuna persona due volte.
+ *  - Se le persone non bastano a prendersi tutto (per il tetto a persona), l'avanzo va alla squadra.
+ * Ogni riga ha un momento casuale tra `startMs` e `endMs`.
  */
-export function planAllocations(
+export function planBoost(
   userIds: string[],
   totalPoints: number,
   startMs: number,
   endMs: number,
   random: () => number = Math.random
-): { allocations: { user_id: string; points: number; at: string }[]; leftover: number } {
+): { allocations: PlannedAllocation[]; peoplePoints: number; teamPoints: number } {
+  const randomTime = () => new Date(startMs + Math.floor(random() * Math.max(1, endMs - startMs))).toISOString();
+
+  // Quota solo-squadra (con totali minuscoli non ha senso spezzare: tutto alle persone)
+  const share = TEAM_ONLY_SHARE.min + random() * (TEAM_ONLY_SHARE.max - TEAM_ONLY_SHARE.min);
+  const wantedTeamOnly = totalPoints >= 8 ? Math.round(totalPoints * share) : 0;
+  let peopleBudget = totalPoints - wantedTeamOnly;
+
   const pool = [...userIds];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
 
-  const allocations: { user_id: string; points: number; at: string }[] = [];
-  let remaining = totalPoints;
-  for (let i = 0; i < pool.length; i++) {
-    if (remaining <= 0) break;
-    const userId = pool[i];
+  const allocations: PlannedAllocation[] = [];
+  let peoplePoints = 0;
+  for (let i = 0; i < pool.length && peopleBudget > 0; i++) {
     // Casuale tra `lo` e `hi`, ma mai meno di quanto serve perché le persone che restano riescano
-    // ancora a coprire il totale (così, finché il totale sta nella capienza, viene sempre raggiunto).
+    // ancora a coprire il budget (così, finché sta nella capienza, viene sempre raggiunto).
     const peopleAfter = pool.length - i - 1;
-    const hi = Math.min(MAX_POINTS_PER_PERSON, remaining);
-    const lo = Math.min(hi, Math.max(1, remaining - peopleAfter * MAX_POINTS_PER_PERSON));
+    const hi = Math.min(MAX_POINTS_PER_PERSON, peopleBudget);
+    const lo = Math.min(hi, Math.max(1, peopleBudget - peopleAfter * MAX_POINTS_PER_PERSON));
     const points = lo + Math.floor(random() * (hi - lo + 1));
-    const at = new Date(startMs + Math.floor(random() * Math.max(1, endMs - startMs))).toISOString();
-    allocations.push({ user_id: userId, points, at });
-    remaining -= points;
+    allocations.push({ user_id: pool[i], points, at: randomTime() });
+    peopleBudget -= points;
+    peoplePoints += points;
   }
-  return { allocations, leftover: Math.max(0, remaining) };
+
+  // Solo squadra: la quota voluta più l'eventuale avanzo che le persone non hanno potuto prendere.
+  let teamRemaining = wantedTeamOnly + peopleBudget;
+  const teamPoints = teamRemaining;
+  while (teamRemaining > 0) {
+    const points = Math.min(teamRemaining, 1 + Math.floor(random() * 2)); // 1 o 2, come i voti ai QR
+    allocations.push({ user_id: null, points, at: randomTime() });
+    teamRemaining -= points;
+  }
+
+  return { allocations, peoplePoints, teamPoints };
 }

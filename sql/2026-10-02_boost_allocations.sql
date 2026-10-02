@@ -1,15 +1,17 @@
--- Bonus squadra assegnato a persone (punti individuali casuali, da 1 a 4 per persona per intervento).
+-- Bonus squadra che imita i voti veri: circa il 20-25% dei punti solo alla squadra, il resto a persone
+-- scelte a caso (da 1 a 4 punti per persona per intervento).
 -- Da eseguire UNA volta nello SQL Editor di Supabase. Finche' non lo si esegue il pannello "Bonus
 -- squadra" continua a funzionare come prima (solo punteggio di squadra).
 
 -- 1) Distingue i bonus a persone da quelli solo squadra gia' esistenti
 alter table public.team_boosts add column if not exists distributed boolean not null default false;
 
--- 2) Le assegnazioni: a chi, quanti punti, da quando contano
+-- 2) Le assegnazioni: a chi (persona, oppure solo alla squadra se user_id e' vuoto), quanti punti, da quando contano
 create table if not exists public.boost_allocations (
   id uuid primary key default gen_random_uuid(),
   boost_id uuid not null references public.team_boosts(id) on delete cascade,
-  user_id uuid not null references public.users(id) on delete cascade,
+  user_id uuid references public.users(id) on delete cascade,
+  team text not null check (team in ('Matricole', 'Veterani')),
   points integer not null check (points > 0),
   at timestamptz not null,
   created_at timestamptz not null default now()

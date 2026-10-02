@@ -5,7 +5,7 @@
 // individuale, classi, sedi) e nel tabellone: ogni pagina scaricava tutte le tabelle a ogni
 // apertura. Ora i telefoni ricevono solo il risultato.
 import { CONFIG_ISCRIZIONE } from "./config";
-import { fetchTeamBoosts, fetchMaturedAllocations, addBoostsToScores, type TeamBoost } from "./boosts";
+import { fetchTeamBoosts, fetchMaturedAllocations, addBoostsToScores, type MaturedAllocation, type TeamBoost } from "./boosts";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetchAll";
 
@@ -61,12 +61,14 @@ export function buildStandings(
   voteRows: VoteRow[],
   eventVotes: EventVoteRow[],
   boosts: TeamBoost[],
-  allocations: { user_id: string; points: number }[] = []
+  allocations: MaturedAllocation[] = []
 ): Standings {
   const usersById = new Map(users.map((u) => [u.id, u]));
-  // I punti dei bonus assegnati a persone contano come voti ricevuti da quella persona.
-  const votes = allocations.length
-    ? voteRows.concat(allocations.map((a) => ({ recipient_id: a.user_id, points: a.points })))
+  // I punti dei bonus assegnati a persone contano come voti ricevuti da quella persona; quelli
+  // "solo squadra" (senza persona) vanno direttamente al punteggio della squadra.
+  const personRows = allocations.filter((a) => a.user_id);
+  const votes = personRows.length
+    ? voteRows.concat(personRows.map((a) => ({ recipient_id: a.user_id as string, points: a.points })))
     : voteRows;
 
   // Squadre: voti ricevuti da Matricole/Veterani + QR di squadra/classe + bonus a tempo.
@@ -102,6 +104,11 @@ export function buildStandings(
     }
   }
   addBoostsToScores(teams, boosts);
+  for (const a of allocations) {
+    if (a.user_id) continue;
+    if (a.team === "Matricole") teams.Matricole += a.points;
+    if (a.team === "Veterani") teams.Veterani += a.points;
+  }
 
   const individuals = withRanks(
     Array.from(pointsByUser.entries())

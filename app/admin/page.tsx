@@ -605,7 +605,7 @@ export default function AdminPage() {
     if (!isSuper) { setMessage("❌ Solo admin possono assegnare bonus"); return; }
     const points = Number(boostForm.points);
     const minutes = Number(boostForm.minutes);
-    if (!confirm(`Assegnare ${points} punti a partecipanti ${boostForm.team} scelti a caso (da 1 a 4 ciascuno), distribuiti nell'arco di ${minutes} minuti a partire da ora?`)) return;
+    if (!confirm(`Assegnare ${points} punti a ${boostForm.team} come farebbero i voti veri (circa il 20-25% solo alla squadra, il resto a partecipanti scelti a caso, da 1 a 4 ciascuno), distribuiti nell'arco di ${minutes} minuti a partire da ora?`)) return;
     const res = await fetch("/api/admin/boosts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -911,7 +911,7 @@ export default function AdminPage() {
         <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
           <h2 style={{ marginTop: 0 }}>⚖️ Bonus squadra</h2>
           <p style={{ color: "#666", fontSize: "0.85rem", marginTop: 0 }}>
-            Assegna punti a partecipanti della squadra scelti a caso, da 1 a 4 ciascuno, in momenti casuali dell&apos;intervallo (es. 100 punti in 60 minuti). Salgono squadra, individuali, classi e sedi, senza che si veda da dove arrivano.
+            Imita i voti veri (es. 100 punti in 60 minuti): circa il 20-25% va solo alla squadra, il resto a partecipanti scelti a caso, da 1 a 4 ciascuno, in momenti casuali. Salgono squadra, individuali, classi e sedi, senza che si veda da dove arrivano.
           </p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <select value={boostForm.team} onChange={(e) => setBoostForm({ ...boostForm, team: e.target.value })} style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc" }}>

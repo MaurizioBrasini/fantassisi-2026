@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { fetchAllRows } from "@/lib/fetchAll";
-import { accruedBoostPoints, planAllocations, MAX_POINTS_PER_PERSON } from "@/lib/boosts";
+import { accruedBoostPoints, planBoost, MAX_POINTS_PER_PERSON } from "@/lib/boosts";
 import { deleteById } from "@/lib/adminCrud";
 
 const MAX_POINTS = 10000;
@@ -11,9 +11,10 @@ const INSERT_BATCH = 500;
 
 // POST: crea un bonus a tempo — solo admin. Parte subito.
 //
-// Modo normale: i punti vanno a partecipanti confermati della squadra scelti a caso, da 1 a 4
-// ciascuno in totale per questo intervento, in momenti casuali dell'intervallo; contano come voti
-// (squadra, individuali, classi, sedi). Se il database non ha ancora la tabella per questo modo
+// Modo normale (imita i voti veri): circa il 20-25% dei punti va solo alla squadra, il resto a
+// partecipanti confermati della squadra scelti a caso, da 1 a 4 ciascuno in totale per questo
+// intervento, in momenti casuali dell'intervallo; contano come voti (squadra, individuali, classi,
+// sedi). Se il database non ha ancora la tabella per questo modo
 // (vedi sql/2026-10-02_boost_allocations.sql) si ricade sul vecchio bonus "solo squadra".
 export async function POST(request: Request) {
   const requester = await requireRole("admin");
@@ -47,20 +48,12 @@ export async function POST(request: Request) {
     const people = await fetchAllRows<{ id: string }>(supabase, "users", "id", {
       filter: (q) => q.eq("team", team).eq("role", "student").eq("status", "confermato"),
     });
-    const { allocations, leftover } = planAllocations(people.map((u) => u.id), p, start.getTime(), end.getTime());
-    if (leftover > 0) {
-      await undo();
-      const max = people.length * MAX_POINTS_PER_PERSON;
-      return NextResponse.json(
-        { message: `Troppi punti: con ${people.length} partecipanti ${team} se ne possono dare al massimo ${max} (${MAX_POINTS_PER_PERSON} a persona).` },
-        { status: 400 }
-      );
-    }
+    const { allocations, peoplePoints, teamPoints } = planBoost(people.map((u) => u.id), p, start.getTime(), end.getTime());
 
     for (let i = 0; i < allocations.length; i += INSERT_BATCH) {
       const { error } = await supabase
         .from("boost_allocations")
-        .insert(allocations.slice(i, i + INSERT_BATCH).map((a) => ({ ...a, boost_id: boost.id })));
+        .insert(allocations.slice(i, i + INSERT_BATCH).map((a) => ({ ...a, boost_id: boost.id, team })));
       if (error) {
         await undo();
         return NextResponse.json({ message: "Errore nell'assegnare i punti alle persone: " + error.message }, { status: 500 });
@@ -68,7 +61,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({
       boost,
-      message: `Bonus avviato: ${p} punti a ${allocations.length} partecipanti ${team}, da 1 a ${MAX_POINTS_PER_PERSON} ciascuno`,
+      message: `Bonus avviato: ${peoplePoints} punti a ${allocations.filter((a) => a.user_id).length} partecipanti ${team} (da 1 a ${MAX_POINTS_PER_PERSON} ciascuno) e ${teamPoints} solo alla squadra`,
     });
   }
 
