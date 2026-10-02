@@ -8,7 +8,7 @@ import { romeLocalToUTCISO, startOfTodayInRomeISO } from "./utils";
 // di gioco in poi (giornate italiane). Prima di quel giorno vale la regola semplice: 20 al giorno,
 // senza accumulo. Per spostare l'inizio del gioco: variabile COINS_START_DATE (AAAA-MM-GG) su Render,
 // altrimenti il 16 ottobre 2026, primo giorno del congresso.
-export const DAILY_COINS = 20;
+const DAILY_COINS = 20;
 
 function gameStart(): { year: number; month: number; day: number } {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(process.env.COINS_START_DATE || "");
