@@ -44,7 +44,8 @@ type SessionUser = {
 /** Imposta i cookie di sessione (identici per ogni modo di accesso: link personale, richiesta accesso). */
 export function applySessionCookies(response: NextResponse, user: SessionUser): void {
   const cookieOptions = {
-    maxAge: 60 * 60 * 24 * 14,
+    // 40 giorni: chi entra dai primi di ottobre resta collegato fino a dopo la fine del congresso (~20 ottobre).
+    maxAge: 60 * 60 * 24 * 40,
     path: "/",
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,

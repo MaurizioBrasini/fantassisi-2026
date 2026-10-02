@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import InstallButton from "@/components/InstallButton"; // 🔥 MODIFICA 1: Aggiunto import
 import { startOfTodayInRomeISO, getCachedDashboardScores, setCachedDashboardScores } from "@/lib/utils";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
@@ -17,7 +16,7 @@ function getCookie(name: string): string | null {
 }
 
 function setCookieClient(name: string, value: string) {
-  const maxAge = 60 * 60 * 24 * 14;
+  const maxAge = 60 * 60 * 24 * 40; // come i cookie di sessione del server (lib/session.ts)
   document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax`;
 }
 
@@ -320,9 +319,6 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
 
       <GameHeader />
 
-      {/* 🔥 MODIFICA 2: Pulsante Installa app - visibile su mobile e desktop */}
-      <InstallButton />
-
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1, background: TEAM_COLORS.Matricole, color: "white", borderRadius: 16, padding: "14px 8px", textAlign: "center" }}>
@@ -556,9 +552,6 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
     <div style={{ maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" }}>
 
       <GameHeader />
-
-      {/* 🔥 MODIFICA 3: Pulsante Installa app - visibile su mobile e desktop */}
-      <InstallButton />
 
       <h2 style={{ textAlign: "center", fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 12 }}>Classifica squadre</h2>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>

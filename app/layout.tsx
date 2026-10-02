@@ -39,6 +39,20 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
         
+        {/* Cattura subito l'evento di installazione di Chrome (parte una volta sola, presto):
+            il banner lo legge da window.__fantInstallPrompt anche se si monta dopo. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('beforeinstallprompt', function(e) {
+                e.preventDefault();
+                window.__fantInstallPrompt = e;
+                window.dispatchEvent(new Event('fant-install-ready'));
+              });
+            `,
+          }}
+        />
+
         {/* 🔥 Service Worker - necessario per il banner "Aggiungi a schermata Home" */}
         <script
           dangerouslySetInnerHTML={{
