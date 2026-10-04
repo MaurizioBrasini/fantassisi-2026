@@ -7,7 +7,7 @@ import { romeLocalToUTCISO } from "./utils";
 //  - "auto": il voto si apre da solo a VOTE_OPEN_AT (giovedì 8 ottobre 2026, 00:00 ora italiana)
 //  - "preview": anteprima forzata, anche dopo la data
 //  - "open": voto aperto subito, anche prima della data
-// Se la tabella non esiste ancora (sql/2026-10-04_app_settings.sql) vale "auto".
+// Se la tabella non esiste ancora (sql/05_app_settings.sql) vale "auto".
 // Il blocco è applicato dal server nei punti dove si vota (castEventVote e /api/vote): i bonus
 // ricarica (coins) restano riscattabili.
 export type PhaseMode = "auto" | "preview" | "open";

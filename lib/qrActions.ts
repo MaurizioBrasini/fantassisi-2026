@@ -21,8 +21,11 @@ export function actionResponse(result: ActionResult): NextResponse {
 }
 const TEAMS = ["Matricole", "Veterani"];
 
-/** Minuti di attesa tra due voti della stessa persona allo stesso QR/PIN di squadra. */
+// Attesa tra due voti della stessa persona allo stesso QR/PIN. Persone (/api/vote): una al giorno.
+/** QR/PIN di squadra (nelle slides di tutti): ogni 15 minuti. */
 export const TEAM_QR_COOLDOWN_MIN = 15;
+/** QR/PIN di classe (e sede): ogni ora. */
+export const CLASS_QR_COOLDOWN_MIN = 60;
 
 /** Riscatta un QR bonus (CBT coins extra). */
 export async function redeemBonusQr(supabase: SupabaseClient, userId: string, bonus: any): Promise<ActionResult> {
@@ -74,12 +77,13 @@ export async function castEventVote(supabase: SupabaseClient, userId: string, ev
 
   if (coins.remaining <= 0) return fail(400, OUT_OF_COINS_MESSAGE);
   if (existing) {
-    // Classe e altri QR: una volta sola. QR/PIN di squadra (nelle slides di tutti): si può rivotare
-    // dopo TEAM_QR_COOLDOWN_MIN minuti (serve l'indice parziale di sql/2026-10-04_team_qr_cooldown.sql).
-    if (event.qr_type !== "team") return fail(409, "Hai già votato questo QR");
-    const waitMs = Date.parse(existing.voted_at) + TEAM_QR_COOLDOWN_MIN * 60_000 - Date.now();
+    // Lo stesso QR si può rivotare dopo un'attesa che dipende dal tipo (serve aver tolto l'indice
+    // univoco su event_votes: sql/04_event_votes_cooldown.sql).
+    const cooldownMin = event.qr_type === "team" ? TEAM_QR_COOLDOWN_MIN : CLASS_QR_COOLDOWN_MIN;
+    const waitMs = Date.parse(existing.voted_at) + cooldownMin * 60_000 - Date.now();
     if (waitMs > 0) {
-      return fail(429, `Hai già votato la squadra da poco: potrai rivotare tra ${Math.ceil(waitMs / 60_000)} minuti.`);
+      const what = event.qr_type === "team" ? "la squadra" : "questa classe";
+      return fail(429, `Hai già votato ${what} da poco: potrai rivotare tra ${Math.ceil(waitMs / 60_000)} minuti.`);
     }
   }
 

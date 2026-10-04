@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const error = await setPhaseMode(mode as PhaseMode, requester.id);
   if (error) {
     return NextResponse.json(
-      { message: "Impossibile salvare (hai eseguito sql/2026-10-04_app_settings.sql?): " + error },
+      { message: "Impossibile salvare (hai eseguito sql/05_app_settings.sql?): " + error },
       { status: 500 }
     );
   }

@@ -15,7 +15,7 @@ const INSERT_BATCH = 500;
 // partecipanti confermati della squadra scelti a caso, da 1 a 4 ciascuno in totale per questo
 // intervento, in momenti casuali dell'intervallo; contano come voti (squadra, individuali, classi,
 // sedi). Se il database non ha ancora la tabella per questo modo
-// (vedi sql/2026-10-02_boost_allocations.sql) si ricade sul vecchio bonus "solo squadra".
+// (vedi sql/03_boost_allocations.sql) si ricade sul vecchio bonus "solo squadra".
 export async function POST(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
