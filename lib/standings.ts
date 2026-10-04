@@ -163,14 +163,17 @@ async function computeStandings(): Promise<Standings> {
   return buildStandings(users, votes, eventVotes, boosts, allocations);
 }
 
-// Cache di processo di pochi secondi, condivisa da tutti i client: il database viene letto al
-// massimo una volta ogni TTL, e le richieste in arrivo mentre si ricalcola aspettano la stessa
-// promessa. Se il ricalcolo fallisce si serve il dato precedente, se c'è.
+// Cache di processo condivisa da tutti i client. Il dato è "fresco" per TTL_MS: entro quel tempo il
+// database non viene riletto. Scaduto, si risponde SUBITO con l'ultimo dato (al massimo MAX_STALE_MS
+// vecchio) e il ricalcolo parte in sottofondo: così con centinaia di telefoni nessuno resta in attesa
+// del ricalcolo completo ogni pochi secondi. Se non c'è nessun dato, o è troppo vecchio, si aspetta il
+// ricalcolo (le richieste simultanee condividono la stessa promessa). Se il ricalcolo fallisce si
+// serve il dato precedente, se c'è.
+const MAX_STALE_MS = 30_000;
 let cache: { at: number; data: Standings } | null = null;
 let inflight: Promise<Standings> | null = null;
 
-export async function getStandings(): Promise<Standings> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
+function refreshStandings(): Promise<Standings> {
   if (!inflight) {
     inflight = computeStandings()
       .then((data) => {
@@ -180,9 +183,18 @@ export async function getStandings(): Promise<Standings> {
       .finally(() => {
         inflight = null;
       });
+    inflight.catch(() => undefined); // un ricalcolo in sottofondo fallito non deve diventare un errore non gestito
   }
+  return inflight;
+}
+
+export async function getStandings(): Promise<Standings> {
+  const age = cache ? Date.now() - cache.at : Infinity;
+  if (cache && age < TTL_MS) return cache.data;
+  const refreshing = refreshStandings();
+  if (cache && age < MAX_STALE_MS) return cache.data;
   try {
-    return await inflight;
+    return await refreshing;
   } catch (e) {
     if (cache) return cache.data;
     throw e;

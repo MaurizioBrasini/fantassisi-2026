@@ -18,16 +18,15 @@ const CLASS_YEARS = ["primo", "secondo", "terzo", "quarto"];
 // I QR di classe sono pochi (una cinquantina): si leggono tutti e si cercano con il confronto che
 // ignora la grafia (anno "4° ANNO 2026" o "quarto", scuola "CCMA Marco Aurelio" o "CCMA", ...).
 // Cache di pochi secondi: l'Anteprima viene aperta da tutti i partecipanti.
-type ClassEvent = EventRow & { class_school: string | null; class_site: string | null; class_year: string | null };
+type ClassEvent = EventRow & { active: boolean | null; class_school: string | null; class_site: string | null; class_year: string | null };
 let classCache: { at: number; rows: ClassEvent[] } | null = null;
 
 async function findClassEvents(mine: { school: string | null; site: string | null; year: string | null }): Promise<ClassEvent[]> {
   if (!classCache || Date.now() - classCache.at > 10_000) {
     const { data } = await getSupabaseAdmin()
       .from("votable_events")
-      .select(FIELDS + ", class_school, class_site, class_year")
+      .select(FIELDS + ", active, class_school, class_site, class_year")
       .eq("qr_type", "class")
-      .neq("active", false)
       .order("created_at", { ascending: true })
       .order("id", { ascending: true });
     classCache = { at: Date.now(), rows: (data || []) as unknown as ClassEvent[] };
@@ -97,7 +96,8 @@ export async function GET() {
         return findClassEvents(mine);
       });
     }
-    classEvent = rows[0] || null;
+    // Un QR di classe spento dall'admin conta come esistente (non se ne crea un altro) ma non si mostra.
+    classEvent = rows.find((r) => r.active !== false) || null;
   }
   const pick = (e: EventRow | null) => (e ? { title: e.title, qr_code: e.qr_code, pin: e.pin } : null);
   return NextResponse.json(
