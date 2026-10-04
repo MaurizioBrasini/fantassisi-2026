@@ -471,6 +471,7 @@ export default function Dashboard() {
   const [noAccess, setNoAccess] = useState(false);
   const [votingOpen, setVotingOpen] = useState(true);
   const [opensAtLabel, setOpensAtLabel] = useState("");
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -486,20 +487,38 @@ export default function Dashboard() {
       setUserId(id);
       setUserRole(role || "");
 
-      const meRes = await fetch("/api/me", { cache: "no-store" });
-      const me = meRes.ok ? await meRes.json() : null;
+      // Senza rete si mostra "riprova" (prima restava "Caricamento..." per sempre). Se il server non
+      // riconosce più la sessione (cookie scaduto o utente rimosso) si chiede di rientrare, invece di
+      // mostrare una dashboard vuota.
+      let meRes: Response;
+      try {
+        meRes = await fetch("/api/me", { cache: "no-store" });
+      } catch {
+        setLoadFailed(true);
+        setLoading(false);
+        return;
+      }
+      if (meRes.status === 401 || meRes.status === 404) {
+        setNoAccess(true);
+        setLoading(false);
+        return;
+      }
+      const me = meRes.ok ? await meRes.json().catch(() => null) : null;
+      if (!me) {
+        setLoadFailed(true);
+        setLoading(false);
+        return;
+      }
 
-      if (me) {
-        setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
-        setMyTeam(me.team || "");
-        setMyClass(me.year || "");
-        setIsDidatta(!!me.is_didatta);
-        setVotingOpen(me.voting_open !== false);
-        if (me.voting_opens_at) {
-          setOpensAtLabel(
-            new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(me.voting_opens_at))
-          );
-        }
+      setUserName(`${me.first_name || ""} ${me.last_name || ""}`.trim());
+      setMyTeam(me.team || "");
+      setMyClass(me.year || "");
+      setIsDidatta(!!me.is_didatta);
+      setVotingOpen(me.voting_open !== false);
+      if (me.voting_opens_at) {
+        setOpensAtLabel(
+          new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(me.voting_opens_at))
+        );
       }
 
       setLoading(false);
@@ -524,6 +543,7 @@ export default function Dashboard() {
   }, [votingOpen]);
 
   if (noAccess) return <NoAccess />;
+  if (loadFailed) return <LoadError />;
 
   if (loading || !userId) {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;

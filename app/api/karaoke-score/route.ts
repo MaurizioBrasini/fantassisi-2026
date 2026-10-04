@@ -52,8 +52,24 @@ export async function GET() {
   }
 }
 
+function karaokeStatus(): string {
+  const now = Date.now();
+  return now < Date.parse(KARAOKE_START_ISO) ? "not_started" : now < Date.parse(KARAOKE_END_ISO) ? "live" : "ended";
+}
+
 async function computeScore() {
   const supabase = getSupabaseAdmin();
+
+  // Somme fatte dal database (sql/09_aggregates.sql); se la funzione non c'è si contano le righe qui.
+  try {
+    const { data, error } = await supabase.rpc("karaoke_totals", { p_from: KARAOKE_START_ISO, p_to: KARAOKE_END_ISO });
+    if (!error && data && typeof data.Matricole === "number" && typeof data.Veterani === "number") {
+      return { Matricole: data.Matricole, Veterani: data.Veterani, status: karaokeStatus() };
+    }
+  } catch {
+    /* si passa al conteggio riga per riga */
+  }
+
   const [usersById, votes, eventVotes] = await Promise.all([
     getUsersTeamMap(),
     // Voti individuali (QR/PIN personale) caduti nella finestra della sfida.
@@ -73,11 +89,5 @@ async function computeScore() {
     if (ev.team_target === "Veterani") pts.Veterani += ev.points || 1;
   }
 
-  const now = Date.now();
-  const status =
-    now < Date.parse(KARAOKE_START_ISO) ? "not_started" :
-    now < Date.parse(KARAOKE_END_ISO) ? "live" :
-    "ended";
-
-  return { ...pts, status };
+  return { ...pts, status: karaokeStatus() };
 }

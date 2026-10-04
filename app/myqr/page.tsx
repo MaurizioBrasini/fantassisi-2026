@@ -28,8 +28,15 @@ export default function MyQRPage() {
         return;
       }
 
-      const meRes = await fetch("/api/me", { cache: "no-store" });
-      const user = meRes.ok ? await meRes.json() : null;
+      // Senza rete si prosegue con i dati dei cookie visibili (il QR personale contiene solo il link);
+      // se il server non riconosce più la sessione si chiede di rientrare.
+      const meRes = await fetch("/api/me", { cache: "no-store" }).catch(() => null);
+      if (meRes && (meRes.status === 401 || meRes.status === 404)) {
+        setNoAccess(true);
+        setLoading(false);
+        return;
+      }
+      const user = meRes && meRes.ok ? await meRes.json().catch(() => null) : null;
 
       if (user) {
         setUserInfo({

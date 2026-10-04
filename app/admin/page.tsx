@@ -8,6 +8,7 @@ import { TEAM_COLORS } from "@/lib/teamColors";
 import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
 import PhaseCard from "@/components/PhaseCard";
+import SystemCheck from "@/components/SystemCheck";
 import { canonClass } from "@/lib/classKey";
 import { uuid } from "@/lib/uuid";
 import BonusGenerator from "@/components/BonusGenerator";
@@ -857,6 +858,9 @@ export default function AdminPage() {
           </button>
         </div>
       )}
+
+      {/* 🩺 Controlli di salute (variabili, migrazioni SQL, QR, fase, classifiche): solo ADMIN */}
+      {isSuper && <SystemCheck />}
 
       {/* 🚦 Fase Anteprima / Voto aperto: solo ADMIN */}
       {isSuper && <PhaseCard />}

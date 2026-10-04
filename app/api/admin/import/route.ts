@@ -5,6 +5,7 @@ import { generateUniquePins } from "@/lib/utils";
 import { normalizePhone } from "@/lib/phone";
 import { fetchAllRows } from "@/lib/fetchAll";
 import { fetchUsedPins } from "@/lib/pins";
+import { canonSchool, canonSite } from "@/lib/classKey";
 import { VALID_TEAMS, VALID_YEARS, isYearValidForTeam } from "@/lib/config";
 import * as XLSX from "xlsx";
 
@@ -369,8 +370,10 @@ export async function POST(request: Request) {
         last_name: r.last_name || null,
         // Il telefono del file vince; se la cella è vuota o non valida si tiene quello già a sistema.
         phone: r.phone || existingPhones.get(email) || null,
-        school: r.school || null,
-        site: r.site || null,
+        // Scuola e sede nella forma standard ("CCMA Marco Aurelio" -> CCMA, "Marco Aurelio Roma" -> Roma),
+        // come l'anno: la stessa classe deve avere una sola grafia (vedi lib/classKey.ts).
+        school: canonSchool(r.school) || null,
+        site: canonSite(r.site) || null,
         year: year,
         role: userRole,
         team: finalTeam,

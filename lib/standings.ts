@@ -151,16 +151,60 @@ export function buildStandings(
   return { teams, individuals, classes, sites, pointsByUser, userInfo, updatedAt: new Date().toISOString() };
 }
 
+/** Come è stato fatto l'ultimo ricalcolo (per la scheda "Stato del sistema" del pannello admin). */
+export const standingsStats: { mode: "somme dal database" | "lettura completa" | null; ms: number; at: string | null; error: string | null } = {
+  mode: null,
+  ms: 0,
+  at: null,
+  error: null,
+};
+
+type Aggregates = { votes: VoteRow[]; event_votes: EventVoteRow[]; allocations: MaturedAllocation[] };
+
+// Le somme le fa il database (sql/09_aggregates.sql): poche centinaia di righe invece di tutti i voti.
+// Le somme per destinatario/QR/assegnazione danno esattamente gli stessi punteggi delle righe singole,
+// perché buildStandings somma e basta. Se la funzione non c'è (o fallisce) si torna alla lettura
+// completa delle tabelle, come prima: più lenta, ma il risultato è lo stesso.
+async function fetchAggregates(supabase: ReturnType<typeof getSupabaseAdmin>): Promise<Aggregates | null> {
+  try {
+    const { data, error } = await supabase.rpc("standings_aggregates", { p_now: new Date().toISOString() });
+    if (error || !data || !Array.isArray(data.votes) || !Array.isArray(data.event_votes) || !Array.isArray(data.allocations)) {
+      if (error) standingsStats.error = error.message;
+      return null;
+    }
+    return data as Aggregates;
+  } catch (e: any) {
+    standingsStats.error = e?.message || String(e);
+    return null;
+  }
+}
+
 async function computeStandings(): Promise<Standings> {
+  const started = Date.now();
   const supabase = getSupabaseAdmin();
-  const [users, votes, eventVotes, boosts, allocations] = await Promise.all([
+  const [users, boosts, aggregates] = await Promise.all([
     fetchAllRows<UserRow>(supabase, "users", "id, first_name, last_name, team, school, site, year"),
-    fetchAllRows<VoteRow>(supabase, "votes", "recipient_id, points"),
-    fetchAllRows<EventVoteRow>(supabase, "event_votes", "team_target, qr_type, class_school, class_site, class_year, points"),
     fetchTeamBoosts(supabase),
-    fetchMaturedAllocations(supabase),
+    fetchAggregates(supabase),
   ]);
-  return buildStandings(users, votes, eventVotes, boosts, allocations);
+
+  let result: Standings;
+  if (aggregates) {
+    result = buildStandings(users, aggregates.votes, aggregates.event_votes, boosts, aggregates.allocations);
+    standingsStats.mode = "somme dal database";
+    standingsStats.error = null;
+  } else {
+    const [votes, eventVotes, allocations] = await Promise.all([
+      fetchAllRows<VoteRow>(supabase, "votes", "recipient_id, points"),
+      fetchAllRows<EventVoteRow>(supabase, "event_votes", "team_target, qr_type, class_school, class_site, class_year, points"),
+      fetchMaturedAllocations(supabase),
+    ]);
+    result = buildStandings(users, votes, eventVotes, boosts, allocations);
+    standingsStats.mode = "lettura completa";
+  }
+  standingsStats.ms = Date.now() - started;
+  standingsStats.at = new Date().toISOString();
+  return result;
 }
 
 // Cache di processo condivisa da tutti i client. Il dato è "fresco" per TTL_MS: entro quel tempo il
