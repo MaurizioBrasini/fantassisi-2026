@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon } from "@/components/TeamIcons";
+import PrizeBanner from "@/components/PrizeBanner";
 
 type Score = { Matricole: number; Veterani: number; status: "not_started" | "live" | "ended" };
 
@@ -73,6 +74,8 @@ export default function TabelloneKaraoke() {
         boxSizing: "border-box",
       }}
     >
+      {/* Premio palese appena assegnato: banner sul proiettore, si chiude da solo */}
+      <PrizeBanner autoCloseMs={15_000} />
       <h1
         style={{
           fontSize: "clamp(1.8rem, 4vw, 3.2rem)",

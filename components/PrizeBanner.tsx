@@ -16,9 +16,16 @@ const writeSeen = (id: string) => { try { localStorage.setItem(SEEN_KEY, id); } 
 const WHO: Record<string, string> = { person: "Premio a", class: "Premio alla classe", site: "Premio alla sede" };
 
 // Banner trionfale per i premi palesi. Chiede l'ultimo premio ogni 20 secondi (a pagina visibile) e
-// lo mostra una volta sola per dispositivo; si chiude toccando.
-export default function PrizeBanner() {
+// lo mostra una volta sola per dispositivo; si chiude toccando. Sul tabellone del proiettore nessuno
+// tocca lo schermo: lì si chiude da solo dopo `autoCloseMs`.
+export default function PrizeBanner({ autoCloseMs }: { autoCloseMs?: number } = {}) {
   const [prize, setPrize] = useState<Prize | null>(null);
+
+  useEffect(() => {
+    if (!prize || !autoCloseMs) return;
+    const t = setTimeout(() => { writeSeen(prize.id); setPrize(null); }, autoCloseMs);
+    return () => clearTimeout(t);
+  }, [prize, autoCloseMs]);
   const confetti = useMemo(
     () => Array.from({ length: 28 }, (_, i) => ({
       left: Math.round((i * 37) % 100), delay: ((i * 13) % 20) / 10, dur: 2.6 + ((i * 7) % 15) / 10, emoji: EMOJI[i % EMOJI.length], size: 18 + ((i * 5) % 18),
@@ -77,7 +84,7 @@ export default function PrizeBanner() {
         <div style={{ fontSize: "3rem", fontWeight: 900, lineHeight: 1, animation: "prizeShine 1.2s ease-in-out infinite" }}>+{prize.total_points}</div>
         <div style={{ fontSize: "1rem", marginBottom: 14 }}>punti</div>
         {prize.reason && <div style={{ fontSize: "1.05rem", fontStyle: "italic", marginBottom: 14 }}>«{prize.reason}»</div>}
-        <div style={{ fontSize: "0.75rem", opacity: 0.75 }}>Tocca per chiudere</div>
+        {!autoCloseMs && <div style={{ fontSize: "0.75rem", opacity: 0.75 }}>Tocca per chiudere</div>}
       </div>
     </div>
   );

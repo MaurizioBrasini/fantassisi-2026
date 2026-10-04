@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon } from "@/components/TeamIcons";
 import type { ScoreboardData } from "@/lib/scoreboard";
+import PrizeBanner from "@/components/PrizeBanner";
 
 const POLL_MS = 5000;
 const SLIDE_MS = 10000;
@@ -107,6 +108,8 @@ export default function Tabellone() {
         boxSizing: "border-box",
       }}
     >
+      {/* Premio palese appena assegnato: banner sul proiettore, si chiude da solo */}
+      <PrizeBanner autoCloseMs={15_000} />
       <h1 style={{ fontSize: "clamp(1.8rem, 4vw, 3.2rem)", fontWeight: 800, margin: "0 0 3vh", textAlign: "center", letterSpacing: 1 }}>
         {TITLES[slide]}
       </h1>

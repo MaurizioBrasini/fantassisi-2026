@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { useRouter, useSearchParams } from "next/navigation";
 import { invalidateCachedDashboardScores } from "@/lib/utils";
@@ -69,6 +69,26 @@ function ScanPageInner() {
   // Riferimento allo scanner html5-qrcode attualmente in esecuzione, per poterlo
   // fermare da "Cambia fotocamera" senza doverne tenere traccia nello stato React.
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  // Lo scanner legge 10 fotogrammi al secondo: lo stesso QR può essere "letto" più volte prima che
+  // lo scanner si fermi. Si gestisce solo la prima lettura (niente voto doppio, niente doppio avviso).
+  const handlingRef = useRef(false);
+
+  // Uscendo dalla pagina (es. "Torna alla dashboard" mentre la fotocamera è accesa) la fotocamera si
+  // spegne: altrimenti resterebbe attiva in sottofondo, con spia accesa e batteria che cala.
+  useEffect(() => {
+    return () => {
+      const scanner = scannerRef.current;
+      scannerRef.current = null;
+      if (scanner) {
+        scanner
+          .stop()
+          .then(() => scanner.clear())
+          .catch(() => {
+            /* già fermo */
+          });
+      }
+    };
+  }, []);
 
   const handleScanResult = async (decodedText: string, userId: string) => {
     // ----- PIN a 4 cifre (fallback manuale per chi non riesce a scansionare) -----
@@ -228,6 +248,8 @@ function ScanPageInner() {
         config,
         { fps: 10, qrbox: { width: 250, height: 250 } },
         async (decodedText) => {
+          if (handlingRef.current) return; // lettura ripetuta dello stesso QR: già in gestione
+          handlingRef.current = true;
           scannerRef.current = null;
           try {
             await scanner.stop();
@@ -241,6 +263,8 @@ function ScanPageInner() {
           } catch (err: any) {
             console.error("Errore dopo la scansione:", err);
             setError("Errore dopo la scansione: " + (err?.message || String(err)));
+          } finally {
+            handlingRef.current = false;
           }
         },
         () => {

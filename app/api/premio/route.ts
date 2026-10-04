@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getVerifiedUserId } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +12,9 @@ export const revalidate = 0;
 const TTL_MS = 5_000;
 let cache: { at: number; prize: unknown } | null = null;
 
+// Senza login: lo chiede anche il tabellone del proiettore, che non ha sessione. Il premio (chi, quanti
+// punti, perché) è un annuncio pubblico, come i nomi della top 10 sul tabellone.
 export async function GET() {
-  if (!getVerifiedUserId()) {
-    return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
-  }
-
   if (!cache || Date.now() - cache.at >= TTL_MS) {
     const { data, error } = await getSupabaseAdmin()
       .from("team_boosts")
