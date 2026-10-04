@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin, TEAM_PINS } from "@/lib/pins";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { canonClass, sameClass } from "@/lib/classKey";
+import { withLock } from "@/lib/userLock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -72,25 +73,31 @@ export async function GET() {
     const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === mine.year)?.label || mine.year;
     classLabel = `${mine.school} ${mine.site} ${yearLabel}`;
 
-    const rows = await findClassEvents(mine);
+    let rows = await findClassEvents(mine);
     if (rows.length === 0) {
-      const teamTarget = (CONFIG_ISCRIZIONE.teamAnniValid.Matricole as string[]).includes(mine.year) ? "Matricole" : "Veterani";
-      const { error } = await supabase.from("votable_events").insert({
-        title: classLabel,
-        qr_type: "class",
-        team_target: teamTarget,
-        class_school: mine.school,
-        class_site: mine.site,
-        class_year: mine.year,
-        qr_code: `QR:${randomUUID()}`,
-        pin: await generateUnusedPin(),
-        active: true,
+      // Creazione una alla volta per classe: due compagni che aprono insieme non ne creano due.
+      rows = await withLock(`class:${mine.school}|${mine.site}|${mine.year}`, async () => {
+        classCache = null;
+        const again = await findClassEvents(mine);
+        if (again.length > 0) return again;
+        const teamTarget = (CONFIG_ISCRIZIONE.teamAnniValid.Matricole as string[]).includes(mine.year!) ? "Matricole" : "Veterani";
+        const { error } = await supabase.from("votable_events").insert({
+          title: classLabel,
+          qr_type: "class",
+          team_target: teamTarget,
+          class_school: mine.school,
+          class_site: mine.site,
+          class_year: mine.year,
+          qr_code: `QR:${randomUUID()}`,
+          pin: await generateUnusedPin(),
+          active: true,
+        });
+        if (error) console.error("Anteprima: creazione QR classe fallita:", error.message);
+        classCache = null;
+        return findClassEvents(mine);
       });
-      if (error) console.error("Anteprima: creazione QR classe fallita:", error.message);
-      classCache = null;
     }
-    // Se due compagni di classe lo hanno creato insieme, vale il più vecchio; gli altri li pulisce l'admin.
-    classEvent = (rows.length ? rows : await findClassEvents(mine))[0] || null;
+    classEvent = rows[0] || null;
   }
   const pick = (e: EventRow | null) => (e ? { title: e.title, qr_code: e.qr_code, pin: e.pin } : null);
   return NextResponse.json(

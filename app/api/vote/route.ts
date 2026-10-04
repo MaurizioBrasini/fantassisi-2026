@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "@/lib/coins";
 import { votingClosedResponse } from "@/lib/phase";
+import { withLock } from "@/lib/userLock";
 
 export async function POST(request: Request) {
   const voterId = getVerifiedUserId();
@@ -10,11 +11,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { recipientId: bodyRecipientId, pin } = await request.json();
-  if (!bodyRecipientId && !pin) {
+  let body: { recipientId?: string; pin?: string | number };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
+  }
+  if (!body.recipientId && !body.pin) {
     return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
   }
 
+  // Una azione di voto alla volta per persona: vedi lib/userLock.ts.
+  return withLock(`vote:${voterId}`, () => voteForPerson(voterId, body));
+}
+
+async function voteForPerson(voterId: string, { recipientId: bodyRecipientId, pin }: { recipientId?: string; pin?: string | number }) {
   const supabase = getSupabaseAdmin();
 
   // Fallback per chi non riesce a scansionare: PIN a 4 cifre stampato sotto
@@ -45,7 +56,7 @@ export async function POST(request: Request) {
 
   const [{ data: voter }, { data: recipient }] = await Promise.all([
     supabase.from("users").select("team, site").eq("id", voterId).single(),
-    supabase.from("users").select("team, site").eq("id", recipientId).single(),
+    supabase.from("users").select("team, site").eq("id", String(recipientId)).single(),
   ]);
 
   if (!voter) {

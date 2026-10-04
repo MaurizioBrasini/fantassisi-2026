@@ -29,7 +29,30 @@ async function getUsersTeamMap(): Promise<Map<string, string | null>> {
 
 const inKaraokeWindow = (query: any) => query.gte("voted_at", KARAOKE_START_ISO).lt("voted_at", KARAOKE_END_ISO);
 
+// Cache di 2 secondi con richieste simultanee unite: il tabellone interroga ogni 2 s per 3 ore e il numero
+// di voti cresce (ora lo stesso QR si può rivotare), quindi ogni calcolo rilegge migliaia di righe.
+let scoreCache: { at: number; body: { Matricole: number; Veterani: number; status: string } } | null = null;
+let scoreInflight: Promise<{ Matricole: number; Veterani: number; status: string }> | null = null;
+
 export async function GET() {
+  if (scoreCache && Date.now() - scoreCache.at < 2000) {
+    return NextResponse.json(scoreCache.body, { headers: { "Cache-Control": "no-store" } });
+  }
+  if (!scoreInflight) {
+    scoreInflight = computeScore()
+      .then((body) => { scoreCache = { at: Date.now(), body }; return body; })
+      .finally(() => { scoreInflight = null; });
+  }
+  try {
+    return NextResponse.json(await scoreInflight, { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    // Se il calcolo fallisce si serve l'ultimo dato buono: meglio quello che uno schermo vuoto.
+    if (scoreCache) return NextResponse.json(scoreCache.body, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ message: "Errore nel calcolo dei punteggi" }, { status: 500 });
+  }
+}
+
+async function computeScore() {
   const supabase = getSupabaseAdmin();
   const [usersById, votes, eventVotes] = await Promise.all([
     getUsersTeamMap(),
@@ -56,5 +79,5 @@ export async function GET() {
     now < Date.parse(KARAOKE_END_ISO) ? "live" :
     "ended";
 
-  return NextResponse.json({ ...pts, status }, { headers: { "Cache-Control": "no-store" } });
+  return { ...pts, status };
 }

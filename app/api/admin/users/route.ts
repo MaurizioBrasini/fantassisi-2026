@@ -54,11 +54,13 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { email, first_name, last_name, team, site, school, year } = body;
+  const { first_name, last_name, team, site, school, year } = body;
+  // Sempre minuscola e senza spazi: /accedi cerca la mail così, e due maiuscole diverse sarebbero due utenti.
+  const email = String(body.email ?? "").trim().toLowerCase();
   let userRole = body.role;
 
-  if (!email) {
-    return NextResponse.json({ message: "Email obbligatoria" }, { status: 400 });
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ message: "Email obbligatoria e valida" }, { status: 400 });
   }
 
   // Solo un admin può assegnare un ruolo diverso da "student" in fase di creazione
@@ -189,7 +191,7 @@ export async function PUT(request: Request) {
   }
 
   if (!isProtectedAccount) {
-    if (email) updateData.email = email;
+    if (email) updateData.email = String(email).trim().toLowerCase();
     if (userRole !== undefined) updateData.role = userRole;
   }
 

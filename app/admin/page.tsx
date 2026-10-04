@@ -8,6 +8,7 @@ import { TEAM_COLORS } from "@/lib/teamColors";
 import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
 import PhaseCard from "@/components/PhaseCard";
+import { canonClass } from "@/lib/classKey";
 import BonusGenerator from "@/components/BonusGenerator";
 
 function teamFromYear(year: string): string {
@@ -377,9 +378,11 @@ export default function AdminPage() {
     // Classi disponibili per QR classe
     const classiSet = new Map<string, { school: string; site: string; year: string }>();
     for (const u of allUsersData) {
-      if (u.school && u.site && u.year) {
-        const key = `${u.school}||${u.site}||${u.year}`;
-        if (!classiSet.has(key)) classiSet.set(key, { school: u.school, site: u.site, year: u.year });
+      // Solo classi vere: studenti in corso (1°-4° anno), con scuola/sede/anno nella forma standard.
+      const c = canonClass(u.school, u.site, u.year);
+      if (c.school && c.site && c.year && ["primo", "secondo", "terzo", "quarto"].includes(c.year)) {
+        const key = `${c.school}||${c.site}||${c.year}`;
+        if (!classiSet.has(key)) classiSet.set(key, { school: c.school, site: c.site, year: c.year });
       }
     }
     setClassiDisponibili(Array.from(classiSet.values()).sort((a, b) =>
@@ -1164,7 +1167,7 @@ export default function AdminPage() {
                   <option value="">Seleziona una classe...</option>
                   {classiDisponibili.map((c) => (
                     <option key={`${c.school}||${c.site}||${c.year}`} value={`${c.school}||${c.site}||${c.year}`}>
-                      {c.school} {c.site} – {c.year}
+                      {c.school} {c.site} – {CONFIG_ISCRIZIONE.anni.find((a) => a.value === c.year)?.label || c.year}
                     </option>
                   ))}
                 </select>

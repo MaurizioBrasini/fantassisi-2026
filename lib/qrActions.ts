@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { CONFIG_ISCRIZIONE } from "./config";
 import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "./coins";
 import { getVotingPhase, votingClosedMessage } from "./phase";
+import { withLock } from "./userLock";
+import { canonYear } from "./classKey";
 
 // Le due azioni che si fanno con un QR/PIN di evento o di bonus. Prima esistevano due copie
 // (una in /api/event-vote e /api/bonus-redeem, una in /api/qr/redeem): ora c'è un solo codice,
@@ -27,8 +29,12 @@ export const TEAM_QR_COOLDOWN_MIN = 15;
 /** QR/PIN di classe (e sede): ogni ora. */
 export const CLASS_QR_COOLDOWN_MIN = 60;
 
-/** Riscatta un QR bonus (CBT coins extra). */
-export async function redeemBonusQr(supabase: SupabaseClient, userId: string, bonus: any): Promise<ActionResult> {
+/** Riscatta un QR bonus (CBT coins extra). Una azione alla volta per persona (vedi lib/userLock.ts). */
+export function redeemBonusQr(supabase: SupabaseClient, userId: string, bonus: any): Promise<ActionResult> {
+  return withLock(`vote:${userId}`, () => redeemBonusQrUnlocked(supabase, userId, bonus));
+}
+
+async function redeemBonusQrUnlocked(supabase: SupabaseClient, userId: string, bonus: any): Promise<ActionResult> {
   if (bonus.active === false) return fail(403, "Questo QR bonus non è più attivo");
 
   const now = Date.now();
@@ -50,8 +56,12 @@ export async function redeemBonusQr(supabase: SupabaseClient, userId: string, bo
   return { ok: true, body: { success: true, type: "bonus", amount: bonus.amount, title: bonus.title } };
 }
 
-/** Vota con un QR evento/squadra/classe. */
-export async function castEventVote(supabase: SupabaseClient, userId: string, event: any): Promise<ActionResult> {
+/** Vota con un QR evento/squadra/classe. Una azione alla volta per persona (vedi lib/userLock.ts). */
+export function castEventVote(supabase: SupabaseClient, userId: string, event: any): Promise<ActionResult> {
+  return withLock(`vote:${userId}`, () => castEventVoteUnlocked(supabase, userId, event));
+}
+
+async function castEventVoteUnlocked(supabase: SupabaseClient, userId: string, event: any): Promise<ActionResult> {
   const phase = await getVotingPhase();
   if (!phase.open) return fail(403, votingClosedMessage(phase));
   if (event.active === false) return fail(403, "Questo QR non è più attivo");
@@ -103,7 +113,7 @@ export async function castEventVote(supabase: SupabaseClient, userId: string, ev
 
   let message = `✅ +${points} punti per i ${event.team_target || "squadra"}`;
   if (event.qr_type === "class" && event.class_school && event.class_site && event.class_year) {
-    const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === event.class_year)?.label || event.class_year;
+    const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === canonYear(event.class_year))?.label || event.class_year;
     message = `✅ +${points} punti per ${event.class_school} ${event.class_site} ${yearLabel}`;
   } else if (event.qr_type === "site" && event.class_site) {
     message = `✅ +${points} punti per ${event.class_site}`;
