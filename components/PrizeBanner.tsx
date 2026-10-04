@@ -55,7 +55,7 @@ export default function PrizeBanner() {
       onClick={close}
       role="dialog"
       aria-label="Premio assegnato"
-      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(10,20,40,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, overflow: "hidden", animation: "prizeFade .3s ease-out" }}
+      style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(10,20,40,0.82)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, overflow: "hidden", fontFamily: "system-ui, sans-serif", animation: "prizeFade .3s ease-out" }}
     >
       <style>{`
         @keyframes prizeFade { from { opacity: 0 } to { opacity: 1 } }

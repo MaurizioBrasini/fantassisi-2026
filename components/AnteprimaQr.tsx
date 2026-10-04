@@ -77,7 +77,7 @@ export default function AnteprimaQr({ opensAtLabel }: { opensAtLabel: string }) 
       {data?.class && <QrCard label="QR della tua classe" heading={`Vota ${data.className}`} qr={data.class} filename="QR_classe.png" />}
       {data && !data.class && (
         <p style={{ textAlign: "center", color: "#666", fontSize: "0.85rem" }}>
-          Il QR di classe non è disponibile: nel tuo profilo mancano scuola, sede o anno.
+          Il QR di classe è riservato agli studenti in corso: per te vale il QR della squadra qui sopra.
         </p>
       )}
     </div>

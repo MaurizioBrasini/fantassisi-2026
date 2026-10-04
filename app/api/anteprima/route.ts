@@ -4,6 +4,7 @@ import { getVerifiedUserId } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin, TEAM_PINS } from "@/lib/pins";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { canonClass, sameClass } from "@/lib/classKey";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,6 +12,27 @@ export const revalidate = 0;
 type EventRow = { id: string; title: string | null; qr_code: string; pin: string | null; created_at: string };
 const FIELDS = "id, title, qr_code, pin, created_at";
 
+const CLASS_YEARS = ["primo", "secondo", "terzo", "quarto"];
+
+// I QR di classe sono pochi (una cinquantina): si leggono tutti e si cercano con il confronto che
+// ignora la grafia (anno "4° ANNO 2026" o "quarto", scuola "CCMA Marco Aurelio" o "CCMA", ...).
+// Cache di pochi secondi: l'Anteprima viene aperta da tutti i partecipanti.
+type ClassEvent = EventRow & { class_school: string | null; class_site: string | null; class_year: string | null };
+let classCache: { at: number; rows: ClassEvent[] } | null = null;
+
+async function findClassEvents(mine: { school: string | null; site: string | null; year: string | null }): Promise<ClassEvent[]> {
+  if (!classCache || Date.now() - classCache.at > 10_000) {
+    const { data } = await getSupabaseAdmin()
+      .from("votable_events")
+      .select(FIELDS + ", class_school, class_site, class_year")
+      .eq("qr_type", "class")
+      .neq("active", false)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
+    classCache = { at: Date.now(), rows: (data || []) as unknown as ClassEvent[] };
+  }
+  return classCache.rows.filter((r) => sameClass({ school: r.class_school, site: r.class_site, year: r.class_year }, mine));
+}
 // Fase Anteprima: a ogni partecipante servono il QR (e il PIN) della propria squadra e della propria
 // classe, da mettere nelle slides delle relazioni. Sono i normali QR di voto (votable_events), che
 // scansionati votano solo quando il voto è aperto. Il QR di classe, se manca, si crea qui al primo
@@ -41,51 +63,35 @@ export async function GET() {
   const teamRows = (teamEvents || []) as EventRow[];
   const teamEvent = teamRows.find((e) => e.pin === TEAM_PINS[user.team as "Matricole" | "Veterani"]) || teamRows[0] || null;
 
-  // QR di classe: solo se la persona ha scuola, sede e anno.
+  // QR di classe: solo per gli studenti in corso (1°-4° anno) con scuola e sede. Pre-iscritti, ex
+  // allievi e docenti non hanno una classe. La classe si riconosce in qualunque grafia (classKey).
   let classEvent: EventRow | null = null;
   let classLabel = "";
-  if (user.school && user.site && user.year) {
-    const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === user.year)?.label || user.year;
-    classLabel = `${user.school} ${user.site} ${yearLabel}`;
+  const mine = canonClass(user.school, user.site, user.year);
+  if (mine.school && mine.site && mine.year && CLASS_YEARS.includes(mine.year)) {
+    const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === mine.year)?.label || mine.year;
+    classLabel = `${mine.school} ${mine.site} ${yearLabel}`;
 
-    const findClass = async () => {
-      const { data } = await supabase
-        .from("votable_events")
-        .select(FIELDS)
-        .eq("qr_type", "class")
-        .eq("class_school", user.school)
-        .eq("class_site", user.site)
-        .eq("class_year", user.year)
-        .neq("active", false)
-        .order("created_at", { ascending: true })
-        .order("id", { ascending: true });
-      return (data || []) as EventRow[];
-    };
-
-    let rows = await findClass();
+    const rows = await findClassEvents(mine);
     if (rows.length === 0) {
-      const teamTarget = (CONFIG_ISCRIZIONE.teamAnniValid.Matricole as string[]).includes(user.year) ? "Matricole" : "Veterani";
+      const teamTarget = (CONFIG_ISCRIZIONE.teamAnniValid.Matricole as string[]).includes(mine.year) ? "Matricole" : "Veterani";
       const { error } = await supabase.from("votable_events").insert({
-        title: `${user.school} ${user.site} ${yearLabel}`,
+        title: classLabel,
         qr_type: "class",
         team_target: teamTarget,
-        class_school: user.school,
-        class_site: user.site,
-        class_year: user.year,
+        class_school: mine.school,
+        class_site: mine.site,
+        class_year: mine.year,
         qr_code: `QR:${randomUUID()}`,
         pin: await generateUnusedPin(),
         active: true,
       });
       if (error) console.error("Anteprima: creazione QR classe fallita:", error.message);
-      rows = await findClass();
-      // Due compagni di classe possono averlo creato insieme: si tiene il più vecchio e si tolgono gli altri.
-      for (const extra of rows.slice(1)) {
-        await supabase.from("votable_events").delete().eq("id", extra.id);
-      }
+      classCache = null;
     }
-    classEvent = rows[0] || null;
+    // Se due compagni di classe lo hanno creato insieme, vale il più vecchio; gli altri li pulisce l'admin.
+    classEvent = (rows.length ? rows : await findClassEvents(mine))[0] || null;
   }
-
   const pick = (e: EventRow | null) => (e ? { title: e.title, qr_code: e.qr_code, pin: e.pin } : null);
   return NextResponse.json(
     { team: pick(teamEvent), class: pick(classEvent), className: classLabel },

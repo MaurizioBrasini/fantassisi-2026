@@ -8,6 +8,7 @@ import { CONFIG_ISCRIZIONE } from "./config";
 import { fetchTeamBoosts, fetchMaturedAllocations, addBoostsToScores, type MaturedAllocation, type TeamBoost } from "./boosts";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetchAll";
+import { canonClass } from "./classKey";
 
 export type TeamScores = { Matricole: number; Veterani: number };
 type IndividualRow = { id: string; name: string; team: string | null; points: number; rank: number };
@@ -24,7 +25,7 @@ export type Standings = {
   updatedAt: string;
 };
 
-// Anni che contano per la classifica delle sedi (esclusi preiscrizione e specializzati).
+// Anni che hanno una classe e contano per la classifica delle sedi (esclusi preiscrizione e specializzati).
 const SITE_YEARS = ["primo", "secondo", "terzo", "quarto"];
 const TTL_MS = 5_000;
 
@@ -57,12 +58,19 @@ function realClassCount(site: string): number {
 
 /** Calcolo puro dei punteggi dai dati grezzi (separato dalla lettura per poterlo verificare). */
 export function buildStandings(
-  users: UserRow[],
+  rawUsers: UserRow[],
   voteRows: VoteRow[],
-  eventVotes: EventVoteRow[],
+  rawEventVotes: EventVoteRow[],
   boosts: TeamBoost[],
   allocations: MaturedAllocation[] = []
 ): Standings {
+  // Scuola, sede e anno nella forma standard (vedi lib/classKey.ts): la stessa classe è una sola
+  // qualunque sia la grafia salvata nel profilo o nel QR.
+  const users = rawUsers.map((u) => ({ ...u, ...canonClass(u.school, u.site, u.year) }));
+  const eventVotes = rawEventVotes.map((ev) => {
+    const c = canonClass(ev.class_school, ev.class_site, ev.class_year);
+    return { ...ev, class_school: c.school, class_site: c.site, class_year: c.year };
+  });
   const usersById = new Map(users.map((u) => [u.id, u]));
   // I punti dei bonus assegnati a persone contano come voti ricevuti da quella persona; quelli
   // "solo squadra" (senza persona) vanno direttamente al punteggio della squadra.
@@ -90,9 +98,10 @@ export function buildStandings(
     pointsByUser.set(r.id, (pointsByUser.get(r.id) || 0) + p);
     if (r.team === "Matricole") teams.Matricole += p;
     if (r.team === "Veterani") teams.Veterani += p;
-    if (r.school && r.site && r.year) {
+    // Hanno una classe solo gli studenti in corso (1°-4° anno): pre-iscritti, ex allievi e docenti no.
+    if (r.school && r.site && r.year && SITE_YEARS.includes(r.year)) {
       addClass(r.school, r.site, r.year, p);
-      if (SITE_YEARS.includes(r.year)) pointsBySite.set(r.site, (pointsBySite.get(r.site) || 0) + p);
+      pointsBySite.set(r.site, (pointsBySite.get(r.site) || 0) + p);
     }
   }
   for (const ev of eventVotes) {

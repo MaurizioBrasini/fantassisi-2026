@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { classesOfSite, teamForYear, yearLabel } from "@/lib/publicBonus";
 import { qrWithPinImage, downloadDataUrl } from "@/lib/qrImage";
+import { sameClass, canonYear } from "@/lib/classKey";
 
 type Kind = "class" | "team" | "recharge";
 type Row = {
@@ -56,7 +57,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
     ]);
     const events: Row[] = (ev.events || []).map((e: any) => ({
       id: e.id, kind: e.qr_type === "class" ? "class" : "team", title: e.title || "", qr_code: e.qr_code, pin: e.pin, active: e.active !== false,
-      detail: e.qr_type === "class" ? `${e.class_school} ${e.class_site} ${yearLabel(e.class_year)}` : `Squadra ${e.team_target || ""}`,
+      detail: e.qr_type === "class" ? `${e.class_school} ${e.class_site} ${yearLabel(canonYear(e.class_year) || "")}` : `Squadra ${e.team_target || ""}`,
       team: e.team_target, school: e.class_school, site: e.class_site, year: e.class_year, created_at: e.created_at,
     }));
     const bonuses: Row[] = (bn.bonuses || []).map((b: any) => ({
@@ -74,7 +75,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
   // Il QR che si sta per creare esiste già? Lo si dice subito e il pulsante resta spento.
   const duplicate = useMemo<Row | null>(() => {
     if (kind === "class" && site && school && year) {
-      return rows.find((r) => r.kind === "class" && r.site === site && r.school === school && r.year === year) || null;
+      return rows.find((r) => r.kind === "class" && sameClass({ school: r.school ?? null, site: r.site ?? null, year: r.year ?? null }, { school, site, year })) || null;
     }
     if (kind === "team") return rows.find((r) => r.kind === "team" && r.team === team) || null;
     if (kind === "recharge" && title.trim()) {

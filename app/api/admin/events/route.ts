@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
+import { sameClass } from "@/lib/classKey";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +48,14 @@ export async function POST(request: Request) {
   };
 
   if (qr_type === "class" && class_school && class_site && class_year) {
-    const already = await findExisting((q) =>
-      q.eq("qr_type", "class").eq("class_school", class_school).eq("class_site", class_site).eq("class_year", class_year)
-    );
+    // Confronto che ignora la grafia: i primi QR hanno l'anno come "4° ANNO 2026", i nuovi come "quarto".
+    const { data: classQrs } = await supabase
+      .from("votable_events")
+      .select(LIST_FIELDS)
+      .eq("qr_type", "class")
+      .order("created_at", { ascending: true });
+    const wanted = { school: class_school, site: class_site, year: class_year };
+    const already = (classQrs || []).find((e: any) => sameClass({ school: e.class_school, site: e.class_site, year: e.class_year }, wanted));
     if (already) {
       return NextResponse.json({ message: `Esiste già il QR di questa classe: ${already.title}`, existing: already }, { status: 409 });
     }
