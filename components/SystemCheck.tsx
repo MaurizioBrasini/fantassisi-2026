@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PANEL } from "./ui";
 
 type Check = { area: string; name: string; status: "ok" | "warn" | "error"; detail: string };
 const ICON = { ok: "✅", warn: "⚠️", error: "❌" } as const;
@@ -29,7 +30,7 @@ export default function SystemCheck() {
   const problems = checks ? checks.filter((c) => c.status !== "ok").length : 0;
 
   return (
-    <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
+    <div style={PANEL}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <h2 style={{ margin: 0 }}>🩺 Stato del sistema</h2>
         <button onClick={run} disabled={busy} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1E3A5F", color: "white", fontWeight: 600, cursor: "pointer" }}>

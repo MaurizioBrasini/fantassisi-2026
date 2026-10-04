@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatRomeDateTime } from "@/lib/utils";
+import { PANEL } from "./ui";
 
 type Mode = "auto" | "preview" | "open";
 type Phase = { open: boolean; mode: Mode; opensAt: string };
@@ -42,7 +43,7 @@ export default function PhaseCard() {
   };
 
   return (
-    <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
+    <div style={PANEL}>
       <h2 style={{ marginTop: 0 }}>🚦 Fase del gioco</h2>
       {phase ? (
         <p style={{ marginTop: 0, fontWeight: 600, color: phase.open ? "#2E7D32" : "#c0392b" }}>

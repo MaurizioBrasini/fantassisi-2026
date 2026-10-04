@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
-import { asShortText, readJsonObject } from "@/lib/http";
+import { forbidden, asShortText, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ const MAX_RECHARGE_COINS = 100;
 // GET: elenco dei QR ricarica esistenti — admin o staff.
 export async function GET() {
   if (!(await requireRole("admin", "staff"))) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
   const { data, error } = await getSupabaseAdmin().from("bonus_qr").select(LIST_FIELDS).order("created_at", { ascending: false });
   if (error) return NextResponse.json({ message: error.message }, { status: 500 });
@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const requester = await requireRole("admin", "staff");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const body = await readJsonObject(request);

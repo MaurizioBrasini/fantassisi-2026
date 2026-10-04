@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { forbidden } from "@/lib/http";
 import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendInviteEmail } from "@/lib/email";
@@ -7,7 +8,7 @@ import { personalLink } from "@/lib/urls";
 export async function POST(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   // renewed: true = mail "nuovo link" dopo la sostituzione del token, con il motivo di sicurezza.

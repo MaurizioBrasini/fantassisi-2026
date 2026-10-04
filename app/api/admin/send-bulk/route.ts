@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { forbidden } from "@/lib/http";
 import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { sendInviteEmail } from "@/lib/email";
@@ -14,7 +15,7 @@ function sleep(ms: number) {
 export async function POST(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const { userIds } = await request.json();

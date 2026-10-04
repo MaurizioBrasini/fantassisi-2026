@@ -6,7 +6,7 @@ import { patchActive, deleteById } from "@/lib/adminCrud";
 import { sameClass, canonClass } from "@/lib/classKey";
 import { validateClass } from "@/lib/publicBonus";
 import { teamForYear } from "@/lib/config";
-import { asShortText, readJsonObject } from "@/lib/http";
+import { forbidden, asShortText, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ const LIST_FIELDS = "id, title, qr_type, team_target, class_school, class_site, 
 // cosa c'è già prima di crearne uno: il QR è comunque pensato per essere mostrato.
 export async function GET() {
   if (!(await requireRole("admin", "staff"))) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
   const { data, error } = await getSupabaseAdmin()
     .from("votable_events")
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
 // la possibilità di votare quella squadra o classe, quindi non è un'operazione dello staff.
 export async function PATCH(request: Request) {
   if (!(await requireRole("admin"))) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
   return patchActive(request, "votable_events");
 }

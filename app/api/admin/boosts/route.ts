@@ -6,7 +6,7 @@ import { CONFIG_ISCRIZIONE, teamForYear, yearLabel } from "@/lib/config";
 import { accruedBoostPoints, planBoost, MAX_POINTS_PER_PERSON } from "@/lib/boosts";
 import { planPublicBonus, validateClass, type PublicTarget } from "@/lib/publicBonus";
 import { deleteById } from "@/lib/adminCrud";
-import { asUuid, readJsonObject } from "@/lib/http";
+import { forbidden, asUuid, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +14,11 @@ const MAX_POINTS = 99999; // numeri a 5 cifre: è anche la scala dei punteggi de
 const MAX_MINUTES = 3 * 24 * 60; // tutta la durata dell'evento
 const MAX_REASON = 120;
 const INSERT_BATCH = 500;
-const denied = () => NextResponse.json({ message: "Accesso negato" }, { status: 403 });
 const bad = (message: string) => NextResponse.json({ message }, { status: 400 });
 
 // GET: elenco dei bonus (nascosti e palesi) con i punti già maturati — admin o staff.
 export async function GET() {
-  if (!(await requireRole("admin", "staff"))) return denied();
+  if (!(await requireRole("admin", "staff"))) return forbidden();
 
   const supabase = getSupabaseAdmin();
   const [boosts, allocations] = await Promise.all([
@@ -49,7 +48,7 @@ export async function GET() {
 //  sql/07_public_bonuses.sql. Body: { target: {type, ...}, points, reason }.
 export async function POST(request: Request) {
   const requester = await requireRole("admin", "staff");
-  if (!requester) return denied();
+  if (!requester) return forbidden();
 
   const body = await readJsonObject(request);
   if (!body) return bad("Richiesta non valida");
@@ -176,7 +175,7 @@ async function createPublicBonus(body: any, p: number, requesterId: string) {
 // PATCH: ferma un bonus in corso — admin o staff. Restano i punti già maturati,
 // quelli non ancora maturati non entrano più.
 export async function PATCH(request: Request) {
-  if (!(await requireRole("admin", "staff"))) return denied();
+  if (!(await requireRole("admin", "staff"))) return forbidden();
 
   const body = await readJsonObject(request);
   const id = body ? asUuid(body.id) : null;

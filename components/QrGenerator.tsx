@@ -6,6 +6,7 @@ import { classesOfSite } from "@/lib/publicBonus";
 import { downloadDataUrl, downloadQrImage, qrDataUrl, qrFileName, qrWithPinImage } from "@/lib/qrImage";
 import { sameClass, canonYear } from "@/lib/classKey";
 import { uuid } from "@/lib/uuid";
+import { INPUT, PANEL, pill } from "./ui";
 
 type Kind = "class" | "team" | "recharge";
 type Row = {
@@ -14,11 +15,6 @@ type Row = {
 };
 type Made = { src: string; heading: string; pin: string | null; filename: string; note: string };
 
-const INPUT = { padding: 8, borderRadius: 6, border: "1px solid #ccc" } as const;
-const PILL = (active: boolean) => ({
-  padding: "8px 14px", borderRadius: 60, border: "2px solid #1E3A5F", cursor: "pointer", fontWeight: 700,
-  background: active ? "#1E3A5F" : "white", color: active ? "white" : "#1E3A5F",
-}) as const;
 const KIND_LABEL: Record<Kind, string> = { class: "🏫 Classe", team: "🏆 Squadra", recharge: "⚡ Ricarica" };
 const PAGE = 25;
 
@@ -150,12 +146,12 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
   const filtered = rows.filter((r) => (filter === "all" || r.kind === filter) && (!q || `${r.title} ${r.detail} ${r.pin || ""}`.toLowerCase().includes(q)));
 
   return (
-    <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
+    <div style={PANEL}>
       <h2 style={{ marginTop: 0 }}>🎯 Genera QR</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        {canCreateVote && <button style={PILL(kind === "class")} onClick={() => setKind("class")}>🏫 Classe</button>}
-        {canCreateVote && <button style={PILL(kind === "team")} onClick={() => setKind("team")}>🏆 Squadra</button>}
-        <button style={PILL(kind === "recharge")} onClick={() => setKind("recharge")}>⚡ Ricarica coins</button>
+        {canCreateVote && <button style={pill(kind === "class")} onClick={() => setKind("class")}>🏫 Classe</button>}
+        {canCreateVote && <button style={pill(kind === "team")} onClick={() => setKind("team")}>🏆 Squadra</button>}
+        <button style={pill(kind === "recharge")} onClick={() => setKind("recharge")}>⚡ Ricarica coins</button>
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -231,7 +227,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
       <h3 style={{ marginBottom: 8, marginTop: 24 }}>QR esistenti ({filtered.length} di {rows.length})</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
         {(["all", "class", "team", "recharge"] as const).map((f) => (
-          <button key={f} style={{ ...PILL(filter === f), padding: "4px 10px", fontSize: "0.8rem" }} onClick={() => { setFilter(f); setShown(PAGE); }}>
+          <button key={f} style={{ ...pill(filter === f), padding: "4px 10px", fontSize: "0.8rem" }} onClick={() => { setFilter(f); setShown(PAGE); }}>
             {f === "all" ? "Tutti" : KIND_LABEL[f]}
           </button>
         ))}

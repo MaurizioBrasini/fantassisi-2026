@@ -15,6 +15,9 @@ export async function readJsonObject(request: Request): Promise<Record<string, u
 
 export const badRequest = (error = "Richiesta non valida") => NextResponse.json({ error }, { status: 400 });
 
+/** Risposta unica a chi non ha il ruolo richiesto (pannelli admin e staff). */
+export const forbidden = () => NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+
 /** IP di chi chiama (dietro il proxy di Render è il primo di x-forwarded-for), per i limiti di tentativi. */
 export function clientIp(request: Request): string {
   const fwd = request.headers.get("x-forwarded-for");

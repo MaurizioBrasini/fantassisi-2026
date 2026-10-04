@@ -5,7 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { randomUUID } from "crypto";
 import { generateUnusedPin } from "@/lib/pins";
 import { personalLink } from "@/lib/urls";
-import { readJsonObject } from "@/lib/http";
+import { forbidden, readJsonObject } from "@/lib/http";
 import { VALID_TEAMS, VALID_YEARS, isYearValidForTeam } from "@/lib/config";
 
 const PROTECTED_EMAIL = "mabras69@gmail.com";
@@ -14,7 +14,7 @@ const PROTECTED_EMAIL = "mabras69@gmail.com";
 export async function GET(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const { searchParams } = new URL(request.url);
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const requester = await requireRole("admin", "staff");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const body = await readJsonObject(request);
@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const body = await readJsonObject(request);
@@ -231,7 +231,7 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const { searchParams } = new URL(request.url);

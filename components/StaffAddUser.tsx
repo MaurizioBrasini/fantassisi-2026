@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { INPUT, PANEL } from "./ui";
 
-const INPUT = { padding: 8, borderRadius: 6, border: "1px solid #ccc" } as const;
 const EMPTY = { email: "", first_name: "", last_name: "", team: "", site: "", school: "", year: "" };
 
 // Aggiunta di un partecipante dalla dashboard staff. Lo staff crea solo partecipanti (ruolo student):
@@ -38,7 +38,7 @@ export default function StaffAddUser() {
   };
 
   return (
-    <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
+    <div style={PANEL}>
       <h2 style={{ marginTop: 0 }}>➕ Aggiungi partecipante</h2>
       <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
         <input placeholder="Email *" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} style={INPUT} />

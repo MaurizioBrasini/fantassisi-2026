@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { getVotingPhase, setPhaseMode, type PhaseMode } from "@/lib/phase";
-import { readJsonObject } from "@/lib/http";
+import { forbidden, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 // GET: fase corrente — admin o staff. POST { mode }: cambia fase — solo admin.
 export async function GET() {
   if (!(await requireRole("admin", "staff"))) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
   return NextResponse.json(await getVotingPhase());
 }
@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const body = await readJsonObject(request);

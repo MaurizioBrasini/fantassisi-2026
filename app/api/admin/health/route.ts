@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { forbidden } from "@/lib/http";
 import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { getVotingPhase } from "@/lib/phase";
@@ -16,7 +17,7 @@ type Check = { area: string; name: string; status: "ok" | "warn" | "error"; deta
 export async function GET() {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const checks: Check[] = [];

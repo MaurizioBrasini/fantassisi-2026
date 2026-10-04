@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { forbidden } from "@/lib/http";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { generateUniquePins } from "@/lib/utils";
@@ -256,7 +257,7 @@ function parseCSV(text: string): Record<string, string>[] {
 export async function POST(request: Request) {
   const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const formData = await request.formData();

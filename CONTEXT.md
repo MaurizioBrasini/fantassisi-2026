@@ -27,6 +27,19 @@ Questo documento descrive l'intero progetto da zero, non solo le ultime modifich
 
 **Protezioni da non togliere.** Voti serializzati per persona (`lib/userLock.ts`: niente doppi voti simultanei); input validati (`lib/http.ts`); intestazioni di sicurezza (`next.config.js`); classifiche con cache e ricalcolo in sottofondo; pagine di errore (`app/error.tsx`, `app/global-error.tsx`).
 
+**Dove sta cosa (usare questi, non riscriverli).**
+| Serve… | Usa |
+|---|---|
+| etichetta di un anno, squadra di un anno, anni con classe | `yearLabel`, `teamForYear`, `CLASS_YEARS` in `lib/config.ts` |
+| riconoscere la stessa classe in grafie diverse | `canonClass`, `sameClass` in `lib/classKey.ts` |
+| data per esteso in ora italiana | `formatRomeDateTime` in `lib/utils.ts` |
+| leggere il corpo di una richiesta, validare codice/uuid, IP, risposte 400/403 | `readJsonObject`, `asPin`, `asUuid`, `asShortText`, `clientIp`, `badRequest`, `forbidden` in `lib/http.ts` |
+| un'azione di voto alla volta per persona | `withLock` in `lib/userLock.ts` |
+| disegnare/scaricare un QR con titolo e codice | `qrDataUrl`, `qrWithPinImage`, `downloadQrImage` in `lib/qrImage.ts` |
+| stile di riquadri, campi e pulsanti delle schede di gestione | `PANEL`, `INPUT`, `pill` in `components/ui.ts` |
+
+Convenzione delle risposte di errore: le API dei partecipanti rispondono `{ error }`, quelle di gestione (admin/staff) `{ message }`; le pagine leggono il campo giusto, non cambiarlo da una parte sola. Nei testi visibili il "PIN" si chiama **codice** (nel database resta la colonna `pin`).
+
 **Messa in produzione senza sorprese.** Gli script SQL sono in `sql/`, numerati nell'ordine di esecuzione (vedi `sql/LEGGIMI.md`). Dopo ogni deploy o script: pannello admin → **🩺 Stato del sistema** → "Esegui controllo" (variabili su Render, migrazioni eseguite, PIN di squadra, QR di classe doppi, fase, velocità delle classifiche). Controllo dei tipi: `npx tsc --noEmit`. Attenzione: `next build` e `next lint` riscrivono `tsconfig.json`, da ripristinare con git.
 
 ---

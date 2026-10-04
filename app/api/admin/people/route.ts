@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { forbidden } from "@/lib/http";
 import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 // entrare come un'altra persona.
 export async function GET(request: Request) {
   if (!(await requireRole("admin", "staff"))) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   // Si tolgono i caratteri che nel filtro di Supabase hanno un significato (virgole, punti, parentesi, %).

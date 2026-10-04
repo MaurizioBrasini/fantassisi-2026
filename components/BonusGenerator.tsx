@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CONFIG_ISCRIZIONE, yearLabel } from "@/lib/config";
 import { classesOfSite } from "@/lib/publicBonus";
+import { INPUT, PANEL, pill } from "./ui";
 
 type Person = { id: string; first_name: string | null; last_name: string | null; team: string; site: string | null; school: string | null; year: string | null };
 type Boost = {
@@ -11,11 +12,6 @@ type Boost = {
 };
 type TargetType = "person" | "class" | "site";
 
-const INPUT = { padding: 8, borderRadius: 6, border: "1px solid #ccc" } as const;
-const PILL = (active: boolean) => ({
-  padding: "8px 14px", borderRadius: 60, border: "2px solid #1E3A5F", cursor: "pointer", fontWeight: 700,
-  background: active ? "#1E3A5F" : "white", color: active ? "white" : "#1E3A5F",
-}) as const;
 const time = (iso: string) => new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 // Generatore unico di bonus: NASCOSTO (a tempo, imita i voti veri) o PALESE (premio immediato a una
@@ -121,12 +117,12 @@ export default function BonusGenerator({ canDelete }: { canDelete: boolean }) {
 
   const now = Date.now();
   return (
-    <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
+    <div style={PANEL}>
       <h2 style={{ marginTop: 0 }}>🎁 Bonus</h2>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <button style={PILL(mode === "public")} onClick={() => setMode("public")}>🏆 Palese (premio con banner)</button>
-        <button style={PILL(mode === "hidden")} onClick={() => setMode("hidden")}>🕶️ Nascosto (a tempo)</button>
+        <button style={pill(mode === "public")} onClick={() => setMode("public")}>🏆 Palese (premio con banner)</button>
+        <button style={pill(mode === "hidden")} onClick={() => setMode("hidden")}>🕶️ Nascosto (a tempo)</button>
       </div>
 
       {mode === "hidden" ? (
@@ -151,7 +147,7 @@ export default function BonusGenerator({ canDelete }: { canDelete: boolean }) {
           </p>
           <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
             {([["person", "👤 Persona"], ["class", "🏫 Classe"], ["site", "📍 Sede"]] as [TargetType, string][]).map(([t, label]) => (
-              <button key={t} style={PILL(targetType === t)} onClick={() => setTargetType(t)}>{label}</button>
+              <button key={t} style={pill(targetType === t)} onClick={() => setTargetType(t)}>{label}</button>
             ))}
           </div>
 

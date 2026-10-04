@@ -2,12 +2,12 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { readJsonObject } from "@/lib/http";
+import { forbidden, readJsonObject } from "@/lib/http";
 
 export async function POST(request: Request) {
   const user = await requireRole("admin");
   if (!user) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return forbidden();
   }
 
   const body = await readJsonObject(request);
