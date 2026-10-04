@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 import { CONFIG_ISCRIZIONE, VALID_TEAMS } from "@/lib/config";
+import { readJsonObject } from "@/lib/http";
 
 export async function POST(request: Request) {
   const userId = getVerifiedUserId();
@@ -10,8 +11,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  const { team, site, school, year } = await request.json();
-  if (!VALID_TEAMS.includes(team)) {
+  const body = await readJsonObject(request);
+  if (!body) {
+    return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
+  }
+  const { team, site, school, year } = body as { team: string; site?: string; school?: string; year?: string };
+  if (typeof team !== "string" || !VALID_TEAMS.includes(team)) {
     return NextResponse.json({ error: "Team non valido" }, { status: 400 });
   }
 

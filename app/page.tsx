@@ -507,6 +507,22 @@ export default function Dashboard() {
     init();
   }, []);
 
+  // Mentre il voto è chiuso si controlla ogni 30 secondi se si è aperto (a pagina visibile): chi ha
+  // l'app aperta allo scoccare dell'apertura vede subito "Vota" senza dover ricaricare.
+  useEffect(() => {
+    if (votingOpen) return;
+    const check = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/fase", { cache: "no-store" });
+        if (res.ok && (await res.json()).open === true) setVotingOpen(true);
+      } catch { /* niente rete: si riprova al prossimo giro */ }
+    };
+    const timer = setInterval(check, 30_000);
+    document.addEventListener("visibilitychange", check);
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", check); };
+  }, [votingOpen]);
+
   if (noAccess) return <NoAccess />;
 
   if (loading || !userId) {

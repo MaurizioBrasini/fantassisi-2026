@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { getVotingPhase, setPhaseMode, type PhaseMode } from "@/lib/phase";
+import { readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
-  const { mode } = await request.json();
+  const body = await readJsonObject(request);
+  const mode = body?.mode;
   if (mode !== "auto" && mode !== "preview" && mode !== "open") {
     return NextResponse.json({ message: "Modalità non valida" }, { status: 400 });
   }

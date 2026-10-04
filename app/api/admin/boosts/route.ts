@@ -6,6 +6,7 @@ import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { accruedBoostPoints, planBoost, MAX_POINTS_PER_PERSON } from "@/lib/boosts";
 import { planPublicBonus, validateClass, yearLabel, teamForYear, type PublicTarget } from "@/lib/publicBonus";
 import { deleteById } from "@/lib/adminCrud";
+import { asUuid, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,8 @@ export async function POST(request: Request) {
   const requester = await requireRole("admin", "staff");
   if (!requester) return denied();
 
-  const body = await request.json();
+  const body = await readJsonObject(request);
+  if (!body) return bad("Richiesta non valida");
   const p = Number(body.points);
   if (!Number.isInteger(p) || p < 1 || p > MAX_POINTS) {
     return bad(`Punti: un numero intero tra 1 e ${MAX_POINTS}`);
@@ -176,9 +178,10 @@ async function createPublicBonus(body: any, p: number, requesterId: string) {
 export async function PATCH(request: Request) {
   if (!(await requireRole("admin", "staff"))) return denied();
 
-  const { id } = await request.json();
+  const body = await readJsonObject(request);
+  const id = body ? asUuid(body.id) : null;
   if (!id) {
-    return NextResponse.json({ message: "ID mancante" }, { status: 400 });
+    return NextResponse.json({ message: "ID mancante o non valido" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();

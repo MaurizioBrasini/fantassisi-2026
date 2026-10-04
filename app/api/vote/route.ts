@@ -4,6 +4,7 @@ import { getVerifiedUserId } from "@/lib/session";
 import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "@/lib/coins";
 import { votingClosedResponse } from "@/lib/phase";
 import { withLock } from "@/lib/userLock";
+import { asPin, asUuid, badRequest, readJsonObject } from "@/lib/http";
 
 export async function POST(request: Request) {
   const voterId = getVerifiedUserId();
@@ -11,27 +12,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Non autenticato" }, { status: 401 });
   }
 
-  let body: { recipientId?: string; pin?: string | number };
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
+  const body = await readJsonObject(request);
+  if (!body || (body.recipientId === undefined && body.pin === undefined)) {
+    return badRequest();
   }
-  if (!body.recipientId && !body.pin) {
-    return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
+
+  // Valori fuori formato (PIN che non è di 4 cifre, id che non è un uuid) non esistono: non arrivano al database.
+  const recipientId = asUuid(body.recipientId);
+  const pin = asPin(body.pin);
+  // Un QR che non è di nessun partecipante (es. un QR qualunque scansionato per sbaglio)
+  if (body.recipientId !== undefined && !recipientId) {
+    return NextResponse.json({ error: "QR non riconosciuto: non è un QR di FantAssisi" }, { status: 404 });
+  }
+  if (!recipientId && !pin) {
+    return NextResponse.json({ error: "PIN non valido" }, { status: 404 });
   }
 
   // Una azione di voto alla volta per persona: vedi lib/userLock.ts.
-  return withLock(`vote:${voterId}`, () => voteForPerson(voterId, body));
+  return withLock(`vote:${voterId}`, () => voteForPerson(voterId, recipientId, pin));
 }
 
-async function voteForPerson(voterId: string, { recipientId: bodyRecipientId, pin }: { recipientId?: string; pin?: string | number }) {
+async function voteForPerson(voterId: string, bodyRecipientId: string | null, pin: string | null) {
   const supabase = getSupabaseAdmin();
 
   // Fallback per chi non riesce a scansionare: PIN a 4 cifre stampato sotto
   // il proprio QR, risolto qui allo stesso id del destinatario.
   const votingViaPin = !bodyRecipientId && !!pin;
-  let recipientId = bodyRecipientId;
+  let recipientId: string | null = bodyRecipientId;
   if (!recipientId && pin) {
     const { data: byPin } = await supabase.from("users").select("id").eq("pin", String(pin)).maybeSingle();
     if (!byPin) {
@@ -56,7 +63,7 @@ async function voteForPerson(voterId: string, { recipientId: bodyRecipientId, pi
 
   const [{ data: voter }, { data: recipient }] = await Promise.all([
     supabase.from("users").select("team, site").eq("id", voterId).single(),
-    supabase.from("users").select("team, site").eq("id", String(recipientId)).single(),
+    supabase.from("users").select("team, site").eq("id", recipientId as string).single(),
   ]);
 
   if (!voter) {

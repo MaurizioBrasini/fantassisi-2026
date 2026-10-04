@@ -3,7 +3,9 @@ import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
-import { sameClass } from "@/lib/classKey";
+import { sameClass, canonClass } from "@/lib/classKey";
+import { validateClass, teamForYear } from "@/lib/publicBonus";
+import { asShortText, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +35,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Solo l'admin può creare QR di voto" }, { status: 403 });
   }
 
-  const { title, qr_type, team_target, class_school, class_site, class_year, qr_code } = await request.json();
-  if (!title || !qr_code) {
-    return NextResponse.json({ message: "Dati mancanti" }, { status: 400 });
+  const body = await readJsonObject(request);
+  if (!body) {
+    return NextResponse.json({ message: "Richiesta non valida" }, { status: 400 });
+  }
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const qr_code = asShortText(body.qr_code, 100);
+  if (!title || title.length > 120 || !qr_code) {
+    return NextResponse.json({ message: "Dati mancanti o troppo lunghi" }, { status: 400 });
+  }
+
+  // Solo i due tipi che esistono, e solo valori veri: squadra Matricole/Veterani, classe che esiste davvero.
+  // Per la classe si salvano sempre i valori standard e la squadra si ricava dall'anno (non da chi chiama).
+  const qr_type = body.qr_type ?? "team";
+  let team_target: string | null = null;
+  let class_school: string | null = null;
+  let class_site: string | null = null;
+  let class_year: string | null = null;
+  if (qr_type === "team") {
+    if (body.team_target !== "Matricole" && body.team_target !== "Veterani") {
+      return NextResponse.json({ message: "Squadra non valida" }, { status: 400 });
+    }
+    team_target = body.team_target;
+  } else if (qr_type === "class") {
+    const c = canonClass(String(body.class_school ?? ""), String(body.class_site ?? ""), String(body.class_year ?? ""));
+    const problem = validateClass(c.school ?? "", c.site ?? "", c.year ?? "");
+    if (problem) {
+      return NextResponse.json({ message: problem }, { status: 400 });
+    }
+    class_school = c.school;
+    class_site = c.site;
+    class_year = c.year;
+    team_target = teamForYear(c.year as string);
+  } else {
+    return NextResponse.json({ message: "Tipo di QR non valido" }, { status: 400 });
   }
 
   const supabase = getSupabaseAdmin();
@@ -47,7 +80,7 @@ export async function POST(request: Request) {
     return data;
   };
 
-  if (qr_type === "class" && class_school && class_site && class_year) {
+  if (qr_type === "class") {
     // Confronto che ignora la grafia: i primi QR hanno l'anno come "4° ANNO 2026", i nuovi come "quarto".
     const { data: classQrs } = await supabase
       .from("votable_events")
@@ -59,25 +92,23 @@ export async function POST(request: Request) {
     if (already) {
       return NextResponse.json({ message: `Esiste già il QR di questa classe: ${already.title}`, existing: already }, { status: 409 });
     }
-  }
-  if ((qr_type || "team") === "team" && team_target) {
+  } else {
     const already = await findExisting((q) => q.eq("qr_type", "team").eq("team_target", team_target));
     if (already) {
       return NextResponse.json({ message: `Esiste già il QR della squadra ${team_target}: ${already.title}`, existing: already }, { status: 409 });
     }
   }
-
   const pin = await generateUnusedPin();
 
   const { data, error } = await getSupabaseAdmin()
     .from("votable_events")
     .insert({
       title,
-      qr_type: qr_type || "team",
-      team_target: team_target || null,
-      class_school: class_school || null,
-      class_site: class_site || null,
-      class_year: class_year || null,
+      qr_type,
+      team_target,
+      class_school,
+      class_site,
+      class_year,
       qr_code,
       pin,
       active: true,

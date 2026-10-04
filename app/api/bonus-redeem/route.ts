@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { actionResponse, redeemBonusQr } from "@/lib/qrActions";
+import { asShortText, asUuid, badRequest, readJsonObject } from "@/lib/http";
 
 export async function POST(request: Request) {
   const userId = getVerifiedUserId();
@@ -10,15 +11,17 @@ export async function POST(request: Request) {
   }
 
   // Il bonus si indica con il suo id oppure con il codice ("BONUS:...") letto dalla fotocamera.
-  const { bonusId, code } = await request.json();
+  const body = await readJsonObject(request);
+  const bonusId = body ? asUuid(body.bonusId) : null;
+  const code = body ? asShortText(body.code) : null;
   if (!bonusId && !code) {
-    return NextResponse.json({ error: "Richiesta non valida" }, { status: 400 });
+    return badRequest();
   }
 
   const supabase = getSupabaseAdmin();
   const { data: bonus } = await (bonusId
     ? supabase.from("bonus_qr").select("*").eq("id", bonusId)
-    : supabase.from("bonus_qr").select("*").eq("code", String(code))
+    : supabase.from("bonus_qr").select("*").eq("code", code as string)
   ).maybeSingle();
   if (!bonus) {
     return NextResponse.json({ error: "Bonus non valido" }, { status: 404 });

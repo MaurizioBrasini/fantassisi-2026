@@ -3,10 +3,12 @@ import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
+import { asShortText, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
 const LIST_FIELDS = "id, title, amount, code, pin, active, created_at";
+const MAX_RECHARGE_COINS = 100;
 
 // GET: elenco dei QR ricarica esistenti — admin o staff.
 export async function GET() {
@@ -26,11 +28,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
-  const { title, amount, code } = await request.json();
-  if (!title || !code) {
-    return NextResponse.json({ message: "Dati mancanti" }, { status: 400 });
+  const body = await readJsonObject(request);
+  if (!body) {
+    return NextResponse.json({ message: "Richiesta non valida" }, { status: 400 });
   }
-
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const code = asShortText(body.code, 60);
+  if (!title || title.length > 80 || !code) {
+    return NextResponse.json({ message: "Dati mancanti o troppo lunghi" }, { status: 400 });
+  }
+  // Coin della ricarica: numero intero da 1 a 100 (mai negativo, mai enorme, anche se chiamata da fuori dalla pagina).
+  const amount = body.amount === undefined || body.amount === null || body.amount === "" ? 5 : Number(body.amount);
+  if (!Number.isInteger(amount) || amount < 1 || amount > MAX_RECHARGE_COINS) {
+    return NextResponse.json({ message: `I coin della ricarica devono essere un numero intero da 1 a ${MAX_RECHARGE_COINS}` }, { status: 400 });
+  }
   const wanted = String(title).trim().toLowerCase();
   const { data: all } = await getSupabaseAdmin().from("bonus_qr").select(LIST_FIELDS).order("created_at", { ascending: true });
   const already = (all || []).find((b: any) => String(b.title || "").trim().toLowerCase() === wanted);
@@ -42,7 +53,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await getSupabaseAdmin()
     .from("bonus_qr")
-    .insert({ title, amount: amount || 5, code, pin, active: true })
+    .insert({ title, amount, code, pin, active: true })
     .select()
     .single();
 

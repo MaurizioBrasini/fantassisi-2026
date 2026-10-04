@@ -5,6 +5,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { randomUUID } from "crypto";
 import { generateUnusedPin } from "@/lib/pins";
 import { personalLink } from "@/lib/urls";
+import { readJsonObject } from "@/lib/http";
 import { VALID_TEAMS, VALID_YEARS, isYearValidForTeam } from "@/lib/config";
 
 const PROTECTED_EMAIL = "mabras69@gmail.com";
@@ -53,8 +54,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
-  const body = await request.json();
-  const { first_name, last_name, team, site, school, year } = body;
+  const body = await readJsonObject(request);
+  if (!body) {
+    return NextResponse.json({ message: "Richiesta non valida" }, { status: 400 });
+  }
+  const { first_name, last_name, team, site, school, year } = body as Record<string, string>;
   // Sempre minuscola e senza spazi: /accedi cerca la mail così, e due maiuscole diverse sarebbero due utenti.
   const email = String(body.email ?? "").trim().toLowerCase();
   let userRole = body.role;
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
   }
 
   // Solo un admin può assegnare un ruolo diverso da "student" in fase di creazione
-  if (requester.role !== "admin") {
+  if (requester.role !== "admin" || !["student", "staff", "admin"].includes(String(userRole))) {
     userRole = "student";
   }
 
