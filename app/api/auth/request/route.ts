@@ -11,6 +11,11 @@ import { isBlocked, registerFailure, clearFailures } from "@/lib/rateLimit";
 const WINDOW_MS = 5 * 60 * 1000;
 const MAX_FAILS_PER_EMAIL = 5;
 const MAX_FAILS_PER_IP = 25;
+// Tetto giornaliero per mail: le combinazioni di 4 cifre sono 10.000. Con il solo limite di 5 ogni
+// 5 minuti si potevano fare 1440 tentativi al giorno su una persona (~14% di riuscita al giorno);
+// con 20 al giorno si scende allo 0,2%. Chi sbaglia davvero ha comunque "Ricevi il link per mail".
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MAX_FAILS_PER_EMAIL_PER_DAY = 20;
 
 const GENERIC_ERROR = "I dati non corrispondono. Controlla la mail con cui ti sei iscritto/a e le ultime 4 cifre del tuo telefono.";
 
@@ -41,6 +46,13 @@ export async function POST(request: Request) {
 
   const ipKey = `ip:${clientIp(request)}`;
   const emailKey = `email:${email}`;
+  const emailDayKey = `email-day:${email}`;
+  if (isBlocked(emailDayKey, MAX_FAILS_PER_EMAIL_PER_DAY)) {
+    return NextResponse.json(
+      { message: "Troppi tentativi per questa mail oggi. Usa il pulsante qui sotto per ricevere il link per mail." },
+      { status: 429 }
+    );
+  }
   if (isBlocked(ipKey, MAX_FAILS_PER_IP) || isBlocked(emailKey, MAX_FAILS_PER_EMAIL)) {
     return NextResponse.json(
       { message: "Troppi tentativi. Riprova tra 5 minuti oppure ricevi il link per mail qui sotto." },
@@ -65,6 +77,7 @@ export async function POST(request: Request) {
   if (!ok || !user) {
     registerFailure(ipKey, WINDOW_MS);
     registerFailure(emailKey, WINDOW_MS);
+    registerFailure(emailDayKey, DAY_MS);
     return NextResponse.json({ message: GENERIC_ERROR }, { status: 401 });
   }
 
