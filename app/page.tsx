@@ -385,7 +385,7 @@ function DashboardDidatti({ userName, userId, userRole, votingOpen, opensAtLabel
 
   return (
     <div style={PAGE_STYLE}>
-      <GameHeader />
+      <GameHeader badge={votingOpen ? undefined : "Anteprima"} />
       <TeamScoreboard teamScores={teamScores} marginBottom={20} />
 
       <p style={{ textAlign: "center", color: "#666", marginBottom: 24 }}>
@@ -431,7 +431,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
   return (
     <div style={PAGE_STYLE}>
-      <GameHeader />
+      <GameHeader badge={votingOpen ? undefined : "Anteprima"} />
       <TeamScoreboard teamScores={teamScores} marginBottom={28} />
 
       <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>

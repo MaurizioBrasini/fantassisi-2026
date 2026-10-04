@@ -4,7 +4,8 @@
 // chiara.
 import { RoosterIcon, CowIcon } from "@/components/TeamIcons";
 
-export default function GameHeader() {
+// `badge`: etichetta sotto il titolo (es. "Anteprima" finché il voto è chiuso).
+export default function GameHeader({ badge }: { badge?: string } = {}) {
   return (
     <div
       style={{
@@ -20,19 +21,39 @@ export default function GameHeader() {
       }}
     >
       <RoosterIcon size={40} stroke="#FFFFFF" />
-      <h1
-        style={{
-          textAlign: "center",
-          color: "#fff",
-          fontSize: "1.6rem",
-          margin: 0,
-          lineHeight: 1.2,
-          letterSpacing: 0.5,
-          textShadow: "0 0 8px rgba(255,255,255,0.25)",
-        }}
-      >
-        FantAssisi<br />2026
-      </h1>
+      <div style={{ textAlign: "center" }}>
+        <h1
+          style={{
+            textAlign: "center",
+            color: "#fff",
+            fontSize: "1.6rem",
+            margin: 0,
+            lineHeight: 1.2,
+            letterSpacing: 0.5,
+            textShadow: "0 0 8px rgba(255,255,255,0.25)",
+          }}
+        >
+          FantAssisi<br />2026
+        </h1>
+        {badge && (
+          <div
+            style={{
+              display: "inline-block",
+              marginTop: 6,
+              padding: "3px 12px",
+              borderRadius: 60,
+              background: "#FF6B35",
+              color: "#fff",
+              fontSize: "0.75rem",
+              fontWeight: 800,
+              letterSpacing: 2,
+              textTransform: "uppercase",
+            }}
+          >
+            {badge}
+          </div>
+        )}
+      </div>
       <CowIcon size={40} stroke="#FFFFFF" />
     </div>
   );

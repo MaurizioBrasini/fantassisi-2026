@@ -15,6 +15,7 @@ import { asPin, asUuid, asShortText } from "../lib/http";
 import { withLock } from "../lib/userLock";
 import { generateUniquePins } from "../lib/utils";
 import { cooldownMinutes } from "../lib/qrActions";
+import { getVotingPhase, isValidOpensAt } from "../lib/phase";
 
 const user = (id: string, team: string | null, school: string | null, site: string | null, year: string | null) => ({
   id, first_name: id, last_name: "", team, school, site, year,
@@ -136,6 +137,15 @@ test("attese di rivoto: squadra 15 min (5 durante il karaoke), classe 1 ora", ()
   assert.equal(cooldownMinutes("team", at("2026-10-17T17:00:00Z")), 15);
   assert.equal(cooldownMinutes("class", at("2026-10-17T15:00:00Z")), 60);
   assert.equal(cooldownMinutes("class", at("2026-10-16T10:00:00Z")), 60);
+});
+
+test("fase: apertura predefinita giovedì 15 ottobre 00:00 (ora italiana), date accettate solo nel 2026", async () => {
+  const phase = await getVotingPhase(); // senza database: valori predefiniti
+  assert.equal(phase.mode, "auto");
+  assert.equal(phase.opensAt, "2026-10-14T22:00:00.000Z");
+  assert.ok(isValidOpensAt("2026-10-15T08:00:00.000Z"));
+  assert.ok(!isValidOpensAt("2062-10-15T08:00:00.000Z"));
+  assert.ok(!isValidOpensAt("domani"));
 });
 
 test("azioni di voto della stessa persona: una alla volta", async () => {

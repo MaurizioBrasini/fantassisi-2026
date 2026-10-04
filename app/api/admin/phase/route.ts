@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
-import { getVotingPhase, setPhaseMode, type PhaseMode } from "@/lib/phase";
+import { getVotingPhase, isValidOpensAt, updatePhase, type PhaseMode } from "@/lib/phase";
 import { forbidden, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-// GET: fase corrente — admin o staff. POST { mode }: cambia fase — solo admin.
+// GET: fase corrente — admin o staff.
+// POST { mode?, opensAt? }: cambia modalità e/o data di apertura automatica — solo admin.
 export async function GET() {
   if (!(await requireRole("admin", "staff"))) {
     return forbidden();
@@ -21,11 +22,18 @@ export async function POST(request: Request) {
 
   const body = await readJsonObject(request);
   const mode = body?.mode;
-  if (mode !== "auto" && mode !== "preview" && mode !== "open") {
+  const opensAt = body?.opensAt;
+  if (mode === undefined && opensAt === undefined) {
+    return NextResponse.json({ message: "Niente da cambiare" }, { status: 400 });
+  }
+  if (mode !== undefined && mode !== "auto" && mode !== "preview" && mode !== "open") {
     return NextResponse.json({ message: "Modalità non valida" }, { status: 400 });
   }
+  if (opensAt !== undefined && !isValidOpensAt(opensAt)) {
+    return NextResponse.json({ message: "Data di apertura non valida (deve essere nel 2026)" }, { status: 400 });
+  }
 
-  const error = await setPhaseMode(mode as PhaseMode, requester.id);
+  const error = await updatePhase({ mode: mode as PhaseMode | undefined, opensAt: opensAt as string | undefined }, requester.id);
   if (error) {
     return NextResponse.json(
       { message: "Impossibile salvare (hai eseguito sql/05_app_settings.sql?): " + error },

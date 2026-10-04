@@ -94,7 +94,7 @@ export function invalidateCachedDashboardScores(userId: string): void {
   }
 }
 
-// Data e ora per esteso, ora italiana: "giovedì 8 ottobre alle ore 00:00". Unico formato per gli
+// Data e ora per esteso, ora italiana: "giovedì 15 ottobre alle ore 00:00". Unico formato per gli
 // annunci di apertura del voto (dashboard, pannello admin, messaggi del server).
 const ROME_DATETIME = new Intl.DateTimeFormat("it-IT", {
   timeZone: "Europe/Rome",
