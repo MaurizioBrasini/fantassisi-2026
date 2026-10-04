@@ -1,7 +1,33 @@
 # FantAssisi 2026 — Documento di handoff tecnico
-### Per il collaudo beta con gruppo utenti — 16 luglio 2026
+### Aggiornato al 4 ottobre 2026 (prima versione: 16 luglio 2026)
 
-Questo documento descrive l'intero progetto da zero, non solo le ultime modifiche. È pensato per chi prende in carico lo sviluppo/collaudo a partire da domani senza contesto pregresso.
+Questo documento descrive l'intero progetto da zero, non solo le ultime modifiche. È pensato per chi prende in carico lo sviluppo/collaudo senza contesto pregresso. **Le sezioni 0 e 11 sono le più aggiornate**; dove una sezione più vecchia le contraddice, valgono la 0 e la 11.
+
+---
+
+## 0. In breve (stato al 4 ottobre 2026)
+
+**Calendario.** Forum di Assisi 16-18 ottobre 2026. Fase **Anteprima** fino a giovedì 8 ottobre ore 00:00 (si vedono QR e PIN di squadra e classe per le slides, non si vota); poi **voto aperto** in automatico. Il 16 ottobre reset "full" dei voti di prova. Sfida karaoke sabato 17 ottobre 16-19 (`lib/karaoke.ts`).
+
+**Architettura.** Next.js 14 (App Router) su Render, Postgres su Supabase. Il browser **non** legge mai il database: ogni dato passa da una route in `app/api` che usa la chiave service role (`lib/supabaseAdmin.ts`). Identità = cookie httpOnly firmato (`lib/session.ts`); autorizzazione = `requireRole()` che rilegge sempre il ruolo dal database.
+
+**Regole di gioco** (una sola fonte nel codice per ciascuna):
+| Regola | Dove |
+|---|---|
+| Voto a una persona: 2 punti tra Matricole e Veterani, 1 altrimenti; una volta al giorno per persona; i docenti non si votano | `app/api/vote/route.ts` + indice `idx_one_vote_per_day` |
+| Voto a un QR di squadra/classe: stessi punti; rivoto dopo 15 min (squadra) o 1 ora (classe) | `lib/qrActions.ts` |
+| PIN fissi dei QR di squadra: 1212 Matricole, 3434 Veterani | `TEAM_PINS` in `lib/pins.ts` |
+| CBT coins: 20 al giorno, dal 16 ottobre si accumulano; ricariche con QR | `lib/coins.ts` |
+| Fase Anteprima / Voto aperto | `lib/phase.ts` (tabella `app_settings`) |
+| Classe = (scuola, sede, anno); solo studenti in corso 1°-4° anno; grafie vecchie riconosciute | `lib/classKey.ts`, `lib/standings.ts` |
+| Bonus nascosti (a tempo) e premi palesi (persona/classe/sede, con banner) | `lib/boosts.ts`, `lib/publicBonus.ts`, `components/BonusGenerator.tsx` |
+| Punteggi e classifiche (squadre, individuali, classi, sedi), anche per i tabelloni | `lib/standings.ts` (somme dal database, `sql/09_aggregates.sql`) |
+
+**Ruoli.** `admin`: tutto (pannello `/admin`). `staff`: pagina `/staff` con QR ricarica, bonus, nuovi partecipanti, elenco e download dei QR esistenti; niente token/PIN altrui, niente QR di voto, niente reset/import. `student` (mostrato come "partecipante"): app.
+
+**Protezioni da non togliere.** Voti serializzati per persona (`lib/userLock.ts`: niente doppi voti simultanei); input validati (`lib/http.ts`); intestazioni di sicurezza (`next.config.js`); classifiche con cache e ricalcolo in sottofondo; pagine di errore (`app/error.tsx`, `app/global-error.tsx`).
+
+**Messa in produzione senza sorprese.** Gli script SQL sono in `sql/`, numerati nell'ordine di esecuzione (vedi `sql/LEGGIMI.md`). Dopo ogni deploy o script: pannello admin → **🩺 Stato del sistema** → "Esegui controllo" (variabili su Render, migrazioni eseguite, PIN di squadra, QR di classe doppi, fase, velocità delle classifiche). Controllo dei tipi: `npx tsc --noEmit`. Attenzione: `next build` e `next lint` riscrivono `tsconfig.json`, da ripristinare con git.
 
 ---
 
@@ -29,7 +55,7 @@ Esiste inoltre un **ruolo admin/staff** separato, con accesso a un pannello di g
 | Repository | GitHub |
 | Deploy | Render |
 
-**Vincolo importante sul workflow**: chi gestisce il codice (Maurizio, committente/proprietario del progetto) **non è uno sviluppatore di professione** e lavora **esclusivamente tramite l'interfaccia web di GitHub**, non da terminale/git CLI. I file di grandi dimensioni vengono caricati con il metodo "upload file" dell'interfaccia web, non incollati manualmente. Chiunque prenda in carico il progetto deve tenerne conto se prevede modifiche che il committente dovrà poi eseguire o verificare autonomamente: le istruzioni vanno sempre date in termini di "che file scaricare/caricare da GitHub", non di comandi git.
+**Vincolo importante sul workflow**: chi gestisce il codice (Maurizio, committente/proprietario del progetto) **non è uno sviluppatore di professione** e non usa il terminale/git CLI. Da settembre 2026: i commit li prepara lo sviluppatore (o l'assistente) in locale, Maurizio fa il push con GitHub Desktop; gli script SQL li esegue lui nello SQL Editor di Supabase. I file di grandi dimensioni vengono caricati con il metodo "upload file" dell'interfaccia web, non incollati manualmente. Chiunque prenda in carico il progetto deve tenerne conto se prevede modifiche che il committente dovrà poi eseguire o verificare autonomamente: le istruzioni vanno sempre date in termini di "che file scaricare/caricare da GitHub", non di comandi git.
 
 **Le funzioni Postgres `SECURITY DEFINER` (`reset_scores`, `reset_full`, `reset_votes_on_date`) vivono in Supabase (SQL Editor), NON nel repository GitHub.** Non cercarle nel codice: se serve modificarle, si interviene direttamente su Supabase.
 
@@ -78,7 +104,7 @@ Questo è uno dei punti più delicati del sistema: **esistono due percorsi di vo
 - Stessa logica di punteggio della sezione 4.1 (1 o 2 punti)
 - **Punto critico già verificato e corretto**: il punteggio va applicato alla sede/classe **indicata dal QR scansionato**, non alla sede dell'utente che vota. Esempio verificato: un Veterano che scansiona un QR "Bari, 1° anno" assegna 2 punti a Bari/1°anno, non alla propria sede di appartenenza.
 
-Qualsiasi modifica alla logica di punteggio va applicata **in entrambi** gli endpoint, altrimenti i due meccanismi si disallineano.
+Qualsiasi modifica alla logica di punteggio va applicata **in entrambi** gli endpoint, altrimenti i due meccanismi si disallineano. (Aggiornamento ottobre: i voti ai QR passano tutti da `castEventVote` in `lib/qrActions.ts`, usato da `/api/event-vote` e `/api/qr/redeem`; lo stesso QR si può rivotare dopo 15 minuti se di squadra, dopo 1 ora se di classe.)
 
 ---
 
@@ -99,7 +125,7 @@ Tre viste:
 
 ## 6. Pannello admin
 
-File: `app/admin/page.tsx`, accessibile solo ai ruoli `admin`/`staff`.
+File: `app/admin/page.tsx`, solo per il ruolo `admin` (lo staff viene mandato alla sua pagina `/staff`). Schede aggiunte a ottobre: 🩺 Stato del sistema, 🚦 Fase del gioco, 🎁 Bonus (generatore unico nascosti/palesi).
 
 ### Funzionalità
 
@@ -161,6 +187,8 @@ Questi pattern sono stati stabiliti per risolvere problemi specifici già incont
 ---
 
 ## 9. Stato attuale del progetto
+
+> Sezione storica (16 luglio 2026). Lo stato aggiornato è nella sezione 0.
 
 - **App in produzione** su Render, nessun bug noto aperto al 16 luglio 2026
 - Testata attivamente da Maurizio (proprietario/responsabile del progetto) prima dell'evento

@@ -1,9 +1,11 @@
 -- =============================================================================
--- FANTASSISI 2026 - SCHEMA DEL DATABASE (letto dal database reale il 2 ottobre 2026)
+-- FANTASSISI 2026 - SCHEMA DEL DATABASE
+-- Letto dal database reale il 2 ottobre 2026, aggiornato il 4 ottobre 2026 con le migrazioni
+-- numerate di questa cartella (01-09).
 --
--- Solo DOCUMENTAZIONE: descrive com'e' fatto oggi il database su Supabase. Non va eseguito da
--- zero: le modifiche si fanno a mano nell'SQL Editor (vedi anche le migrazioni datate in questa
--- cartella). Il file precedente non corrispondeva piu' al database reale ed e' stato sostituito.
+-- Solo DOCUMENTAZIONE: descrive com'e' fatto il database su Supabase. Non va eseguito da zero:
+-- le modifiche si fanno con gli script numerati (01_..., 02_...) nell'SQL Editor, nell'ordine.
+-- Per sapere quali sono gia' stati eseguiti: pannello admin -> "Stato del sistema".
 --
 -- Accesso: il browser NON legge il database. Le tabelle hanno RLS attiva e i ruoli anon e
 -- authenticated non hanno nessun permesso; il sito legge e scrive dal server con la chiave
@@ -78,7 +80,10 @@ CREATE TABLE public.event_votes (
   CONSTRAINT event_votes_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE INDEX idx_event_votes_user ON public.event_votes USING btree (user_id);
-CREATE UNIQUE INDEX idx_one_event_vote_per_user ON public.event_votes USING btree (user_id, event_id);
+-- 04: tolto l'indice univoco idx_one_event_vote_per_user (lo stesso QR si rivota dopo un'attesa,
+-- controllata dall'app: squadra 15 minuti, classe 1 ora). Indici aggiunti:
+CREATE INDEX idx_event_votes_user_event_time ON public.event_votes USING btree (user_id, event_id, voted_at DESC);
+CREATE INDEX idx_event_votes_voted_at ON public.event_votes USING btree (voted_at);  -- 09 (karaoke)
 ALTER TABLE public.event_votes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "agent read" ON public.event_votes FOR SELECT TO claude_agent USING (true);
 
@@ -151,23 +156,78 @@ CREATE POLICY "agent read" ON public.bonus_redemptions FOR SELECT TO claude_agen
 -- ---------------------------------------------------------------------------
 -- team_boosts
 -- ---------------------------------------------------------------------------
+-- Bonus decisi dall'admin/staff. kind = 'hidden' (a tempo, imita i voti veri) oppure 'public'
+-- (premio palese immediato con banner: target_type/target_label/reason). I punti veri stanno in
+-- boost_allocations; le righe vecchie con distributed = false maturano linearmente (solo squadra).
 CREATE TABLE public.team_boosts (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  team text NOT NULL,
+  team text,                                   -- 07: puo' essere vuoto (premio a una sede)
   total_points integer NOT NULL,
   start_at timestamp with time zone NOT NULL DEFAULT now(),
   end_at timestamp with time zone NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   created_by uuid,
+  distributed boolean NOT NULL DEFAULT false,  -- 03
+  kind text NOT NULL DEFAULT 'hidden',         -- 07
+  reason text,                                 -- 07
+  target_type text,                            -- 07: person | class | site
+  target_label text,                           -- 07
   CONSTRAINT team_boosts_pkey PRIMARY KEY (id),
-  CONSTRAINT team_boosts_team_check CHECK ((team = ANY (ARRAY['Matricole'::text, 'Veterani'::text]))),
+  CONSTRAINT team_boosts_team_check CHECK ((team IS NULL OR team = ANY (ARRAY['Matricole'::text, 'Veterani'::text]))),
+  CONSTRAINT team_boosts_kind_check CHECK ((kind = ANY (ARRAY['hidden'::text, 'public'::text]))),
+  CONSTRAINT team_boosts_target_type_check CHECK ((target_type IS NULL OR target_type = ANY (ARRAY['person'::text, 'class'::text, 'site'::text]))),
   CONSTRAINT team_boosts_total_points_check CHECK ((total_points > 0))
 );
+CREATE INDEX idx_team_boosts_public ON public.team_boosts USING btree (created_at DESC) WHERE (kind = 'public'::text);
 ALTER TABLE public.team_boosts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "agent read" ON public.team_boosts FOR SELECT TO claude_agent USING (true);
 
 -- ---------------------------------------------------------------------------
--- admins
+-- boost_allocations (03, colonne di classe dal 07)
+-- Una riga = punti di un bonus che maturano al momento "at". Tre forme:
+--   user_id valorizzato         -> conta come voto ricevuto da quella persona
+--   class_school/site/year      -> conta per classe e sede (e per la squadra solo se team e' valorizzato)
+--   nessuno dei due             -> solo punteggio di squadra
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.boost_allocations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  boost_id uuid NOT NULL,
+  user_id uuid,
+  team text,
+  points integer NOT NULL,
+  at timestamp with time zone NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  class_school text,
+  class_site text,
+  class_year text,
+  CONSTRAINT boost_allocations_pkey PRIMARY KEY (id),
+  CONSTRAINT boost_allocations_boost_id_fkey FOREIGN KEY (boost_id) REFERENCES team_boosts(id) ON DELETE CASCADE,
+  CONSTRAINT boost_allocations_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT boost_allocations_team_check CHECK ((team IS NULL OR team = ANY (ARRAY['Matricole'::text, 'Veterani'::text]))),
+  CONSTRAINT boost_allocations_points_check CHECK ((points > 0))
+);
+CREATE INDEX idx_boost_allocations_boost ON public.boost_allocations USING btree (boost_id);
+CREATE INDEX idx_boost_allocations_at ON public.boost_allocations USING btree (at);
+ALTER TABLE public.boost_allocations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.boost_allocations FOR SELECT TO claude_agent USING (true);
+
+-- ---------------------------------------------------------------------------
+-- app_settings (05): impostazioni dell'app. Oggi una sola chiave:
+--   'voting_phase' -> {"mode": "auto" | "preview" | "open"}  (fase Anteprima / Voto aperto)
+-- ---------------------------------------------------------------------------
+CREATE TABLE public.app_settings (
+  key text NOT NULL,
+  value jsonb NOT NULL,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_by uuid,
+  CONSTRAINT app_settings_pkey PRIMARY KEY (key),
+  CONSTRAINT app_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "agent read" ON public.app_settings FOR SELECT TO claude_agent USING (true);
+
+-- ---------------------------------------------------------------------------
+-- admins: tabella storica, NON usata dall'app (i ruoli stanno in users.role). Si puo' ignorare.
 -- ---------------------------------------------------------------------------
 CREATE TABLE public.admins (
   user_id uuid NOT NULL,
@@ -214,6 +274,7 @@ BEGIN
 END;
 $function$;
 
+-- reset_today: storica, NON usata (conta il giorno in UTC). Il pannello usa reset_votes_on_date.
 CREATE OR REPLACE FUNCTION public.reset_today()
  RETURNS void
  LANGUAGE plpgsql
@@ -244,3 +305,11 @@ AS $function$
   SELECT (ts AT TIME ZONE 'UTC')::date;
 $function$;
 
+-- ---------------------------------------------------------------------------
+-- Funzioni di 09_aggregates.sql (eseguibili solo dal server, ruolo service_role)
+--   standings_aggregates(p_now)  -> jsonb {votes, event_votes, allocations}: le somme usate da
+--                                   lib/standings.ts al posto della lettura di tutte le righe
+--   karaoke_totals(p_from, p_to) -> jsonb {Matricole, Veterani}: totali della sfida karaoke
+--   fantassisi_db_check()        -> jsonb con lo stato delle migrazioni (scheda "Stato del sistema")
+-- Il testo completo e' in sql/09_aggregates.sql.
+-- ---------------------------------------------------------------------------
