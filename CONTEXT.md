@@ -27,6 +27,8 @@ Questo documento descrive l'intero progetto da zero, non solo le ultime modifich
 
 **Protezioni da non togliere.** Voti serializzati per persona (`lib/userLock.ts`: niente doppi voti simultanei); input validati (`lib/http.ts`); intestazioni di sicurezza (`next.config.js`); classifiche con cache e ricalcolo in sottofondo; pagine di errore (`app/error.tsx`, `app/global-error.tsx`).
 
+**Nuovo link (🔄 nel pannello admin, `/api/admin/new-link`).** Sostituisce il codice segreto del link personale di una persona: il vecchio link smette subito di funzionare, chi è già dentro resta collegato. Facoltativamente invia la mail "Nuovo link di accesso" (versione `renewed` di `lib/email.ts`). Solo admin.
+
 **Dove sta cosa (usare questi, non riscriverli).**
 | Serve… | Usa |
 |---|---|

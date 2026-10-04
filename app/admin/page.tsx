@@ -656,6 +656,23 @@ export default function AdminPage() {
     setMessage(data.message);
   };
 
+  // ── Nuovo link: sostituisce il link personale (il vecchio smette di funzionare) ──
+  const handleNewLink = async (userId: string, userName: string, email: string | null) => {
+    if (!confirm(`Creare un NUOVO link per ${userName}?\n\nIl link attuale smetterà subito di funzionare (chi è già dentro l'app resta collegato).`)) return;
+    const sendEmail = !!email && confirm(`Inviare subito a ${userName} il nuovo link per mail (${email})?\n\nOK = invia la mail «Nuovo link di accesso»\nAnnulla = non inviare, lo copio io`);
+    const res = await fetch("/api/admin/new-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, sendEmail }),
+    });
+    const data = await res.json();
+    if (!res.ok) { setMessage("❌ " + (data.message || "Errore")); return; }
+    // Il link nuovo sostituisce il vecchio anche nell'elenco, così 📋 copia quello giusto.
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, auth_token: data.token } : u)));
+    try { await navigator.clipboard.writeText(data.link); } catch { /* copia a mano con 📋 */ }
+    setMessage(data.message + (sendEmail ? "" : " Il nuovo link è stato copiato: incollalo dove ti serve (o usa 📋)."));
+  };
+
   // ── Esporta CSV con link ──────────────────────────────────
   const handleExportCSV = (team?: string) => {
     const url = team
@@ -1051,6 +1068,9 @@ export default function AdminPage() {
                       <button onClick={() => openEditModal(u)} style={{ padding: "4px 8px", marginRight: 4, background: "#ffc107", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Modifica">✏️</button>
                       <button onClick={() => { navigator.clipboard.writeText(personalLink(u.auth_token)); showToast(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
                       <button onClick={() => handleSendLink(u.id, `${u.first_name} ${u.last_name}`, u.email)} style={{ padding: "4px 8px", marginRight: 4, background: "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Invia link via email">✉️</button>
+                      {isSuper && (
+                        <button onClick={() => handleNewLink(u.id, `${u.first_name} ${u.last_name}`, u.email)} style={{ padding: "4px 8px", marginRight: 4, background: "#6f42c1", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Nuovo link (il vecchio smette di funzionare)">🔄</button>
+                      )}
                       {isSuper && (
                         <button onClick={() => handleDeleteUser(u.id, `${u.first_name} ${u.last_name}`)} disabled={isProtected} style={{ padding: "4px 8px", background: isProtected ? "#ccc" : "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: isProtected ? "not-allowed" : "pointer", fontSize: "0.8rem", opacity: isProtected ? 0.5 : 1 }}>
                           🗑️
