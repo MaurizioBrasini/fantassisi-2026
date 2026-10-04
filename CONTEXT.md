@@ -42,6 +42,8 @@ Questo documento descrive l'intero progetto da zero, non solo le ultime modifich
 
 Convenzione delle risposte di errore: le API dei partecipanti rispondono `{ error }`, quelle di gestione (admin/staff) `{ message }`; le pagine leggono il campo giusto, non cambiarlo da una parte sola. Nei testi visibili il "PIN" si chiama **codice** (nel database resta la colonna `pin`).
 
+**Procedure per l'evento** (prima dell'invio dei link, prova di carico, prova iPhone, backup, mattina del 16 ottobre): `docs/EVENTO.md`. Prova di carico in sola lettura: `node scripts/load-test.mjs --users 300 --minutes 3`. Backup completo: pannello admin → Stato del sistema → 💾 Scarica backup.
+
 **Messa in produzione senza sorprese.** Gli script SQL sono in `sql/`, numerati nell'ordine di esecuzione (vedi `sql/LEGGIMI.md`). Dopo ogni deploy o script: pannello admin → **🩺 Stato del sistema** → "Esegui controllo" (variabili su Render, migrazioni eseguite, PIN di squadra, QR di classe doppi, fase, velocità delle classifiche). Controllo dei tipi: `npx tsc --noEmit`. Attenzione: `next build` e `next lint` riscrivono `tsconfig.json`, da ripristinare con git.
 
 ---
