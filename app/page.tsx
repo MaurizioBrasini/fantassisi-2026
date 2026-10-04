@@ -353,7 +353,7 @@ function AdminAndLogout({ isAdmin, adminHref }: { isAdmin: boolean; adminHref: s
       {/* Pulsante Admin (visibile solo a admin/staff) */}
       {isAdmin && (
         <Link href={adminHref} style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
-          ⚙️ Admin
+          {adminHref === "/staff" ? "🛠️ Staff" : "⚙️ Admin"}
         </Link>
       )}
       <button
