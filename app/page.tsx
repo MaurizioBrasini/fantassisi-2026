@@ -441,9 +441,9 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
       <ContributionLinks />
 
-      {!votingOpen && <AnteprimaQr opensAtLabel={opensAtLabel} />}
-
-      {votingOpen && <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+      {/* Il proprio punteggio si vede sempre (in Anteprima arrivano già i premi palesi); il QR personale
+          per farsi votare solo a voto aperto. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
           <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
@@ -454,16 +454,22 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
             </div>
           </div>
         </div>
-        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
-            Mostra il QR per ricevere voti
-          </div>
-          <Link href="/myqr" style={{ ...ACTION_LINK_STYLE, background: "#A8D8A8", border: "2px solid #2E7D32" }}>
-            Il mio QR
-          </Link>
-        </div>
-      </div>}
+        {votingOpen && (
+          <>
+            <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+                Mostra il QR per ricevere voti
+              </div>
+              <Link href="/myqr" style={{ ...ACTION_LINK_STYLE, background: "#A8D8A8", border: "2px solid #2E7D32" }}>
+                Il mio QR
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
+
+      {!votingOpen && <AnteprimaQr opensAtLabel={opensAtLabel} />}
 
       <CoinsAndRecharge remainingCoins={remainingCoins} />
       {votingOpen && <VoteButton />}
