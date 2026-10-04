@@ -25,7 +25,7 @@ export default function StaffPage() {
         <h1 style={{ margin: 0, fontSize: "1.5rem" }}>🛠️ Staff FantAssisi</h1>
         <Link href="/" style={{ color: "#FF6B35" }}>← Dashboard</Link>
       </div>
-      <QrGenerator />
+      <QrGenerator canCreateVote={role === "admin"} />
       <BonusGenerator canDelete={role === "admin"} />
       <StaffAddUser />
     </div>

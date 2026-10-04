@@ -22,13 +22,14 @@ export async function GET() {
   return NextResponse.json({ events: data || [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
-// POST: crea un QR voto (squadra o classe) — admin o staff. Mai due QR per la stessa classe o per la
+// POST: crea un QR voto (squadra o classe) — solo admin. Mai due QR per la stessa classe o per la
 // stessa squadra (l'Anteprima e le slides usano quello esistente): se c'è già, risposta 409 con il QR
 // esistente, così chi ha provato a rifarlo lo vede.
 export async function POST(request: Request) {
-  const requester = await requireRole("admin", "staff");
+  // I QR di voto muovono i punteggi di squadre e classi: li crea solo l'admin (lo staff li vede e li scarica).
+  const requester = await requireRole("admin");
   if (!requester) {
-    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+    return NextResponse.json({ message: "Solo l'admin può creare QR di voto" }, { status: 403 });
   }
 
   const { title, qr_type, team_target, class_school, class_site, class_year, qr_code } = await request.json();
@@ -84,6 +85,12 @@ export async function POST(request: Request) {
   return NextResponse.json({ event: data });
 }
 
-// PATCH: attiva/disattiva — admin o staff. DELETE: elimina — solo admin.
-export const PATCH = (request: Request) => patchActive(request, "votable_events");
+// PATCH (attiva/disattiva) e DELETE (elimina): solo admin. Spegnere un QR di voto toglie ai partecipanti
+// la possibilità di votare quella squadra o classe, quindi non è un'operazione dello staff.
+export async function PATCH(request: Request) {
+  if (!(await requireRole("admin"))) {
+    return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
+  }
+  return patchActive(request, "votable_events");
+}
 export const DELETE = (request: Request) => deleteById(request, "votable_events");

@@ -31,8 +31,9 @@ async function qrImage(row: { qr_code: string; title: string; pin: string | null
 // Generatore di QR per la dashboard staff: classe, squadra e ricarica coins, con l'elenco di quelli
 // che esistono già. Non si può creare un QR che c'è già (lo impone anche il server, con una risposta
 // 409 che restituisce quello esistente). Usa /api/admin/events e /api/admin/bonus.
-export default function QrGenerator() {
-  const [kind, setKind] = useState<Kind>("class");
+export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean }) {
+  // Lo staff crea solo QR ricarica; i QR di voto (classe, squadra) li crea l'admin. Lo staff li vede e li scarica.
+  const [kind, setKind] = useState<Kind>(canCreateVote ? "class" : "recharge");
   const [site, setSite] = useState("");
   const [school, setSchool] = useState("");
   const [year, setYear] = useState("");
@@ -156,8 +157,8 @@ export default function QrGenerator() {
     <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
       <h2 style={{ marginTop: 0 }}>🎯 Genera QR</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <button style={PILL(kind === "class")} onClick={() => setKind("class")}>🏫 Classe</button>
-        <button style={PILL(kind === "team")} onClick={() => setKind("team")}>🏆 Squadra</button>
+        {canCreateVote && <button style={PILL(kind === "class")} onClick={() => setKind("class")}>🏫 Classe</button>}
+        {canCreateVote && <button style={PILL(kind === "team")} onClick={() => setKind("team")}>🏆 Squadra</button>}
         <button style={PILL(kind === "recharge")} onClick={() => setKind("recharge")}>⚡ Ricarica coins</button>
       </div>
 
@@ -256,7 +257,9 @@ export default function QrGenerator() {
                 <td style={{ padding: 6 }}>{r.active ? "Attivo" : "Disattivo"}</td>
                 <td style={{ padding: 6, whiteSpace: "nowrap" }}>
                   <button onClick={() => downloadRow(r)} style={{ marginRight: 4, cursor: "pointer" }}>⬇️ QR</button>
-                  <button onClick={() => toggle(r)} style={{ cursor: "pointer" }}>{r.active ? "Disattiva" : "Attiva"}</button>
+                  {(canCreateVote || r.kind === "recharge") && (
+                    <button onClick={() => toggle(r)} style={{ cursor: "pointer" }}>{r.active ? "Disattiva" : "Attiva"}</button>
+                  )}
                 </td>
               </tr>
             ))}
