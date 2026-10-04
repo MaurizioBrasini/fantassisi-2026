@@ -603,7 +603,7 @@ export default function AdminPage() {
     const msgs: Record<string, string> = {
       today: "🗑️ Cancellare SOLO i voti di oggi?",
       scores: "⚠️ Cancellare TUTTI i voti? Operazione irreversibile!",
-      full: "🚨 RESET COMPLETO: cancellare tutto?",
+      full: "🚨 RESET COMPLETO: cancellare tutti i voti (persone e QR) e tutte le ricariche di coins riscattate? Bonus e premi NON vengono toccati: vanno eliminati a mano dalla scheda Bonus.",
     };
     if (!confirm(msgs[resetType])) return;
     const res = await fetch("/api/admin/reset", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: resetType }) });
@@ -1224,6 +1224,10 @@ export default function AdminPage() {
               <option value="scores">🔄 Reset punteggi (tutti i voti)</option>
               <option value="full">⚠️ Reset completo</option>
             </select>
+            <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 10, marginBottom: 0 }}>
+              <strong>Oggi</strong>: voti di oggi (persone e QR). <strong>Punteggi</strong>: tutti i voti. <strong>Completo</strong>: tutti i voti e le ricariche di coins riscattate.
+              Nessun reset tocca utenti, QR, <strong>bonus nascosti e premi palesi</strong>: per azzerare davvero la classifica eliminali dalla scheda 🎁 Bonus.
+            </p>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button onClick={handleReset} style={{ padding: "8px 16px", background: "#dc3545", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>Conferma</button>
               <button onClick={() => setShowResetModal(false)} style={{ padding: "8px 16px", background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Annulla</button>
