@@ -20,7 +20,7 @@ export default function SiteRanking() {
         myRow && {
           label: "La tua sede",
           rank: myIndex + 1,
-          detail: `${myRow.site} · media ${myRow.average.toFixed(1)} (${myRow.points} punti / ${myRow.classCount} classi)`,
+          detail: `${myRow.site} · media ${myRow.average.toFixed(1)} (${myRow.points} punti / ${myRow.classCount} ${myRow.classCount === 1 ? "classe" : "classi"})`,
         }
       }
       empty={rows.length === 0 ? { text: "Nessuna sede con classi registrate." } : null}
@@ -35,7 +35,7 @@ export default function SiteRanking() {
           value={r.average.toFixed(1)}
         >
           {i + 1}. {r.site}
-          <span style={{ color: "#999", fontWeight: 400, fontSize: "0.75rem" }}> ({r.classCount} classi)</span>
+          <span style={{ color: "#999", fontWeight: 400, fontSize: "0.75rem" }}> ({r.classCount} {r.classCount === 1 ? "classe" : "classi"})</span>
         </RankingRow>
       ))}
     </RankingScreen>

@@ -177,7 +177,7 @@ export default function Tabellone() {
                 <div key={s.site} style={rowStyle}>
                   <strong style={{ width: "3.5vw", minWidth: 40 }}>{s.rank}.</strong>
                   <span style={{ flex: 1 }}>{s.site}</span>
-                  <span style={{ opacity: 0.7, fontSize: "0.7em" }}>{s.points} punti / {s.classCount} classi</span>
+                  <span style={{ opacity: 0.7, fontSize: "0.7em" }}>{s.points} punti / {s.classCount} {s.classCount === 1 ? "classe" : "classi"}</span>
                   <strong>{s.average.toFixed(1)}</strong>
                 </div>
               ))}
