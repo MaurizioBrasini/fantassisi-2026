@@ -76,7 +76,7 @@ export function PermissionsHelp({ inAppBrowser, isRicarica }: { inAppBrowser: st
       </p>
       <p style={{ color: "#666", fontSize: "0.78rem" }}>(Su iPhone, usando Chrome invece di Safari, il permesso si trova come su Android: tocca l&apos;icona accanto all&apos;indirizzo.)</p>
 
-      <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il PIN: {isRicarica ? "ricarica" : "vota"} comunque, senza bisogno della fotocamera.</p>
+      <p style={{ margin: 0, color: "#666" }}>Se proprio nessuna di queste funziona, usa il codice: {isRicarica ? "ricarica" : "vota"} comunque, senza bisogno della fotocamera.</p>
     </div>
   );
 }

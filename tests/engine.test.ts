@@ -100,6 +100,17 @@ test("bonus nascosto: tutti i punti assegnati, mai più di 4 a persona", () => {
   }
 });
 
+test("bonus nascosto enorme (99.999 punti): tutti i punti, poche migliaia di righe", () => {
+  const people = Array.from({ length: 480 }, (_, i) => "p" + i);
+  const { allocations, peoplePoints, teamPoints } = planBoost(people, 99999, 0, 60_000);
+  assert.equal(peoplePoints + teamPoints, 99999);
+  assert.equal(allocations.reduce((s, a) => s + a.points, 0), 99999);
+  assert.ok(allocations.length < 3000, `righe: ${allocations.length}`);
+  // i bonus normali restano a pezzi da 1-2 punti
+  const small = planBoost(people, 500, 0, 60_000).allocations.filter((a) => !a.user_id);
+  assert.ok(small.every((a) => a.points <= 2));
+});
+
 test("PIN generati: mai 1212/3434 se riservati, mai ripetuti", () => {
   const used = new Set(["1212", "3434", "0001"]);
   const pins = generateUniquePins(500, used);

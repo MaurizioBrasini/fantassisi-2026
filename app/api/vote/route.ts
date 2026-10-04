@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "QR non riconosciuto: non è un QR di FantAssisi" }, { status: 404 });
   }
   if (!recipientId && !pin) {
-    return NextResponse.json({ error: "PIN non valido" }, { status: 404 });
+    return NextResponse.json({ error: "Codice non valido" }, { status: 404 });
   }
 
   // Una azione di voto alla volta per persona: vedi lib/userLock.ts.
@@ -42,7 +42,7 @@ async function voteForPerson(voterId: string, bodyRecipientId: string | null, pi
   if (!recipientId && pin) {
     const { data: byPin } = await supabase.from("users").select("id").eq("pin", String(pin)).maybeSingle();
     if (!byPin) {
-      return NextResponse.json({ error: "PIN non valido" }, { status: 404 });
+      return NextResponse.json({ error: "Codice non valido" }, { status: 404 });
     }
     recipientId = byPin.id;
   }
@@ -56,7 +56,7 @@ async function voteForPerson(voterId: string, bodyRecipientId: string | null, pi
     // Errore frequente in collaudo: la gente inserisce il PROPRIO PIN invece
     // di quello della persona che vuole votare. Messaggio mirato per questo caso.
     const message = votingViaPin
-      ? "Hai inserito il TUO PIN. Devi inserire il PIN della persona che vuoi votare, non il tuo."
+      ? "Hai inserito il TUO codice. Devi inserire il codice della persona che vuoi votare, non il tuo."
       : "Non puoi votare te stesso";
     return NextResponse.json({ error: message }, { status: 400 });
   }

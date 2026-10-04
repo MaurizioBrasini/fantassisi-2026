@@ -23,7 +23,7 @@ export async function qrWithPinImage(qrDataUrl: string, heading: string, pin: st
   if (pin) {
     ctx.fillStyle = "#666666";
     ctx.font = "26px system-ui, sans-serif";
-    ctx.fillText("Oppure vota con il PIN", canvas.width / 2, head + qr + 50);
+    ctx.fillText("Oppure vota con il codice", canvas.width / 2, head + qr + 50);
     ctx.fillStyle = "#1E3A5F";
     ctx.font = "800 96px system-ui, sans-serif";
     ctx.fillText(pin.split("").join(" "), canvas.width / 2, head + qr + 150);

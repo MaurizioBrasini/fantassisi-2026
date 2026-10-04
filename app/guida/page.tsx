@@ -36,7 +36,7 @@ export default function GuidaPage() {
       <p style={{ lineHeight: 1.5 }}>Per votare un collega o un QR basta inquadrarlo. Il modo che non chiede nessun permesso:</p>
       <NativeCameraHelp isRicarica={false} />
       <p style={{ lineHeight: 1.5 }}>
-        Sotto ogni QR c&apos;è anche un <strong>PIN a 4 cifre</strong>: se non riesci a inquadrare, nella pagina «Vota» scrivi il PIN della persona che vuoi votare.
+        Sotto ogni QR c&apos;è anche un <strong>codice a 4 cifre</strong>: se non riesci a inquadrare, nella pagina «Vota» scrivi il codice della persona che vuoi votare.
       </p>
 
       <h2 style={heading}>3. Se la fotocamera dell&apos;app non si accende</h2>

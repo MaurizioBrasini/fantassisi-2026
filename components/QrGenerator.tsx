@@ -208,7 +208,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
 
       {duplicate && (
         <p style={{ marginBottom: 0, color: "#b45309", fontWeight: 600 }}>
-          ⚠️ Esiste già: «{duplicate.title || duplicate.detail}» (PIN {duplicate.pin}). Non si crea due volte.{" "}
+          ⚠️ Esiste già: «{duplicate.title || duplicate.detail}» (codice {duplicate.pin}). Non si crea due volte.{" "}
           <button onClick={() => show(duplicate, "È già stato creato: ecco quello esistente.")} style={{ cursor: "pointer" }}>Mostra</button>
         </p>
       )}
@@ -247,7 +247,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
           <thead>
             <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
-              <th style={{ padding: 6 }}>Tipo</th><th style={{ padding: 6 }}>QR</th><th style={{ padding: 6 }}>PIN</th><th style={{ padding: 6 }}>Stato</th><th style={{ padding: 6 }}></th>
+              <th style={{ padding: 6 }}>Tipo</th><th style={{ padding: 6 }}>QR</th><th style={{ padding: 6 }}>Codice</th><th style={{ padding: 6 }}>Stato</th><th style={{ padding: 6 }}></th>
             </tr>
           </thead>
           <tbody>

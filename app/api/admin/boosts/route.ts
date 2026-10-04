@@ -10,7 +10,7 @@ import { asUuid, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
 
-const MAX_POINTS = 10000;
+const MAX_POINTS = 99999; // numeri a 5 cifre: è anche la scala dei punteggi delle squadre a fine evento
 const MAX_MINUTES = 3 * 24 * 60; // tutta la durata dell'evento
 const MAX_REASON = 120;
 const INSERT_BATCH = 500;

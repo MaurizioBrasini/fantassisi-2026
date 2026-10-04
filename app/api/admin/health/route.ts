@@ -69,7 +69,7 @@ export async function GET() {
       const rows = events.filter((e: any) => e.qr_type === "team" && e.team_target === team);
       const fixed = rows.find((e: any) => e.pin === TEAM_PINS[team]);
       add("QR", `squadra ${team}`, rows.length === 1 && fixed && fixed.active !== false ? "ok" : "error",
-        rows.length === 0 ? "nessun QR di squadra" : rows.length > 1 ? `${rows.length} QR di squadra (ne serve uno)` : !fixed ? `PIN diverso da ${TEAM_PINS[team]}: eseguire sql/06` : fixed.active === false ? "QR disattivato" : `PIN ${fixed.pin}, attivo`);
+        rows.length === 0 ? "nessun QR di squadra" : rows.length > 1 ? `${rows.length} QR di squadra (ne serve uno)` : !fixed ? `codice diverso da ${TEAM_PINS[team]}: eseguire sql/06` : fixed.active === false ? "QR disattivato" : `codice ${fixed.pin}, attivo`);
     }
     const classes = events.filter((e: any) => e.qr_type === "class");
     const seen = new Map<string, number>();

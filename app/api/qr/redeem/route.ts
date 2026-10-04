@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const code = asShortText(body.code);
   const pin = asPin(body.pin);
   if (!code && !pin) {
-    return NextResponse.json({ error: body.code !== undefined ? "QR non valido o già utilizzato" : "PIN non valido" }, { status: 404 });
+    return NextResponse.json({ error: body.code !== undefined ? "QR non valido o già utilizzato" : "Codice non valido" }, { status: 404 });
   }
 
   const supabase = getSupabaseAdmin();
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   if (!result) {
     return NextResponse.json(
-      { error: pin ? "PIN non valido" : "QR non valido o già utilizzato" },
+      { error: pin ? "Codice non valido" : "QR non valido o già utilizzato" },
       { status: 404 }
     );
   }

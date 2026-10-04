@@ -94,6 +94,9 @@ export function addBoostsToScores(
 /** Una riga del piano: a una persona, oppure solo alla squadra (user_id nullo). */
 export type PlannedAllocation = { user_id: string | null; points: number; at: string };
 
+/** Righe "solo squadra" oltre le quali i pezzi diventano più grandi di 1-2 punti (bonus enormi). */
+const MAX_TEAM_ROWS = 2000;
+
 /** Quota dei punti che va solo alla squadra: tra il 20% e il 25%, come i voti ai QR di squadra. */
 const TEAM_ONLY_SHARE = { min: 0.2, max: 0.25 };
 
@@ -140,10 +143,13 @@ export function planBoost(
   }
 
   // Solo squadra: la quota voluta più l'eventuale avanzo che le persone non hanno potuto prendere.
+  // Pezzi da 1-2 punti come i voti ai QR; per bonus molto grandi i pezzi crescono (al massimo circa
+  // MAX_TEAM_ROWS righe), altrimenti 99.999 punti sarebbero ~65.000 righe da scrivere e da sommare.
   let teamRemaining = wantedTeamOnly + peopleBudget;
   const teamPoints = teamRemaining;
+  const maxPiece = Math.max(2, Math.ceil((teamRemaining * 2) / MAX_TEAM_ROWS)); // pezzo medio ≈ punti / righe
   while (teamRemaining > 0) {
-    const points = Math.min(teamRemaining, 1 + Math.floor(random() * 2)); // 1 o 2, come i voti ai QR
+    const points = Math.min(teamRemaining, 1 + Math.floor(random() * maxPiece));
     allocations.push({ user_id: null, points, at: randomTime() });
     teamRemaining -= points;
   }

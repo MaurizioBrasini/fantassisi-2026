@@ -106,7 +106,7 @@ export default function MyQRPage() {
           ctx.fillStyle = "#666666";
           ctx.font = "16px system-ui, sans-serif";
           ctx.textAlign = "center";
-          ctx.fillText("Se non riesce a scansionare, vota con il PIN:", centerX, padding + qrSize + 32);
+          ctx.fillText("Se non riesce a scansionare, vota con il codice:", centerX, padding + qrSize + 32);
 
           ctx.fillStyle = "#1E3A5F";
           ctx.font = "800 40px system-ui, sans-serif";
@@ -197,7 +197,7 @@ export default function MyQRPage() {
 
           {myPin && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: "0.75rem", color: "#666" }}>Se non riesce a scansionare, può votarti con il tuo PIN:</div>
+              <div style={{ fontSize: "0.75rem", color: "#666" }}>Se non riesce a scansionare, può votarti con il tuo codice:</div>
               <div style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: 6, color: "#1E3A5F", marginTop: 4 }}>{myPin}</div>
             </div>
           )}

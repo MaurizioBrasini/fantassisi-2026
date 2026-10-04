@@ -44,7 +44,7 @@ function buildQrWithPin(qrDataUrl: string, pin?: string | null): Promise<string>
       ctx.fillStyle = "#666666";
       ctx.font = "18px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Se non riesce a scansionare, vota/riscatta col PIN:", centerX, padding + qrSize + 36);
+      ctx.fillText("Se non riesce a scansionare, vota/riscatta con il codice:", centerX, padding + qrSize + 36);
 
       ctx.fillStyle = "#1E3A5F";
       ctx.font = "800 46px system-ui, sans-serif";
@@ -1202,7 +1202,7 @@ export default function AdminPage() {
                 <img src={previewQR} alt="QR" style={{ width: 200, height: 200, margin: "12px auto", display: "block", borderRadius: 8 }} />
                 {previewPin && (
                   <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 4 }}>
-                    PIN: <strong style={{ fontSize: "1.3rem", letterSpacing: 4, color: "#1E3A5F" }}>{previewPin}</strong>
+                    Codice: <strong style={{ fontSize: "1.3rem", letterSpacing: 4, color: "#1E3A5F" }}>{previewPin}</strong>
                   </p>
                 )}
                 <button onClick={() => downloadQR(previewCode, previewLabel, previewPin)} style={{ padding: "10px 20px", background: "#FF6B35", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>

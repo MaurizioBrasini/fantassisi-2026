@@ -37,7 +37,7 @@ function QrCard({ label, heading, qr, filename }: { label: string; heading: stri
       )}
       {qr.pin && (
         <div style={{ marginTop: 6 }}>
-          <div style={{ fontSize: "0.75rem", color: "#666" }}>PIN</div>
+          <div style={{ fontSize: "0.75rem", color: "#666" }}>Codice</div>
           <div style={{ fontSize: "2rem", fontWeight: 800, letterSpacing: 6, color: "#1E3A5F" }}>{qr.pin}</div>
         </div>
       )}

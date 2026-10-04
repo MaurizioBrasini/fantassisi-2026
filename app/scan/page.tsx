@@ -108,7 +108,9 @@ function ScanPageInner() {
         router.push("/");
         return;
       }
-      if (data.error !== "PIN non valido") {
+      // 404 = il codice non è di nessuna persona: si prova come codice di un QR (squadra, classe,
+      // ricarica). Si decide dal codice di risposta, non dal testo del messaggio.
+      if (res.status !== 404) {
         alert(data.error || "Errore nel voto");
         router.push("/");
         return;
@@ -121,7 +123,7 @@ function ScanPageInner() {
       });
       const data2 = await res2.json();
       if (!res2.ok) {
-        alert(data2.error || "PIN non valido");
+        alert(data2.error || "Codice non valido");
         router.push("/");
         return;
       }
@@ -594,19 +596,19 @@ function ScanPageInner() {
       {!scanning && (
         <div style={{ marginTop: 20, background: "#f8f9fa", borderRadius: 12, padding: 16, textAlign: "left" }}>
           <p style={{ margin: "0 0 8px", fontSize: "0.9rem", fontWeight: 700, color: "#1E3A5F" }}>
-            {isRicarica ? "🔢 Ricarica col PIN" : "🔢 Vota col PIN"}
+            {isRicarica ? "🔢 Ricarica con il codice" : "🔢 Vota con il codice"}
           </p>
           {isRicarica ? (
             <p style={{ margin: "0 0 10px", fontSize: "0.8rem", color: "#333" }}>
-              Inserisci il PIN del bonus ricarica (lo trovi scritto sotto il QR):
+              Inserisci il codice del bonus ricarica (lo trovi scritto sotto il QR):
             </p>
           ) : (
             <>
               <p style={{ margin: "0 0 4px", fontSize: "0.8rem", color: "#333" }}>
-                Inserisci il PIN della persona che vuoi votare (ce l'ha scritto sotto il suo QR):
+                Inserisci il codice della persona che vuoi votare (ce l'ha scritto sotto il suo QR):
               </p>
               <p style={{ margin: "0 0 10px", fontSize: "0.76rem", fontWeight: 700, color: "#dc3545" }}>
-                ⚠️ È il PIN di chi vuoi votare, non il tuo!
+                ⚠️ È il codice di chi vuoi votare, non il tuo!
               </p>
             </>
           )}
@@ -617,7 +619,7 @@ function ScanPageInner() {
               inputMode="numeric"
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
-              placeholder={isRicarica ? "PIN del bonus ricarica" : "PIN di chi vuoi votare"}
+              placeholder={isRicarica ? "Codice del bonus ricarica" : "Codice di chi vuoi votare"}
               style={{ flex: 1, padding: 10, borderRadius: 8, border: "1px solid #ccc", fontSize: "1.1rem", letterSpacing: 2 }}
             />
             <button

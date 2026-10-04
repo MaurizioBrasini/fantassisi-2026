@@ -412,7 +412,7 @@ export async function POST(request: Request) {
     const clashPin = u.pin ? pinOwner.get(u.pin) : undefined;
     if (clashPin) {
       return NextResponse.json(
-        { message: `Import annullato: il PIN di ${clashPin} coincide con quello di un altro utente. Non è stato modificato nulla.` },
+        { message: `Import annullato: il codice di voto di ${clashPin} coincide con quello di un altro utente. Non è stato modificato nulla.` },
         { status: 409 }
       );
     }
