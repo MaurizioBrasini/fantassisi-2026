@@ -14,6 +14,7 @@ import { canonClass, sameClass } from "../lib/classKey";
 import { asPin, asUuid, asShortText } from "../lib/http";
 import { withLock } from "../lib/userLock";
 import { generateUniquePins } from "../lib/utils";
+import { cooldownMinutes } from "../lib/qrActions";
 
 const user = (id: string, team: string | null, school: string | null, site: string | null, year: string | null) => ({
   id, first_name: id, last_name: "", team, school, site, year,
@@ -113,6 +114,17 @@ test("input dall'esterno: PIN, uuid e codici fuori formato sono scartati", () =>
   assert.equal(asUuid("20565f48-56eb-44a8-ad19-1ceb37827fee"), "20565f48-56eb-44a8-ad19-1ceb37827fee");
   assert.equal(asUuid("' or 1=1 --"), null);
   assert.equal(asShortText("x".repeat(121)), null);
+});
+
+test("attese di rivoto: squadra 15 min (5 durante il karaoke), classe 1 ora", () => {
+  const at = (iso: string) => Date.parse(iso);
+  // sabato 17 ottobre 2026: karaoke 16:00-19:00 ora italiana = 14:00-17:00 UTC
+  assert.equal(cooldownMinutes("team", at("2026-10-17T13:59:00Z")), 15);
+  assert.equal(cooldownMinutes("team", at("2026-10-17T14:00:00Z")), 5);
+  assert.equal(cooldownMinutes("team", at("2026-10-17T16:59:00Z")), 5);
+  assert.equal(cooldownMinutes("team", at("2026-10-17T17:00:00Z")), 15);
+  assert.equal(cooldownMinutes("class", at("2026-10-17T15:00:00Z")), 60);
+  assert.equal(cooldownMinutes("class", at("2026-10-16T10:00:00Z")), 60);
 });
 
 test("azioni di voto della stessa persona: una alla volta", async () => {

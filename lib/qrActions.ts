@@ -5,6 +5,7 @@ import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "./coins";
 import { getVotingPhase, votingClosedMessage } from "./phase";
 import { withLock } from "./userLock";
 import { canonYear } from "./classKey";
+import { KARAOKE_START_ISO, KARAOKE_END_ISO } from "./karaoke";
 
 // Le due azioni che si fanno con un QR/PIN di evento o di bonus. Prima esistevano due copie
 // (una in /api/event-vote e /api/bonus-redeem, una in /api/qr/redeem): ora c'è un solo codice,
@@ -26,8 +27,17 @@ const TEAMS = ["Matricole", "Veterani"];
 // Attesa tra due voti della stessa persona allo stesso QR/PIN. Persone (/api/vote): una al giorno.
 /** QR/PIN di squadra (nelle slides di tutti): ogni 15 minuti. */
 export const TEAM_QR_COOLDOWN_MIN = 15;
+/** QR/PIN di squadra durante la sfida karaoke (4 manche: si vota la squadra a ogni manche): ogni 5 minuti. */
+export const TEAM_QR_COOLDOWN_KARAOKE_MIN = 5;
 /** QR/PIN di classe (e sede): ogni ora. */
 export const CLASS_QR_COOLDOWN_MIN = 60;
+
+/** Minuti di attesa per rivotare lo stesso QR, in base al tipo e al momento (fascia karaoke: lib/karaoke.ts). */
+export function cooldownMinutes(qrType: string | null | undefined, nowMs: number = Date.now()): number {
+  if (qrType !== "team") return CLASS_QR_COOLDOWN_MIN;
+  const inKaraoke = nowMs >= Date.parse(KARAOKE_START_ISO) && nowMs < Date.parse(KARAOKE_END_ISO);
+  return inKaraoke ? TEAM_QR_COOLDOWN_KARAOKE_MIN : TEAM_QR_COOLDOWN_MIN;
+}
 
 /** Riscatta un QR bonus (CBT coins extra). Una azione alla volta per persona (vedi lib/userLock.ts). */
 export function redeemBonusQr(supabase: SupabaseClient, userId: string, bonus: any): Promise<ActionResult> {
@@ -89,7 +99,7 @@ async function castEventVoteUnlocked(supabase: SupabaseClient, userId: string, e
   if (existing) {
     // Lo stesso QR si può rivotare dopo un'attesa che dipende dal tipo (serve aver tolto l'indice
     // univoco su event_votes: sql/04_event_votes_cooldown.sql).
-    const cooldownMin = event.qr_type === "team" ? TEAM_QR_COOLDOWN_MIN : CLASS_QR_COOLDOWN_MIN;
+    const cooldownMin = cooldownMinutes(event.qr_type);
     const waitMs = Date.parse(existing.voted_at) + cooldownMin * 60_000 - Date.now();
     if (waitMs > 0) {
       const what = event.qr_type === "team" ? "la squadra" : "questa classe";

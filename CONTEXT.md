@@ -15,7 +15,7 @@ Questo documento descrive l'intero progetto da zero, non solo le ultime modifich
 | Regola | Dove |
 |---|---|
 | Voto a una persona: 2 punti tra Matricole e Veterani, 1 altrimenti; una volta al giorno per persona; i docenti non si votano | `app/api/vote/route.ts` + indice `idx_one_vote_per_day` |
-| Voto a un QR di squadra/classe: stessi punti; rivoto dopo 15 min (squadra) o 1 ora (classe) | `lib/qrActions.ts` |
+| Voto a un QR di squadra/classe: stessi punti; rivoto dopo 15 min (squadra; **5 min durante la sfida karaoke**, sabato 17 ottobre 16-19, 4 manche) o 1 ora (classe) | `cooldownMinutes` in `lib/qrActions.ts` |
 | PIN fissi dei QR di squadra: 1212 Matricole, 3434 Veterani | `TEAM_PINS` in `lib/pins.ts` |
 | CBT coins: 20 al giorno, dal 16 ottobre si accumulano; ricariche con QR | `lib/coins.ts` |
 | Fase Anteprima / Voto aperto | `lib/phase.ts` (tabella `app_settings`) |
