@@ -376,7 +376,7 @@ function DashboardDidatti({ userName, userId, userRole, votingOpen, opensAtLabel
       {votingOpen ? (
         <VoteButton />
       ) : (
-        <p style={{ textAlign: "center", color: "#666", fontSize: "0.9rem" }}>Il voto si apre {opensAtLabel}.</p>
+        <p style={{ textAlign: "center", color: "#666", fontSize: "0.9rem" }}>{opensAtLabel.charAt(0).toUpperCase() + opensAtLabel.slice(1)} inizia il gioco vero e proprio: potrai votare e farti votare!</p>
       )}
 
       {/* Bottone arruolamento */}

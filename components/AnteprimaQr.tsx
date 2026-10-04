@@ -69,12 +69,12 @@ export default function AnteprimaQr({ opensAtLabel }: { opensAtLabel: string }) 
       <div style={{ background: "linear-gradient(135deg, #FF6B35, #1E3A5F)", color: "white", borderRadius: 16, padding: 16, textAlign: "center", marginBottom: 16 }}>
         <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>Anteprima FantAssisi</div>
         <div style={{ fontSize: "0.85rem", marginTop: 4 }}>
-          Il voto si apre {opensAtLabel}. Intanto metti il QR della tua squadra e della tua classe nelle slides della tua relazione: chi lo scansiona vota per voi.
+          {opensAtLabel.charAt(0).toUpperCase() + opensAtLabel.slice(1)} inizia il gioco vero e proprio e si sbloccheranno nuove funzioni: potrai votare e farti votare! Intanto metti il QR della tua squadra e della tua classe nelle slides della tua relazione: da quel momento chi lo scansiona vota per voi.
         </div>
       </div>
       {failed && <p style={{ textAlign: "center", color: "#666" }}>Non riesco a caricare i QR. Riprova tra poco.</p>}
       {data?.team && <QrCard label="QR della tua squadra" heading={data.team.title || "Squadra"} qr={data.team} filename="QR_squadra.png" />}
-      {data?.class && <QrCard label="QR della tua classe" heading={data.className} qr={data.class} filename="QR_classe.png" />}
+      {data?.class && <QrCard label="QR della tua classe" heading={`Vota ${data.className}`} qr={data.class} filename="QR_classe.png" />}
       {data && !data.class && (
         <p style={{ textAlign: "center", color: "#666", fontSize: "0.85rem" }}>
           Il QR di classe non è disponibile: nel tuo profilo mancano scuola, sede o anno.

@@ -46,7 +46,7 @@ export async function GET() {
   let classLabel = "";
   if (user.school && user.site && user.year) {
     const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === user.year)?.label || user.year;
-    classLabel = `${user.school} · ${user.site} · ${yearLabel}`;
+    classLabel = `${user.school} ${user.site} ${yearLabel}`;
 
     const findClass = async () => {
       const { data } = await supabase
