@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { getVerifiedUserId } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin, TEAM_PINS } from "@/lib/pins";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { CLASS_YEARS, teamForYear, yearLabel } from "@/lib/config";
 import { canonClass, sameClass } from "@/lib/classKey";
 import { withLock } from "@/lib/userLock";
 
@@ -13,7 +13,6 @@ export const revalidate = 0;
 type EventRow = { id: string; title: string | null; qr_code: string; pin: string | null; created_at: string };
 const FIELDS = "id, title, qr_code, pin, created_at";
 
-const CLASS_YEARS = ["primo", "secondo", "terzo", "quarto"];
 
 // I QR di classe sono pochi (una cinquantina): si leggono tutti e si cercano con il confronto che
 // ignora la grafia (anno "4° ANNO 2026" o "quarto", scuola "CCMA Marco Aurelio" o "CCMA", ...).
@@ -69,8 +68,7 @@ export async function GET() {
   let classLabel = "";
   const mine = canonClass(user.school, user.site, user.year);
   if (mine.school && mine.site && mine.year && CLASS_YEARS.includes(mine.year)) {
-    const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === mine.year)?.label || mine.year;
-    classLabel = `${mine.school} ${mine.site} ${yearLabel}`;
+    classLabel = `${mine.school} ${mine.site} ${yearLabel(mine.year)}`;
 
     let rows = await findClassEvents(mine);
     if (rows.length === 0) {
@@ -79,7 +77,7 @@ export async function GET() {
         classCache = null;
         const again = await findClassEvents(mine);
         if (again.length > 0) return again;
-        const teamTarget = (CONFIG_ISCRIZIONE.teamAnniValid.Matricole as string[]).includes(mine.year!) ? "Matricole" : "Veterani";
+        const teamTarget = teamForYear(mine.year as string);
         const { error } = await supabase.from("votable_events").insert({
           title: classLabel,
           qr_type: "class",

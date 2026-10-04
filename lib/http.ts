@@ -15,6 +15,12 @@ export async function readJsonObject(request: Request): Promise<Record<string, u
 
 export const badRequest = (error = "Richiesta non valida") => NextResponse.json({ error }, { status: 400 });
 
+/** IP di chi chiama (dietro il proxy di Render è il primo di x-forwarded-for), per i limiti di tentativi. */
+export function clientIp(request: Request): string {
+  const fwd = request.headers.get("x-forwarded-for");
+  return (fwd ? fwd.split(",")[0].trim() : "") || request.headers.get("x-real-ip") || "sconosciuto";
+}
+
 /** Un PIN è di 4 cifre. Tutto il resto (lettere, spazi, stringhe lunghissime) non può esistere: si scarta subito. */
 export function asPin(value: unknown): string | null {
   const s = typeof value === "number" ? String(value) : typeof value === "string" ? value.trim() : "";

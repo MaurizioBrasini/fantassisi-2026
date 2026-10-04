@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import QRCode from "qrcode";
-import { CONFIG_ISCRIZIONE, isYearValidForTeam } from "@/lib/config";
+import { CONFIG_ISCRIZIONE, CLASS_YEARS, isYearValidForTeam, teamForYear, yearLabel } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
@@ -11,67 +10,13 @@ import PhaseCard from "@/components/PhaseCard";
 import SystemCheck from "@/components/SystemCheck";
 import { canonClass } from "@/lib/classKey";
 import { uuid } from "@/lib/uuid";
+import { downloadQrImage, qrDataUrl, qrFileName } from "@/lib/qrImage";
 import BonusGenerator from "@/components/BonusGenerator";
 
-function teamFromYear(year: string): string {
-  return CONFIG_ISCRIZIONE.teamAnniValid['Matricole'].includes(year) ? "Matricole" : "Veterani";
-}
 
-// Compone QR + PIN in un'unica immagine scaricabile, stesso schema usato per
-// il QR personale (myqr): chi non riesce a scansionare può comunque votare/
-// riscattare inserendo a mano il PIN stampato sotto.
-function buildQrWithPin(qrDataUrl: string, pin?: string | null): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!pin) { resolve(qrDataUrl); return; }
-    const qrImg = new Image();
-    qrImg.onload = () => {
-      const qrSize = 400;
-      const padding = 24;
-      const pinBlockHeight = 130;
-      const width = qrSize + padding * 2;
-      const height = qrSize + padding * 2 + pinBlockHeight;
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("Canvas non supportato")); return; }
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
-
-      const centerX = width / 2;
-      ctx.fillStyle = "#666666";
-      ctx.font = "18px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Se non riesce a scansionare, vota/riscatta con il codice:", centerX, padding + qrSize + 36);
-
-      ctx.fillStyle = "#1E3A5F";
-      ctx.font = "800 46px system-ui, sans-serif";
-      ctx.fillText(pin.split("").join("  "), centerX, padding + qrSize + 92);
-
-      resolve(canvas.toDataURL("image/png"));
-    };
-    qrImg.onerror = () => reject(new Error("Impossibile caricare il QR"));
-    qrImg.src = qrDataUrl;
-  });
-}
-
-async function downloadQR(code: string, label: string, pin?: string | null) {
-  const dataUrl = await QRCode.toDataURL(code, {
-    width: 400, margin: 2,
-    color: { dark: "#1E3A5F", light: "#ffffff" },
-  });
-  let finalUrl = dataUrl;
-  try {
-    finalUrl = await buildQrWithPin(dataUrl, pin);
-  } catch (err) {
-    console.error("Errore generazione immagine QR+PIN, scarico solo il QR:", err);
-  }
-  const link = document.createElement("a");
-  link.href = finalUrl;
-  link.download = `QR_${label.replace(/\s+/g, "_")}.png`;
-  link.click();
+// Scarica il QR di un evento o di una ricarica: titolo + QR + codice (lib/qrImage.ts).
+function downloadQR(code: string, label: string, pin?: string | null) {
+  return downloadQrImage(code, label, pin ?? null, qrFileName(label), "Se non riesce a scansionare, vota o ricarica con il codice");
 }
 
 // Componente per la selezione della scuola con input custom
@@ -235,7 +180,7 @@ function UserFormFields({ form, setForm, isSuper, validYears, suggestedSchools, 
       {/* Avviso se anno non valido per il team */}
       {form.team && form.year && !isYearValidForTeam(form.team, form.year) && (
         <p style={{ color: "#dc3545", fontSize: "0.8rem", marginTop: 4 }}>
-          ⚠️ L'anno "{CONFIG_ISCRIZIONE.anni.find((a) => a.value === form.year)?.label}" non è valido per {form.team}.
+          ⚠️ L'anno "{yearLabel(form.year)}" non è valido per {form.team}.
         </p>
       )}
     </>
@@ -382,7 +327,7 @@ export default function AdminPage() {
     for (const u of allUsersData) {
       // Solo classi vere: studenti in corso (1°-4° anno), con scuola/sede/anno nella forma standard.
       const c = canonClass(u.school, u.site, u.year);
-      if (c.school && c.site && c.year && ["primo", "secondo", "terzo", "quarto"].includes(c.year)) {
+      if (c.school && c.site && c.year && CLASS_YEARS.includes(c.year)) {
         const key = `${c.school}||${c.site}||${c.year}`;
         if (!classiSet.has(key)) classiSet.set(key, { school: c.school, site: c.site, year: c.year });
       }
@@ -517,7 +462,7 @@ export default function AdminPage() {
       insertData = {
         title: qrClasseForm.title || label,
         qr_type: "class",
-        team_target: teamFromYear(qrClasseForm.year),
+        team_target: teamForYear(qrClasseForm.year),
         class_school: qrClasseForm.school,
         class_site: qrClasseForm.site,
         class_year: qrClasseForm.year,
@@ -543,10 +488,7 @@ export default function AdminPage() {
 
     const createdPin: string | null = resData.event?.pin || resData.bonus?.pin || null;
 
-    const dataUrl = await QRCode.toDataURL(qrCode, {
-      width: 300, margin: 2,
-      color: { dark: "#1E3A5F", light: "#ffffff" },
-    });
+    const dataUrl = await qrDataUrl(qrCode, 300);
     setPreviewQR(dataUrl);
     setPreviewLabel(label);
     setPreviewCode(qrCode);
@@ -618,7 +560,7 @@ export default function AdminPage() {
     
     // Validazione Team ↔ Anno
     if (userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year)) {
-      setMessage(`❌ L'anno "${CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per ${userForm.team}`);
+      setMessage(`❌ L'anno "${yearLabel(userForm.year)}" non è valido per ${userForm.team}`);
       return;
     }
     
@@ -668,7 +610,7 @@ export default function AdminPage() {
   const handleEditUser = async () => {
     // Validazione Team ↔ Anno
     if (userForm.team && userForm.year && !isYearValidForTeam(userForm.team, userForm.year)) {
-      setMessage(`❌ L'anno "${CONFIG_ISCRIZIONE.anni.find(a => a.value === userForm.year)?.label}" non è valido per ${userForm.team}`);
+      setMessage(`❌ L'anno "${yearLabel(userForm.year)}" non è valido per ${userForm.team}`);
       return;
     }
     
@@ -1071,7 +1013,7 @@ export default function AdminPage() {
             <tbody>
               {filteredUsers.map((u) => {
                 const isProtected = u.email === "mabras69@gmail.com";
-                const yearLabel = u.year ? CONFIG_ISCRIZIONE.anni.find(a => a.value === u.year)?.label || u.year : "-";
+                const yearText = u.year ? yearLabel(u.year) : "-";
                 return (
                   <tr key={u.id} style={{ borderBottom: "1px solid #eee" }}>
                     {isSuper && (
@@ -1104,7 +1046,7 @@ export default function AdminPage() {
                     </td>
                     <td style={{ padding: 8 }}>{u.site || "-"}</td>
                     <td style={{ padding: 8 }}>{u.school || "-"}</td>
-                    <td style={{ padding: 8 }}>{yearLabel}</td>
+                    <td style={{ padding: 8 }}>{yearText}</td>
                     <td style={{ textAlign: "center", padding: 8 }}>
                       <button onClick={() => openEditModal(u)} style={{ padding: "4px 8px", marginRight: 4, background: "#ffc107", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Modifica">✏️</button>
                       <button onClick={() => { navigator.clipboard.writeText(personalLink(u.auth_token)); showToast(`📋 Link copiato per ${u.first_name} ${u.last_name}`); }} style={{ padding: "4px 8px", marginRight: 4, background: "#17a2b8", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.8rem" }} title="Copia link">📋</button>
@@ -1164,13 +1106,13 @@ export default function AdminPage() {
                   <option value="">Seleziona una classe...</option>
                   {classiDisponibili.map((c) => (
                     <option key={`${c.school}||${c.site}||${c.year}`} value={`${c.school}||${c.site}||${c.year}`}>
-                      {c.school} {c.site} – {CONFIG_ISCRIZIONE.anni.find((a) => a.value === c.year)?.label || c.year}
+                      {c.school} {c.site} – {yearLabel(c.year)}
                     </option>
                   ))}
                 </select>
                 {qrClasseForm.year && (
                   <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 8 }}>
-                    Team assegnato: <strong>{teamFromYear(qrClasseForm.year)}</strong>. I voti aggiornano anche la classifica per sede.
+                    Team assegnato: <strong>{teamForYear(qrClasseForm.year)}</strong>. I voti aggiornano anche la classifica per sede.
                   </p>
                 )}
               </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { romeLocalToUTCISO } from "./utils";
+import { formatRomeDateTime, romeLocalToUTCISO } from "./utils";
 
 // Fase del gioco: ANTEPRIMA (si vedono QR e PIN, non si può votare) oppure VOTO APERTO.
 // L'interruttore sta nel pannello admin (tabella app_settings, chiave "voting_phase"):
@@ -49,17 +49,8 @@ export async function getVotingPhase(): Promise<VotingPhase> {
   return { open, mode, opensAt: VOTE_OPEN_AT };
 }
 
-const OPENS_LABEL = new Intl.DateTimeFormat("it-IT", {
-  timeZone: "Europe/Rome",
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
 export const votingClosedMessage = (phase: VotingPhase) =>
-  `Il voto non è ancora aperto: si apre ${OPENS_LABEL.format(new Date(phase.opensAt))}.`;
+  `Il voto non è ancora aperto: si apre ${formatRomeDateTime(phase.opensAt)}.`;
 
 /** Se il voto è chiuso restituisce la risposta 403 da dare; altrimenti null. */
 export async function votingClosedResponse(): Promise<NextResponse | null> {

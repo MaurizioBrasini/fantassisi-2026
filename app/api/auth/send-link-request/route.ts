@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
+import { clientIp } from "@/lib/http";
 import { sendInviteEmail } from "@/lib/email";
 import { personalLink } from "@/lib/urls";
 import { isBlocked, registerFailure } from "@/lib/rateLimit";
@@ -14,11 +15,6 @@ const MAX_PER_EMAIL_PER_DAY = 3;
 
 const OK_MESSAGE =
   "Se la mail è tra gli iscritti, tra poco riceverai il link personale. Controlla anche la cartella spam.";
-
-function clientIp(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for");
-  return (fwd ? fwd.split(",")[0].trim() : "") || request.headers.get("x-real-ip") || "sconosciuto";
-}
 
 export async function POST(request: Request) {
   let body: { email?: unknown };

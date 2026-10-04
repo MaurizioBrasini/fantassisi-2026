@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
+import { clientIp } from "@/lib/http";
 import { applySessionCookies } from "@/lib/session";
 import { phoneLast4 } from "@/lib/phone";
 import { isBlocked, registerFailure, clearFailures } from "@/lib/rateLimit";
@@ -18,11 +19,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const MAX_FAILS_PER_EMAIL_PER_DAY = 20;
 
 const GENERIC_ERROR = "I dati non corrispondono. Controlla la mail con cui ti sei iscritto/a e le ultime 4 cifre del tuo telefono.";
-
-function clientIp(request: Request): string {
-  const fwd = request.headers.get("x-forwarded-for");
-  return (fwd ? fwd.split(",")[0].trim() : "") || request.headers.get("x-real-ip") || "sconosciuto";
-}
 
 function sameDigits(a: string, b: string): boolean {
   const ba = Buffer.from(a);

@@ -4,7 +4,8 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
 import { sameClass, canonClass } from "@/lib/classKey";
-import { validateClass, teamForYear } from "@/lib/publicBonus";
+import { validateClass } from "@/lib/publicBonus";
+import { teamForYear } from "@/lib/config";
 import { asShortText, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";

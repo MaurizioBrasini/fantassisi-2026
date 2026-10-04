@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { CONFIG_ISCRIZIONE } from "./config";
+import { yearLabel } from "./config";
 import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "./coins";
 import { getVotingPhase, votingClosedMessage } from "./phase";
 import { withLock } from "./userLock";
@@ -123,8 +123,7 @@ async function castEventVoteUnlocked(supabase: SupabaseClient, userId: string, e
 
   let message = `✅ +${points} punti per i ${event.team_target || "squadra"}`;
   if (event.qr_type === "class" && event.class_school && event.class_site && event.class_year) {
-    const yearLabel = CONFIG_ISCRIZIONE.anni.find((a) => a.value === canonYear(event.class_year))?.label || event.class_year;
-    message = `✅ +${points} punti per ${event.class_school} ${event.class_site} ${yearLabel}`;
+    message = `✅ +${points} punti per ${event.class_school} ${event.class_site} ${yearLabel(canonYear(event.class_year))}`;
   } else if (event.qr_type === "site" && event.class_site) {
     message = `✅ +${points} punti per ${event.class_site}`;
   }

@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import QRCode from "qrcode";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
-import { classesOfSite, teamForYear, yearLabel } from "@/lib/publicBonus";
-import { qrWithPinImage, downloadDataUrl } from "@/lib/qrImage";
+import { CONFIG_ISCRIZIONE, teamForYear, yearLabel } from "@/lib/config";
+import { classesOfSite } from "@/lib/publicBonus";
+import { downloadDataUrl, downloadQrImage, qrDataUrl, qrFileName, qrWithPinImage } from "@/lib/qrImage";
 import { sameClass, canonYear } from "@/lib/classKey";
 import { uuid } from "@/lib/uuid";
 
@@ -23,12 +22,7 @@ const PILL = (active: boolean) => ({
 const KIND_LABEL: Record<Kind, string> = { class: "🏫 Classe", team: "🏆 Squadra", recharge: "⚡ Ricarica" };
 const PAGE = 25;
 
-const fileName = (t: string) => `QR_${t.replace(/[^A-Za-z0-9À-ɏ]+/g, "_")}.png`;
-
-async function qrImage(row: { qr_code: string; title: string; pin: string | null }): Promise<string> {
-  const src = await QRCode.toDataURL(row.qr_code, { width: 600, margin: 2, color: { dark: "#1E3A5F", light: "#ffffff" } });
-  try { return await qrWithPinImage(src, row.title, row.pin); } catch { return src; } // se il disegno fallisce, il solo QR
-}
+const fileName = qrFileName;
 
 // Generatore di QR per la dashboard staff: classe, squadra e ricarica coins, con l'elenco di quelli
 // che esistono già. Non si può creare un QR che c'è già (lo impone anche il server, con una risposta
@@ -86,7 +80,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
   }, [rows, kind, site, school, year, team, title]);
 
   const show = async (row: Row, note: string) => {
-    const src = await QRCode.toDataURL(row.qr_code, { width: 600, margin: 2, color: { dark: "#1E3A5F", light: "#ffffff" } });
+    const src = await qrDataUrl(row.qr_code);
     setMade({ src, heading: row.title || row.detail, pin: row.pin, filename: fileName(row.title || row.detail), note });
   };
 
@@ -136,7 +130,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
     await loadRows();
   };
 
-  const downloadRow = async (r: Row) => downloadDataUrl(await qrImage({ qr_code: r.qr_code, title: r.title || r.detail, pin: r.pin }), fileName(r.title || r.detail));
+  const downloadRow = (r: Row) => downloadQrImage(r.qr_code, r.title || r.detail, r.pin, fileName(r.title || r.detail));
 
   const toggle = async (r: Row) => {
     const endpoint = r.kind === "recharge" ? "/api/admin/bonus" : "/api/admin/events";

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
-import { qrWithPinImage } from "@/lib/qrImage";
+import { downloadDataUrl, qrDataUrl, qrWithPinImage } from "@/lib/qrImage";
 
 type Qr = { title: string | null; qr_code: string; pin: string | null };
 type Data = { team: Qr | null; class: Qr | null; className: string };
@@ -11,7 +10,7 @@ function QrCard({ label, heading, qr, filename }: { label: string; heading: stri
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    QRCode.toDataURL(qr.qr_code, { width: 600, margin: 2, color: { dark: "#1E3A5F", light: "#ffffff" } })
+    qrDataUrl(qr.qr_code)
       .then(setSrc)
       .catch(() => setSrc(null));
   }, [qr.qr_code]);
@@ -20,10 +19,7 @@ function QrCard({ label, heading, qr, filename }: { label: string; heading: stri
     if (!src) return;
     let href = src;
     try { href = await qrWithPinImage(src, heading, qr.pin); } catch { /* si scarica il solo QR */ }
-    const a = document.createElement("a");
-    a.href = href;
-    a.download = filename;
-    a.click();
+    downloadDataUrl(href, filename);
   };
 
   return (

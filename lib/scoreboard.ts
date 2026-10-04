@@ -1,6 +1,6 @@
 // Dati del tabellone pubblico /tabellone: stessi numeri dell'app perché vengono dallo stesso
 // calcolo (lib/standings.ts), qui solo ridotti a quello che serve allo schermo.
-import { CONFIG_ISCRIZIONE } from "./config";
+import { yearLabel } from "./config";
 import { getStandings, type TeamScores } from "./standings";
 
 type IndividualRow = { rank: number; name: string; team: string | null; points: number };
@@ -30,7 +30,7 @@ export async function computeScoreboard(): Promise<ScoreboardData> {
         rank: r.rank,
         school: r.school,
         site: r.site,
-        yearLabel: CONFIG_ISCRIZIONE.anni.find((a) => a.value === r.year)?.label || r.year,
+        yearLabel: yearLabel(r.year),
         points: r.points,
       })),
     // Nella pagina dell'app la sede ha la posizione dell'indice (nessun pari merito).

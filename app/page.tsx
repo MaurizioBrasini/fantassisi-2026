@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getCachedDashboardScores, setCachedDashboardScores } from "@/lib/utils";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { formatRomeDateTime, getCachedDashboardScores, setCachedDashboardScores } from "@/lib/utils";
+import { CONFIG_ISCRIZIONE, yearLabel } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
@@ -436,7 +436,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
       <p style={{ textAlign: "center", color: "#666", marginTop: -20, marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
         Ciao <strong>{userName || "Partecipante"}</strong> · <TeamIcon team={myTeam} size={16} /> {myTeam || "Team non assegnato"}
-        {myClass && ` · ${CONFIG_ISCRIZIONE.anni.find((a) => a.value === myClass)?.label || myClass}`}
+        {myClass && ` · ${yearLabel(myClass)}`}
       </p>
 
       <ContributionLinks />
@@ -545,7 +545,7 @@ export default function Dashboard() {
       setVotingOpen(me.voting_open !== false);
       if (me.voting_opens_at) {
         setOpensAtLabel(
-          new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(me.voting_opens_at))
+          formatRomeDateTime(me.voting_opens_at)
         );
       }
 

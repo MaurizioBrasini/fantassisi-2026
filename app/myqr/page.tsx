@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import QRCode from "qrcode";
+import { downloadDataUrl, qrDataUrl as makeQrImage, qrFileName, qrWithPinImage } from "@/lib/qrImage";
 import { TeamIcon } from "@/components/TeamIcons";
 import { getCookie } from "@/lib/clientCookies";
 import NoAccess from "@/components/NoAccess";
@@ -62,11 +62,7 @@ export default function MyQRPage() {
       setMyLink(link);
 
       try {
-        const qr = await QRCode.toDataURL(link, {
-          width: 300,
-          margin: 2,
-          color: { dark: "#1E3A5F", light: "#ffffff" },
-        });
+        const qr = await makeQrImage(link);
         setQrDataUrl(qr);
       } catch (err) {
         console.error("Errore generazione QR:", err);
@@ -77,63 +73,17 @@ export default function MyQRPage() {
     generateQR();
   }, []);
 
-  // Compone QR + PIN in un'unica immagine scaricabile: il solo QR (qrDataUrl)
-  // non basta più a votare da solo se manca la fotocamera, e chi scarica/
-  // stampa il file perde il PIN mostrato solo a video se non lo includiamo
-  // direttamente nel PNG.
-  const buildDownloadImage = (): Promise<string> =>
-    new Promise((resolve, reject) => {
-      if (!qrDataUrl) return reject(new Error("QR non pronto"));
-      const qrImg = new Image();
-      qrImg.onload = () => {
-        const qrSize = 300;
-        const padding = 24;
-        const pinBlockHeight = myPin ? 110 : 0;
-        const width = qrSize + padding * 2;
-        const height = qrSize + padding * 2 + pinBlockHeight;
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("Canvas non supportato"));
-
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(qrImg, padding, padding, qrSize, qrSize);
-
-        if (myPin) {
-          const centerX = width / 2;
-          ctx.fillStyle = "#666666";
-          ctx.font = "16px system-ui, sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText("Se non riesce a scansionare, vota con il codice:", centerX, padding + qrSize + 32);
-
-          ctx.fillStyle = "#1E3A5F";
-          ctx.font = "800 40px system-ui, sans-serif";
-          // canvas non supporta letter-spacing in modo affidabile su tutti i
-          // browser: spaziatura manuale per leggibilità, come sullo schermo.
-          ctx.fillText(myPin.split("").join("  "), centerX, padding + qrSize + 80);
-        }
-
-        resolve(canvas.toDataURL("image/png"));
-      };
-      qrImg.onerror = () => reject(new Error("Impossibile caricare il QR"));
-      qrImg.src = qrDataUrl;
-    });
-
+  // Immagine scaricabile con nome, QR e codice (lib/qrImage.ts): chi la stampa o la inoltra non perde
+  // il codice, che a schermo sta sotto al QR.
   const handleDownload = async () => {
     if (!qrDataUrl || !userInfo) return;
-    const filename = `QR_${userInfo.name.replace(/\s+/g, "_")}.png`;
     let href = qrDataUrl;
     try {
-      href = await buildDownloadImage();
+      href = await qrWithPinImage(qrDataUrl, userInfo.name || null, myPin, "Se non riesce a scansionare, vota con il codice");
     } catch (err) {
-      console.error("Errore generazione immagine QR+PIN, scarico solo il QR:", err);
+      console.error("Errore nel comporre l'immagine, scarico solo il QR:", err);
     }
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = filename;
-    link.click();
+    downloadDataUrl(href, qrFileName(userInfo.name || "mio"));
   };
 
   const handleCopyCode = async () => {

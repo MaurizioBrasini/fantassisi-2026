@@ -88,6 +88,20 @@ export const CONFIG_ISCRIZIONE = {
 export const VALID_TEAMS: readonly string[] = ['Matricole', 'Veterani', 'Didatti&Docenti'];
 export const VALID_YEARS: readonly string[] = CONFIG_ISCRIZIONE.anni.map((a) => a.value).filter(Boolean);
 
+/** Anni che hanno una classe: gli studenti in corso (pre-iscritti ed ex allievi/specializzati no). */
+export const CLASS_YEARS: readonly string[] = ["primo", "secondo", "terzo", "quarto"];
+
+/** Etichetta leggibile di un anno ("terzo" -> "3° Anno"); un valore sconosciuto resta com'è. */
+export function yearLabel(year: string | null | undefined): string {
+  if (!year) return "";
+  return CONFIG_ISCRIZIONE.anni.find((a) => a.value === year)?.label || year;
+}
+
+/** Squadra a cui appartiene una classe, dall'anno: Matricole fino al 2° anno, poi Veterani. */
+export function teamForYear(year: string): "Matricole" | "Veterani" {
+  return CONFIG_ISCRIZIONE.teamAnniValid.Matricole.includes(year) ? "Matricole" : "Veterani";
+}
+
 /** L'anno è compatibile con la squadra? Senza anno sì; senza squadra vale qualunque anno. */
 export function isYearValidForTeam(team: string | null | undefined, year: string | null | undefined): boolean {
   if (!year) return true;

@@ -94,6 +94,20 @@ export function invalidateCachedDashboardScores(userId: string): void {
   }
 }
 
+// Data e ora per esteso, ora italiana: "giovedì 8 ottobre alle ore 00:00". Unico formato per gli
+// annunci di apertura del voto (dashboard, pannello admin, messaggi del server).
+const ROME_DATETIME = new Intl.DateTimeFormat("it-IT", {
+  timeZone: "Europe/Rome",
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+export function formatRomeDateTime(iso: string): string {
+  return ROME_DATETIME.format(new Date(iso));
+}
+
 // Converte una data/ora "locale" italiana (Europe/Rome) in un istante UTC ISO,
 // gestendo da sé l'ora legale/solare — stesso trucco di offset usato sopra in
 // startOfTodayInRomeISO, generalizzato a un orario qualsiasi. Utile per

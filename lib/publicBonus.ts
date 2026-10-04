@@ -1,4 +1,4 @@
-import { CONFIG_ISCRIZIONE } from "./config";
+import { CONFIG_ISCRIZIONE, CLASS_YEARS, teamForYear, yearLabel } from "./config";
 
 // Bonus PALESI (premi con banner): punti dati a una persona, a una classe o a una sede, subito.
 // Come si ramificano (tutto a punti interi, i resti si arrotondano):
@@ -22,17 +22,10 @@ export type PublicAllocation = {
   class_year: string | null;
 };
 
-const CLASS_YEARS = ["primo", "secondo", "terzo", "quarto"];
 const row = (p: Partial<PublicAllocation> & { points: number }): PublicAllocation => ({
   user_id: null, team: null, class_school: null, class_site: null, class_year: null, ...p,
 });
 
-export const yearLabel = (year: string) => CONFIG_ISCRIZIONE.anni.find((a) => a.value === year)?.label || year;
-
-/** Squadra a cui appartiene una classe, dall'anno (come nei QR di classe). */
-export function teamForYear(year: string): "Matricole" | "Veterani" {
-  return (CONFIG_ISCRIZIONE.teamAnniValid.Matricole as string[]).includes(year) ? "Matricole" : "Veterani";
-}
 
 /** Le classi che esistono davvero in una sede: per ogni scuola i primi N anni (N da `classiPerSedeScuola`). */
 export function classesOfSite(site: string): { school: string; year: string }[] {

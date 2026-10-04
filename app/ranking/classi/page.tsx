@@ -1,20 +1,15 @@
 "use client";
 
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { teamForYear, yearLabel } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { useStandings } from "@/lib/useStandings";
 import RankingScreen, { RankingRow } from "@/components/RankingScreen";
 
-function yearLabel(year: string | null): string {
-  if (!year) return "";
-  return CONFIG_ISCRIZIONE.anni.find((a) => a.value === year)?.label || year;
-}
-
 type Row = { key: string; school: string; site: string; year: string; points: number; rank: number };
 
-// Le classi del 3°/4° anno e specializzati sono dei Veterani, le altre delle Matricole.
+// Le classi del 3°/4° anno sono dei Veterani, le altre delle Matricole.
 const teamColor = (year: string) =>
-  CONFIG_ISCRIZIONE.teamAnniValid["Veterani"].includes(year)
+  teamForYear(year) === "Veterani"
     ? { background: "#E3EAF2", color: TEAM_COLORS.Veterani, borderColor: TEAM_COLORS.Veterani }
     : { background: "#FFEDE3", color: TEAM_COLORS.Matricole, borderColor: TEAM_COLORS.Matricole };
 

@@ -4,7 +4,7 @@
 // Sostituisce i calcoli che prima venivano rifatti in ogni telefono (dashboard, classifica
 // individuale, classi, sedi) e nel tabellone: ogni pagina scaricava tutte le tabelle a ogni
 // apertura. Ora i telefoni ricevono solo il risultato.
-import { CONFIG_ISCRIZIONE } from "./config";
+import { CONFIG_ISCRIZIONE, CLASS_YEARS } from "./config";
 import { fetchTeamBoosts, fetchMaturedAllocations, addBoostsToScores, type MaturedAllocation, type TeamBoost } from "./boosts";
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetchAll";
@@ -26,7 +26,7 @@ export type Standings = {
 };
 
 // Anni che hanno una classe e contano per la classifica delle sedi (esclusi preiscrizione e specializzati).
-const SITE_YEARS = ["primo", "secondo", "terzo", "quarto"];
+const SITE_YEARS = CLASS_YEARS;
 const TTL_MS = 5_000;
 
 type UserRow = { id: string; first_name: string | null; last_name: string | null; team: string | null; school: string | null; site: string | null; year: string | null };

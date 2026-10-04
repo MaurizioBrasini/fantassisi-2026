@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
-import { classesOfSite, yearLabel } from "@/lib/publicBonus";
+import { CONFIG_ISCRIZIONE, yearLabel } from "@/lib/config";
+import { classesOfSite } from "@/lib/publicBonus";
 
 type Person = { id: string; first_name: string | null; last_name: string | null; team: string; site: string | null; school: string | null; year: string | null };
 type Boost = {

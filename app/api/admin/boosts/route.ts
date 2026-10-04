@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { fetchAllRows } from "@/lib/fetchAll";
-import { CONFIG_ISCRIZIONE } from "@/lib/config";
+import { CONFIG_ISCRIZIONE, teamForYear, yearLabel } from "@/lib/config";
 import { accruedBoostPoints, planBoost, MAX_POINTS_PER_PERSON } from "@/lib/boosts";
-import { planPublicBonus, validateClass, yearLabel, teamForYear, type PublicTarget } from "@/lib/publicBonus";
+import { planPublicBonus, validateClass, type PublicTarget } from "@/lib/publicBonus";
 import { deleteById } from "@/lib/adminCrud";
 import { asUuid, readJsonObject } from "@/lib/http";
 

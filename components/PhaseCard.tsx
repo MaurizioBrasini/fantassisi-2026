@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatRomeDateTime } from "@/lib/utils";
 
 type Mode = "auto" | "preview" | "open";
 type Phase = { open: boolean; mode: Mode; opensAt: string };
@@ -11,8 +12,7 @@ const OPTIONS: { mode: Mode; label: string; hint: string }[] = [
   { mode: "open", label: "Voto aperto", hint: "si vota subito" },
 ];
 
-const dateLabel = (iso: string) =>
-  new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+const dateLabel = formatRomeDateTime;
 
 // Interruttore Anteprima / Voto aperto del pannello admin. Il blocco vero del voto sta nel server
 // (lib/phase.ts): qui si cambia soltanto la modalità.
