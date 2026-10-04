@@ -20,8 +20,7 @@ export async function GET(request: Request) {
   let query = getSupabaseAdmin()
     .from("users")
     .select("id, first_name, last_name, team, site, school, year")
-    .in("team", ["Matricole", "Veterani"])
-    .eq("role", "student");
+    .in("team", ["Matricole", "Veterani"]); // il voto non guarda il ruolo: anche un admin o un docente in squadra può ricevere punti
   for (const w of words) query = query.or(`first_name.ilike.%${w}%,last_name.ilike.%${w}%`);
 
   const { data, error } = await query.order("last_name").limit(15);

@@ -35,3 +35,6 @@ alter table public.boost_allocations
 alter table public.boost_allocations add column if not exists class_school text;
 alter table public.boost_allocations add column if not exists class_site text;
 alter table public.boost_allocations add column if not exists class_year text;
+
+-- 3) Dice all'API di Supabase di rileggere lo schema (altrimenti le nuove colonne risultano 'non trovate')
+notify pgrst, 'reload schema';
