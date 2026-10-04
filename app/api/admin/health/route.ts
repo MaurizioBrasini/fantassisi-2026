@@ -14,7 +14,8 @@ type Check = { area: string; name: string; status: "ok" | "warn" | "error"; deta
 // variabili d'ambiente su Render, migrazioni SQL eseguite su Supabase, PIN di squadra, QR di classe,
 // fase del gioco, velocità delle classifiche. Non modifica nulla e non mostra mai i valori segreti.
 export async function GET() {
-  if (!(await requireRole("admin"))) {
+  const requester = await requireRole("admin");
+  if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
@@ -49,6 +50,13 @@ export async function GET() {
     add("Supabase", "07 premi palesi", d.public_bonus_columns && d.allocation_class_columns ? "ok" : "error", d.public_bonus_columns && d.allocation_class_columns ? "colonne presenti" : "MANCANO: eseguire sql/07_public_bonuses.sql");
     add("Supabase", "09 indice karaoke", d.event_votes_voted_at_index ? "ok" : "warn", d.event_votes_voted_at_index ? "presente" : "manca (eseguire sql/09)");
   }
+
+  // Saldo coin in una sola lettura (09): usato a ogni apertura della dashboard e a ogni voto.
+  const coinStart = Date.now();
+  const coin = await supabase.rpc("coin_usage", { p_user: requester.id, p_since: new Date(Date.now() - 86_400_000).toISOString() });
+  const coinOk = !coin.error && coin.data && typeof (coin.data as any).votes === "number";
+  add("Supabase", "09 saldo coin", coinOk ? "ok" : "warn",
+    coinOk ? `funzione coin_usage attiva (${Date.now() - coinStart} ms)` : `funzione coin_usage non disponibile, si usano letture separate (più lente): ${coin.error?.message || "risposta inattesa"}. Rieseguire sql/09`);
 
   // --- QR di squadra (06) e QR di classe (08) ---
   const { data: events, error: evError } = await supabase
