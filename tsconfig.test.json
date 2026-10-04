@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": ".test-build",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2019",
+    "jsx": "react",
+    "incremental": false,
+    "isolatedModules": false
+  },
+  "include": ["tests/**/*.ts"],
+  "exclude": ["node_modules", ".test-build"]
+}
