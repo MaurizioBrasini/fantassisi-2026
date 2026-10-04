@@ -33,12 +33,23 @@ export default function SystemCheck() {
     <div style={PANEL}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <h2 style={{ margin: 0 }}>🩺 Stato del sistema</h2>
-        <button onClick={run} disabled={busy} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1E3A5F", color: "white", fontWeight: 600, cursor: "pointer" }}>
-          {busy ? "Controllo…" : checks ? "Ricontrolla" : "Esegui controllo"}
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={run} disabled={busy} style={{ padding: "8px 16px", borderRadius: 6, border: "none", background: "#1E3A5F", color: "white", fontWeight: 600, cursor: "pointer" }}>
+            {busy ? "Controllo…" : checks ? "Ricontrolla" : "Esegui controllo"}
+          </button>
+          {/* Backup completo dei dati del gioco (file JSON riservato): prima di ogni giornata e prima di reset/import */}
+          <a
+            href="/api/admin/backup"
+            download
+            style={{ padding: "8px 16px", borderRadius: 6, background: "#2E7D32", color: "white", fontWeight: 600, textDecoration: "none" }}
+            title="Scarica tutti i dati del gioco in un file (contiene dati personali: conservalo in un posto sicuro)"
+          >
+            💾 Scarica backup
+          </a>
+        </div>
       </div>
       <p style={{ color: "#666", fontSize: "0.8rem", margin: "6px 0 0" }}>
-        Da eseguire dopo ogni aggiornamento del sito o script SQL, e prima di aprire il voto.
+        Controllo: dopo ogni aggiornamento del sito o script SQL, e prima di aprire il voto. Backup: ogni mattina dell&apos;evento e prima di ogni reset o import (il file contiene dati personali: conservalo in un posto sicuro).
       </p>
       {error && <p style={{ color: "#c0392b" }}>❌ {error}</p>}
       {checks && (
