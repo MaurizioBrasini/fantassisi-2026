@@ -326,6 +326,27 @@ function VoteButton() {
   );
 }
 
+// A voto aperto i QR di squadra e classe per le slides restano disponibili (i relatori li proiettano
+// durante il congresso), ma si caricano solo quando li si apre: niente peso in più sulla dashboard.
+function SlidesQrToggle() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 16 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{ width: "100%", padding: 12, borderRadius: 60, border: "2px solid #1E3A5F", background: "white", color: "#1E3A5F", fontWeight: 700, cursor: "pointer" }}
+      >
+        {open ? "▲ Chiudi i QR per le slides" : "📊 QR della squadra e della classe (per le slides)"}
+      </button>
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          <AnteprimaQr opensAtLabel="" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminAndLogout({ isAdmin, adminHref }: { isAdmin: boolean; adminHref: string }) {
   return (
     <>
@@ -446,6 +467,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
       <CoinsAndRecharge remainingCoins={remainingCoins} />
       {votingOpen && <VoteButton />}
+      {votingOpen && <SlidesQrToggle />}
 
       {/* Solo chi è (o è stato) Didatti&Docenti può cambiare squadra o uscirne */}
       {isDidatta && (
