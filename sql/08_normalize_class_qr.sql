@@ -1,4 +1,4 @@
--- Allinea ai valori standard i QR di classe creati all'inizio (anno come "4° ANNO 2026", scuola come
+-- Allinea ai valori standard i QR di classe creati all'inizio (anno come "4 ANNO 2026", scuola come
 -- "CCMA Marco Aurelio" o "APC ROMANIA"). Il codice riconosce gia' tutte le grafie (lib/classKey.ts),
 -- quindi questo script NON e' indispensabile: serve solo a tenere i dati puliti e uguali a quelli dei
 -- profili. Non cambia ne' i codici QR ne' i PIN: i QR gia' stampati o salvati restano validi.
