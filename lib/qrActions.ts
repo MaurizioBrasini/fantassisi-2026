@@ -83,7 +83,8 @@ export async function castEventVote(supabase: SupabaseClient, userId: string, ev
     const waitMs = Date.parse(existing.voted_at) + cooldownMin * 60_000 - Date.now();
     if (waitMs > 0) {
       const what = event.qr_type === "team" ? "la squadra" : "questa classe";
-      return fail(429, `Hai già votato ${what} da poco: potrai rivotare tra ${Math.ceil(waitMs / 60_000)} minuti.`);
+      const left = Math.ceil(waitMs / 60_000);
+      return fail(429, `Hai già votato ${what} da poco: potrai rivotare tra ${left} ${left === 1 ? "minuto" : "minuti"}.`);
     }
   }
 
