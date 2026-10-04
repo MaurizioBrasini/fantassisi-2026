@@ -9,6 +9,7 @@ import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
 import NoAccess from "@/components/NoAccess";
 import AnteprimaQr from "@/components/AnteprimaQr";
+import PrizeBanner from "@/components/PrizeBanner";
 import { getCookie, setCookie, logout } from "@/lib/clientCookies";
 
 // ─────────────────────────────────────────────
@@ -325,12 +326,12 @@ function VoteButton() {
   );
 }
 
-function AdminAndLogout({ isAdmin }: { isAdmin: boolean }) {
+function AdminAndLogout({ isAdmin, adminHref }: { isAdmin: boolean; adminHref: string }) {
   return (
     <>
       {/* Pulsante Admin (visibile solo a admin/staff) */}
       {isAdmin && (
-        <Link href="/admin" style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
+        <Link href={adminHref} style={{ display: "block", marginTop: 16, padding: 12, borderRadius: 60, textAlign: "center", fontWeight: 600, background: "#4a5568", color: "white", textDecoration: "none", fontSize: "0.85rem" }}>
           ⚙️ Admin
         </Link>
       )}
@@ -381,7 +382,7 @@ function DashboardDidatti({ userName, userId, userRole, votingOpen, opensAtLabel
       {/* Bottone arruolamento */}
       <TeamSwitchBox currentTeam="Didatti&Docenti" allowLeave={false} onDone={onEnrolled} />
 
-      <AdminAndLogout isAdmin={isAdmin} />
+      <AdminAndLogout isAdmin={isAdmin} adminHref={userRole === "staff" ? "/staff" : "/admin"} />
     </div>
   );
 }
@@ -451,7 +452,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
         <TeamSwitchBox currentTeam={myTeam} allowLeave onDone={onTeamChange} />
       )}
 
-      <AdminAndLogout isAdmin={isAdmin} />
+      <AdminAndLogout isAdmin={isAdmin} adminHref={userRole === "staff" ? "/staff" : "/admin"} />
     </div>
   );
 }
@@ -522,18 +523,23 @@ export default function Dashboard() {
   // (Didatti&Docenti, null, "", o qualsiasi altro valore)
   if (myTeam !== "Matricole" && myTeam !== "Veterani") {
     return (
-      <DashboardDidatti
-        userName={userName}
-        userId={userId}
-        userRole={userRole}
-        votingOpen={votingOpen}
-        opensAtLabel={opensAtLabel}
-        onEnrolled={handleTeamChange}
-      />
+      <>
+        <PrizeBanner />
+        <DashboardDidatti
+          userName={userName}
+          userId={userId}
+          userRole={userRole}
+          votingOpen={votingOpen}
+          opensAtLabel={opensAtLabel}
+          onEnrolled={handleTeamChange}
+        />
+      </>
     );
   }
 
   return (
+    <>
+    <PrizeBanner />
     <DashboardNormale
       userId={userId}
       userName={userName}
@@ -545,5 +551,6 @@ export default function Dashboard() {
       opensAtLabel={opensAtLabel}
       onTeamChange={handleTeamChange}
     />
+    </>
   );
 }

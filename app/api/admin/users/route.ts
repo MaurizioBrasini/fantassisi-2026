@@ -9,9 +9,9 @@ import { VALID_TEAMS, VALID_YEARS, isYearValidForTeam } from "@/lib/config";
 
 const PROTECTED_EMAIL = "mabras69@gmail.com";
 
-// GET: Lista utenti (con paginazione e ricerca)
+// GET: Lista utenti (con paginazione e ricerca) — solo admin: contiene token di accesso e PIN di tutti
 export async function GET(request: Request) {
-  const requester = await requireRole("admin", "staff");
+  const requester = await requireRole("admin");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
@@ -125,9 +125,9 @@ export async function POST(request: Request) {
   });
 }
 
-// PUT: Aggiorna un utente
+// PUT: Aggiorna un utente — solo admin
 export async function PUT(request: Request) {
-  const requester = await requireRole("admin", "staff");
+  const requester = await requireRole("admin");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
@@ -207,9 +207,9 @@ export async function PUT(request: Request) {
   return NextResponse.json({ message: "✅ Utente aggiornato!", user: data });
 }
 
-// DELETE: Elimina un utente
+// DELETE: Elimina un utente — solo admin
 export async function DELETE(request: Request) {
-  const requester = await requireRole("admin", "staff");
+  const requester = await requireRole("admin");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }

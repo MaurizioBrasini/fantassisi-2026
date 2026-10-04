@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { CONFIG_ISCRIZIONE, isYearValidForTeam } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
-import { accruedBoostPoints } from "@/lib/boosts";
 import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
 import PhaseCard from "@/components/PhaseCard";
+import BonusGenerator from "@/components/BonusGenerator";
 
 function teamFromYear(year: string): string {
   return CONFIG_ISCRIZIONE.teamAnniValid['Matricole'].includes(year) ? "Matricole" : "Veterani";
@@ -300,15 +300,6 @@ export default function AdminPage() {
   const [resetType, setResetType] = useState("scores");
   const [importFile, setImportFile] = useState<File | null>(null);
 
-  // Bonus a tempo per le squadre (solo admin)
-  const [boosts, setBoosts] = useState<any[]>([]);
-  const [boostForm, setBoostForm] = useState({ team: "Veterani", points: "100", minutes: "60" });
-  const [nowMs, setNowMs] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNowMs(Date.now()), 5000);
-    return () => clearInterval(id);
-  }, []);
-
   // Scuole suggerite per il form
   const [suggestedSchools, setSuggestedSchools] = useState<string[]>(CONFIG_ISCRIZIONE.scuole);
   const [editSuggestedSchools, setEditSuggestedSchools] = useState<string[]>(CONFIG_ISCRIZIONE.scuole);
@@ -329,6 +320,7 @@ export default function AdminPage() {
       if (!userId || (role !== "admin" && role !== "staff")) {
         setIsAdmin(false); setLoading(false); return;
       }
+      if (role === "staff") { router.replace("/staff"); return; } // lo staff ha la sua dashboard
       setIsAdmin(true);
       setIsSuper(role === "admin");
       await loadData();
@@ -379,7 +371,7 @@ export default function AdminPage() {
       setMessage("❌ Non riesco a caricare i dati del pannello. Ricarica la pagina.");
       return;
     }
-    const { users: allUsersData, events: ev, bonuses: bn, boosts: tb } = await res.json();
+    const { users: allUsersData, events: ev, bonuses: bn } = await res.json();
     setUsers(allUsersData);
 
     // Classi disponibili per QR classe
@@ -396,7 +388,6 @@ export default function AdminPage() {
 
     setEvents(ev || []);
     setBonuses(bn || []);
-    setBoosts(tb || []);
   };
 
   const filteredUsers = users
@@ -599,42 +590,6 @@ export default function AdminPage() {
     const data = await res.json();
     if (!res.ok) setMessage("❌ " + data.message);
     else { setMessage("✅ QR eliminato"); loadData(); }
-  };
-
-  // ── Bonus a tempo alle squadre (SOLO ADMIN) ───────────────
-  const handleCreateBoost = async () => {
-    if (!isSuper) { setMessage("❌ Solo admin possono assegnare bonus"); return; }
-    const points = Number(boostForm.points);
-    const minutes = Number(boostForm.minutes);
-    if (!confirm(`Assegnare ${points} punti a ${boostForm.team} come farebbero i voti veri (circa il 20-25% solo alla squadra, il resto a partecipanti scelti a caso, da 1 a 4 ciascuno), distribuiti nell'arco di ${minutes} minuti a partire da ora?`)) return;
-    const res = await fetch("/api/admin/boosts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ team: boostForm.team, points, minutes }),
-    });
-    const data = await res.json();
-    if (!res.ok) setMessage("❌ " + data.message);
-    else { setMessage("✅ " + (data.message || "Bonus avviato")); loadData(); }
-  };
-
-  const handleStopBoost = async (id: string) => {
-    if (!confirm("Fermare il bonus? Restano i punti già maturati, gli altri non entrano più.")) return;
-    const res = await fetch("/api/admin/boosts", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    const data = await res.json();
-    if (!res.ok) setMessage("❌ " + data.message);
-    else { setMessage("✅ Bonus fermato"); loadData(); }
-  };
-
-  const handleDeleteBoost = async (id: string) => {
-    if (!confirm("Eliminare il bonus? Vengono tolti anche i punti già maturati.")) return;
-    const res = await fetch(`/api/admin/boosts?id=${id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (!res.ok) setMessage("❌ " + data.message);
-    else { setMessage("✅ Bonus eliminato"); loadData(); }
   };
 
   // ── Reset (SOLO ADMIN) ────────────────────────────────────
@@ -910,72 +865,8 @@ export default function AdminPage() {
       {/* 🚦 Fase Anteprima / Voto aperto: solo ADMIN */}
       {isSuper && <PhaseCard />}
 
-      {/* 🔥 Bonus a tempo alle squadre: solo ADMIN */}
-      {isSuper && (
-        <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
-          <h2 style={{ marginTop: 0 }}>⚖️ Bonus squadra</h2>
-          <p style={{ color: "#666", fontSize: "0.85rem", marginTop: 0 }}>
-            Imita i voti veri (es. 100 punti in 60 minuti): circa il 20-25% va solo alla squadra, il resto a partecipanti scelti a caso, da 1 a 4 ciascuno, in momenti casuali. Salgono squadra, individuali, classi e sedi, senza che si veda da dove arrivano.
-          </p>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <select value={boostForm.team} onChange={(e) => setBoostForm({ ...boostForm, team: e.target.value })} style={{ padding: 8, borderRadius: 6, border: "1px solid #ccc" }}>
-              <option value="Matricole">Matricole</option>
-              <option value="Veterani">Veterani</option>
-            </select>
-            <input type="number" min={1} value={boostForm.points} onChange={(e) => setBoostForm({ ...boostForm, points: e.target.value })} style={{ width: 90, padding: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            <span>punti in</span>
-            <input type="number" min={1} value={boostForm.minutes} onChange={(e) => setBoostForm({ ...boostForm, minutes: e.target.value })} style={{ width: 90, padding: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-            <span>minuti</span>
-            <button onClick={handleCreateBoost} style={{ padding: "8px 16px", background: "#1E3A5F", color: "white", border: "none", borderRadius: 6, cursor: "pointer" }}>
-              Avvia
-            </button>
-          </div>
-          {boosts.length > 0 && (
-            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12 }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #ddd" }}>
-                  <th style={{ textAlign: "left", padding: 8 }}>Squadra</th>
-                  <th style={{ textAlign: "left", padding: 8 }}>Maturati</th>
-                  <th style={{ textAlign: "left", padding: 8 }}>Intervallo</th>
-                  <th style={{ textAlign: "center", padding: 8 }}>Stato</th>
-                  <th style={{ textAlign: "center", padding: 8 }}>Azioni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {boosts.map((b) => {
-                  const running = nowMs < Date.parse(b.end_at);
-                  const fmt = (iso: string) => new Date(iso).toLocaleString("it-IT", { timeZone: "Europe/Rome", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-                  return (
-                    <tr key={b.id} style={{ borderBottom: "1px solid #eee" }}>
-                      <td style={{ padding: 8 }}>
-                        {b.team}
-                        <span style={{ color: "#999", fontSize: "0.7rem" }}>{b.distributed ? " · a persone" : " · solo squadra"}</span>
-                      </td>
-                      <td style={{ padding: 8 }}>{b.accrued ?? accruedBoostPoints(b, nowMs)} / {b.total_points}</td>
-                      <td style={{ padding: 8 }}>{fmt(b.start_at)} → {fmt(b.end_at)}</td>
-                      <td style={{ padding: 8, textAlign: "center" }}>
-                        <span style={{ padding: "2px 8px", borderRadius: 4, background: running ? "#ffc107" : "#28a745", color: running ? "#333" : "white", fontSize: "0.75rem" }}>
-                          {running ? "In corso" : "Concluso"}
-                        </span>
-                      </td>
-                      <td style={{ padding: 8, textAlign: "center", whiteSpace: "nowrap" }}>
-                        {running && (
-                          <button onClick={() => handleStopBoost(b.id)} style={{ padding: "4px 8px", marginRight: 4, background: "#6c757d", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                            Ferma
-                          </button>
-                        )}
-                        <button onClick={() => handleDeleteBoost(b.id)} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
+      {/* 🎁 Generatore unico di bonus (nascosti e palesi) */}
+      {isSuper && <BonusGenerator canDelete />}
 
       {/* Sezione QR Voto */}
       <div style={{ marginTop: 20 }}>

@@ -4,9 +4,10 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
 
-// POST: crea un QR voto (squadra o classe) — solo admin
+// POST: crea un QR voto (squadra o classe) — admin o staff. Per una classe che ha già il suo QR
+// non se ne crea un secondo (l'Anteprima e le slides usano quello): si restituisce l'esistente.
 export async function POST(request: Request) {
-  const requester = await requireRole("admin");
+  const requester = await requireRole("admin", "staff");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
@@ -14,6 +15,20 @@ export async function POST(request: Request) {
   const { title, qr_type, team_target, class_school, class_site, class_year, qr_code } = await request.json();
   if (!title || !qr_code) {
     return NextResponse.json({ message: "Dati mancanti" }, { status: 400 });
+  }
+
+  if (qr_type === "class" && class_school && class_site && class_year) {
+    const { data: already } = await getSupabaseAdmin()
+      .from("votable_events")
+      .select("*")
+      .eq("qr_type", "class")
+      .eq("class_school", class_school)
+      .eq("class_site", class_site)
+      .eq("class_year", class_year)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (already) return NextResponse.json({ event: already, existing: true });
   }
 
   const pin = await generateUnusedPin();

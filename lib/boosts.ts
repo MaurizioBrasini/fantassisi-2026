@@ -30,21 +30,38 @@ export async function fetchTeamBoosts(client: { from: (table: string) => any }):
   }
 }
 
-/** Punti di un bonus già scattati: a una persona (user_id) o solo alla squadra (user_id nullo). */
-export type MaturedAllocation = { user_id: string | null; team: string | null; points: number };
+/**
+ * Punti di un bonus già scattati. Tre forme:
+ *  - a una persona (user_id): conta come voto ricevuto da lei (squadra, individuale, classe, sede);
+ *  - a una classe (class_school/site/year): conta per la classe e la sede, e per la squadra solo se
+ *    `team` è valorizzato (premio a una classe sì, metà "classi" del premio a una sede no);
+ *  - solo alla squadra (nessuno dei due): conta per la squadra.
+ */
+export type MaturedAllocation = {
+  user_id: string | null;
+  team: string | null;
+  points: number;
+  class_school?: string | null;
+  class_site?: string | null;
+  class_year?: string | null;
+};
 
 // Punti dei bonus distribuiti che sono già "maturati" (il loro momento è passato). Come sopra: se
-// la tabella manca, nessun punto.
+// la tabella manca, nessun punto. Se mancano solo le colonne della classe (sql/07_public_bonuses.sql
+// non ancora eseguito) si leggono le vecchie, così i bonus già dati non spariscono dai punteggi.
 export async function fetchMaturedAllocations(
   client: { from: (table: string) => any },
   nowMs: number = Date.now()
 ): Promise<MaturedAllocation[]> {
+  const filter = (q: any) => q.lte("at", new Date(nowMs).toISOString());
   try {
-    return await fetchAllRows<MaturedAllocation>(client, "boost_allocations", "user_id, team, points", {
-      filter: (q) => q.lte("at", new Date(nowMs).toISOString()),
-    });
+    return await fetchAllRows<MaturedAllocation>(client, "boost_allocations", "user_id, team, points, class_school, class_site, class_year", { filter });
   } catch {
-    return [];
+    try {
+      return await fetchAllRows<MaturedAllocation>(client, "boost_allocations", "user_id, team, points", { filter });
+    } catch {
+      return [];
+    }
   }
 }
 

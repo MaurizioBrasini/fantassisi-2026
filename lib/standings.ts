@@ -106,6 +106,11 @@ export function buildStandings(
   addBoostsToScores(teams, boosts);
   for (const a of allocations) {
     if (a.user_id) continue;
+    // Premio a una classe (o metà "classi" del premio a una sede): classe e sede come un QR di classe.
+    if (a.class_school && a.class_site && a.class_year) {
+      addClass(a.class_school, a.class_site, a.class_year, a.points);
+      pointsBySite.set(a.class_site, (pointsBySite.get(a.class_site) || 0) + a.points);
+    }
     if (a.team === "Matricole") teams.Matricole += a.points;
     if (a.team === "Veterani") teams.Veterani += a.points;
   }

@@ -4,9 +4,9 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
 
-// POST: crea un QR ricarica bonus — solo admin
+// POST: crea un QR ricarica bonus — admin o staff
 export async function POST(request: Request) {
-  const requester = await requireRole("admin");
+  const requester = await requireRole("admin", "staff");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }

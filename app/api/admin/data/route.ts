@@ -10,7 +10,8 @@ export const revalidate = 0;
 // server solo per admin e staff. Il pannello non legge più le tabelle dal browser: i token di
 // accesso e i dati personali non devono essere raggiungibili con la sola chiave pubblica.
 export async function GET() {
-  const requester = await requireRole("admin", "staff");
+  // Contiene token di accesso e PIN di tutti i partecipanti: solo admin, mai lo staff.
+  const requester = await requireRole("admin");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }

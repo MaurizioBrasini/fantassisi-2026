@@ -2,41 +2,10 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { qrWithPinImage } from "@/lib/qrImage";
 
 type Qr = { title: string | null; qr_code: string; pin: string | null };
 type Data = { team: Qr | null; class: Qr | null; className: string };
-
-// Compone QR + PIN in un'immagine pulita, da inserire in una slide.
-async function slideImage(qrDataUrl: string, heading: string, pin: string | null): Promise<string> {
-  const img = new Image();
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error("QR non caricato"));
-    img.src = qrDataUrl;
-  });
-  const qr = 600, pad = 40, head = 70, foot = pin ? 190 : 0;
-  const canvas = document.createElement("canvas");
-  canvas.width = qr + pad * 2;
-  canvas.height = head + qr + pad + foot;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas non supportato");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#1E3A5F";
-  ctx.font = "700 34px system-ui, sans-serif";
-  ctx.fillText(heading, canvas.width / 2, 50, canvas.width - 40);
-  ctx.drawImage(img, pad, head, qr, qr);
-  if (pin) {
-    ctx.fillStyle = "#666666";
-    ctx.font = "26px system-ui, sans-serif";
-    ctx.fillText("Oppure vota con il PIN", canvas.width / 2, head + qr + 50);
-    ctx.fillStyle = "#1E3A5F";
-    ctx.font = "800 96px system-ui, sans-serif";
-    ctx.fillText(pin.split("").join(" "), canvas.width / 2, head + qr + 150);
-  }
-  return canvas.toDataURL("image/png");
-}
 
 function QrCard({ label, heading, qr, filename }: { label: string; heading: string; qr: Qr; filename: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -50,7 +19,7 @@ function QrCard({ label, heading, qr, filename }: { label: string; heading: stri
   const download = async () => {
     if (!src) return;
     let href = src;
-    try { href = await slideImage(src, heading, qr.pin); } catch { /* si scarica il solo QR */ }
+    try { href = await qrWithPinImage(src, heading, qr.pin); } catch { /* si scarica il solo QR */ }
     const a = document.createElement("a");
     a.href = href;
     a.download = filename;

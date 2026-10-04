@@ -5,7 +5,7 @@ import { sendInviteEmail } from "@/lib/email";
 import { personalLink } from "@/lib/urls";
 
 export async function POST(request: Request) {
-  const requester = await requireRole("admin", "staff");
+  const requester = await requireRole("admin");
   if (!requester) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
