@@ -69,7 +69,7 @@ export default function AnteprimaQr({ opensAtLabel }: { opensAtLabel: string }) 
       <div style={{ background: "linear-gradient(135deg, #FF6B35, #1E3A5F)", color: "white", borderRadius: 16, padding: 16, textAlign: "center", marginBottom: 16 }}>
         <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>Anteprima FantAssisi</div>
         <div style={{ fontSize: "0.85rem", marginTop: 4 }}>
-          {opensAtLabel.charAt(0).toUpperCase() + opensAtLabel.slice(1)} inizia il gioco vero e proprio e si sbloccheranno nuove funzioni: potrai votare e farti votare! Intanto metti il QR della tua squadra e della tua classe nelle slides della tua relazione: da quel momento chi lo scansiona vota per voi.
+          {opensAtLabel.charAt(0).toUpperCase() + opensAtLabel.slice(1)} inizia il gioco vero e proprio e si sbloccheranno nuove funzioni: potrai votare e farti votare! Intanto metti il QR della tua squadra e della tua classe nelle slides della tua relazione: potrai sostenere la tua squadra anche con il tuo contributo ai lavori!
         </div>
       </div>
       {failed && <p style={{ textAlign: "center", color: "#666" }}>Non riesco a caricare i QR. Riprova tra poco.</p>}
