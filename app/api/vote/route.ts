@@ -2,6 +2,7 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { NextResponse } from "next/server";
 import { getVerifiedUserId } from "@/lib/session";
 import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "@/lib/coins";
+import { votingClosedResponse } from "@/lib/phase";
 
 export async function POST(request: Request) {
   const voterId = getVerifiedUserId();
@@ -27,6 +28,11 @@ export async function POST(request: Request) {
     }
     recipientId = byPin.id;
   }
+
+  // Dopo la ricerca del PIN: un PIN che non è di una persona (404 sopra) passa ancora a /api/qr/redeem,
+  // dove i bonus ricarica restano riscattabili anche in anteprima.
+  const closed = await votingClosedResponse();
+  if (closed) return closed;
 
   if (recipientId === voterId) {
     // Errore frequente in collaudo: la gente inserisce il PROPRIO PIN invece

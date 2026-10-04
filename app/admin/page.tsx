@@ -8,6 +8,7 @@ import { TEAM_COLORS } from "@/lib/teamColors";
 import { accruedBoostPoints } from "@/lib/boosts";
 import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
+import PhaseCard from "@/components/PhaseCard";
 
 function teamFromYear(year: string): string {
   return CONFIG_ISCRIZIONE.teamAnniValid['Matricole'].includes(year) ? "Matricole" : "Veterani";
@@ -905,6 +906,9 @@ export default function AdminPage() {
           </button>
         </div>
       )}
+
+      {/* 🚦 Fase Anteprima / Voto aperto: solo ADMIN */}
+      {isSuper && <PhaseCard />}
 
       {/* 🔥 Bonus a tempo alle squadre: solo ADMIN */}
       {isSuper && (

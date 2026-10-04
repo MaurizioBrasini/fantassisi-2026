@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CONFIG_ISCRIZIONE } from "./config";
 import { getCoinBalance, OUT_OF_COINS_MESSAGE } from "./coins";
+import { getVotingPhase, votingClosedMessage } from "./phase";
 
 // Le due azioni che si fanno con un QR/PIN di evento o di bonus. Prima esistevano due copie
 // (una in /api/event-vote e /api/bonus-redeem, una in /api/qr/redeem): ora c'è un solo codice,
@@ -19,6 +20,9 @@ export function actionResponse(result: ActionResult): NextResponse {
     : NextResponse.json(result.body);
 }
 const TEAMS = ["Matricole", "Veterani"];
+
+/** Minuti di attesa tra due voti della stessa persona allo stesso QR/PIN di squadra. */
+export const TEAM_QR_COOLDOWN_MIN = 15;
 
 /** Riscatta un QR bonus (CBT coins extra). */
 export async function redeemBonusQr(supabase: SupabaseClient, userId: string, bonus: any): Promise<ActionResult> {
@@ -45,6 +49,8 @@ export async function redeemBonusQr(supabase: SupabaseClient, userId: string, bo
 
 /** Vota con un QR evento/squadra/classe. */
 export async function castEventVote(supabase: SupabaseClient, userId: string, event: any): Promise<ActionResult> {
+  const phase = await getVotingPhase();
+  if (!phase.open) return fail(403, votingClosedMessage(phase));
   if (event.active === false) return fail(403, "Questo QR non è più attivo");
   if (event.start_time && event.end_time) {
     const now = Date.now();
@@ -56,11 +62,26 @@ export async function castEventVote(supabase: SupabaseClient, userId: string, ev
   const [{ data: voter }, coins, { data: existing }] = await Promise.all([
     supabase.from("users").select("team").eq("id", userId).single(),
     getCoinBalance(supabase, userId),
-    supabase.from("event_votes").select("id").eq("user_id", userId).eq("event_id", event.id).maybeSingle(),
+    supabase
+      .from("event_votes")
+      .select("voted_at")
+      .eq("user_id", userId)
+      .eq("event_id", event.id)
+      .order("voted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (coins.remaining <= 0) return fail(400, OUT_OF_COINS_MESSAGE);
-  if (existing) return fail(409, "Hai già votato questo QR");
+  if (existing) {
+    // Classe e altri QR: una volta sola. QR/PIN di squadra (nelle slides di tutti): si può rivotare
+    // dopo TEAM_QR_COOLDOWN_MIN minuti (serve l'indice parziale di sql/2026-10-04_team_qr_cooldown.sql).
+    if (event.qr_type !== "team") return fail(409, "Hai già votato questo QR");
+    const waitMs = Date.parse(existing.voted_at) + TEAM_QR_COOLDOWN_MIN * 60_000 - Date.now();
+    if (waitMs > 0) {
+      return fail(429, `Hai già votato la squadra da poco: potrai rivotare tra ${Math.ceil(waitMs / 60_000)} minuti.`);
+    }
+  }
 
   // 2 punti se il votante è della squadra opposta a quella del QR, 1 altrimenti.
   const opposite =

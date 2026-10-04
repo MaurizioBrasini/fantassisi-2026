@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getVerifiedUserId, applySessionCookies } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { getVotingPhase } from "@/lib/phase";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,7 +27,11 @@ export async function GET() {
     return NextResponse.json({ error: "Utente non trovato" }, { status: 404 });
   }
 
-  const response = NextResponse.json(user, { headers: { "Cache-Control": "no-store" } });
+  const phase = await getVotingPhase();
+  const response = NextResponse.json(
+    { ...user, voting_open: phase.open, voting_opens_at: phase.opensAt },
+    { headers: { "Cache-Control": "no-store" } }
+  );
   applySessionCookies(response, { id: userId, team: user.team, role: user.role, year: user.year, site: user.site });
   return response;
 }

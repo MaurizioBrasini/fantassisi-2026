@@ -8,6 +8,7 @@ import { TEAM_COLORS } from "@/lib/teamColors";
 import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
 import NoAccess from "@/components/NoAccess";
+import AnteprimaQr from "@/components/AnteprimaQr";
 import { getCookie, setCookie, logout } from "@/lib/clientCookies";
 
 // ─────────────────────────────────────────────
@@ -346,10 +347,12 @@ function AdminAndLogout({ isAdmin }: { isAdmin: boolean }) {
 // ─────────────────────────────────────────────
 // Dashboard Didatti&Docenti (con pulsante Admin)
 // ─────────────────────────────────────────────
-function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
+function DashboardDidatti({ userName, userId, userRole, votingOpen, opensAtLabel, onEnrolled }: {
   userName: string;
   userId: string;
   userRole: string;
+  votingOpen: boolean;
+  opensAtLabel: string;
   onEnrolled: (team: string, year?: string) => void;
 }) {
   const { teamScores, remainingCoins, loading, loadError } = useDashboardData(userId);
@@ -369,7 +372,11 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
 
       <ContributionLinks />
       <CoinsAndRecharge remainingCoins={remainingCoins} />
-      <VoteButton />
+      {votingOpen ? (
+        <VoteButton />
+      ) : (
+        <p style={{ textAlign: "center", color: "#666", fontSize: "0.9rem" }}>Il voto si apre {opensAtLabel}.</p>
+      )}
 
       {/* Bottone arruolamento */}
       <TeamSwitchBox currentTeam="Didatti&Docenti" allowLeave={false} onDone={onEnrolled} />
@@ -382,13 +389,15 @@ function DashboardDidatti({ userName, userId, userRole, onEnrolled }: {
 // ─────────────────────────────────────────────
 // Dashboard normale (Matricole / Veterani)
 // ─────────────────────────────────────────────
-function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidatta, onTeamChange }: {
+function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidatta, votingOpen, opensAtLabel, onTeamChange }: {
   userId: string;
   userName: string;
   myTeam: string;
   myClass: string;
   userRole: string;
   isDidatta: boolean;
+  votingOpen: boolean;
+  opensAtLabel: string;
   onTeamChange: (team: string, year?: string) => void;
 }) {
   const { teamScores, remainingCoins, myPoints, myRank, loading, loadError } = useDashboardData(userId);
@@ -410,7 +419,9 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
       <ContributionLinks />
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+      {!votingOpen && <AnteprimaQr opensAtLabel={opensAtLabel} />}
+
+      {votingOpen && <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
           <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
@@ -430,10 +441,10 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
             Il mio QR
           </Link>
         </div>
-      </div>
+      </div>}
 
       <CoinsAndRecharge remainingCoins={remainingCoins} />
-      <VoteButton />
+      {votingOpen && <VoteButton />}
 
       {/* Solo chi è (o è stato) Didatti&Docenti può cambiare squadra o uscirne */}
       {isDidatta && (
@@ -457,6 +468,8 @@ export default function Dashboard() {
   const [isDidatta, setIsDidatta] = useState(false);
   const [loading, setLoading] = useState(true);
   const [noAccess, setNoAccess] = useState(false);
+  const [votingOpen, setVotingOpen] = useState(true);
+  const [opensAtLabel, setOpensAtLabel] = useState("");
 
   useEffect(() => {
     const init = async () => {
@@ -480,6 +493,12 @@ export default function Dashboard() {
         setMyTeam(me.team || "");
         setMyClass(me.year || "");
         setIsDidatta(!!me.is_didatta);
+        setVotingOpen(me.voting_open !== false);
+        if (me.voting_opens_at) {
+          setOpensAtLabel(
+            new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }).format(new Date(me.voting_opens_at))
+          );
+        }
       }
 
       setLoading(false);
@@ -507,6 +526,8 @@ export default function Dashboard() {
         userName={userName}
         userId={userId}
         userRole={userRole}
+        votingOpen={votingOpen}
+        opensAtLabel={opensAtLabel}
         onEnrolled={handleTeamChange}
       />
     );
@@ -520,6 +541,8 @@ export default function Dashboard() {
       myClass={myClass}
       userRole={userRole}
       isDidatta={isDidatta}
+      votingOpen={votingOpen}
+      opensAtLabel={opensAtLabel}
       onTeamChange={handleTeamChange}
     />
   );
