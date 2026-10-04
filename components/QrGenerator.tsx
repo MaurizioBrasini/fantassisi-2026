@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { classesOfSite, teamForYear, yearLabel } from "@/lib/publicBonus";
 import { qrWithPinImage, downloadDataUrl } from "@/lib/qrImage";
 
 type Kind = "class" | "team" | "recharge";
+type Row = {
+  id: string; kind: Kind; title: string; detail: string; qr_code: string; pin: string | null; active: boolean;
+  team?: string | null; school?: string | null; site?: string | null; year?: string | null; created_at: string;
+};
 type Made = { src: string; heading: string; pin: string | null; filename: string; note: string };
 
 const INPUT = { padding: 8, borderRadius: 6, border: "1px solid #ccc" } as const;
@@ -14,9 +18,19 @@ const PILL = (active: boolean) => ({
   padding: "8px 14px", borderRadius: 60, border: "2px solid #1E3A5F", cursor: "pointer", fontWeight: 700,
   background: active ? "#1E3A5F" : "white", color: active ? "white" : "#1E3A5F",
 }) as const;
+const KIND_LABEL: Record<Kind, string> = { class: "🏫 Classe", team: "🏆 Squadra", recharge: "⚡ Ricarica" };
+const PAGE = 25;
 
-// Generatore di QR per la dashboard staff: classe, squadra e ricarica coins. Le stesse API del
-// pannello admin (/api/admin/events e /api/admin/bonus), che accettano admin e staff.
+const fileName = (t: string) => `QR_${t.replace(/[^A-Za-z0-9À-ɏ]+/g, "_")}.png`;
+
+async function qrImage(row: { qr_code: string; title: string; pin: string | null }): Promise<string> {
+  const src = await QRCode.toDataURL(row.qr_code, { width: 600, margin: 2, color: { dark: "#1E3A5F", light: "#ffffff" } });
+  try { return await qrWithPinImage(src, row.title, row.pin); } catch { return src; } // se il disegno fallisce, il solo QR
+}
+
+// Generatore di QR per la dashboard staff: classe, squadra e ricarica coins, con l'elenco di quelli
+// che esistono già. Non si può creare un QR che c'è già (lo impone anche il server, con una risposta
+// 409 che restituisce quello esistente). Usa /api/admin/events e /api/admin/bonus.
 export default function QrGenerator() {
   const [kind, setKind] = useState<Kind>("class");
   const [site, setSite] = useState("");
@@ -29,13 +43,55 @@ export default function QrGenerator() {
   const [message, setMessage] = useState("");
   const [made, setMade] = useState<Made | null>(null);
 
+  const [rows, setRows] = useState<Row[]>([]);
+  const [filter, setFilter] = useState<"all" | Kind>("all");
+  const [search, setSearch] = useState("");
+  const [shown, setShown] = useState(PAGE);
+
+  const loadRows = useCallback(async () => {
+    const [ev, bn] = await Promise.all([
+      fetch("/api/admin/events", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { events: [] })),
+      fetch("/api/admin/bonus", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { bonuses: [] })),
+    ]);
+    const events: Row[] = (ev.events || []).map((e: any) => ({
+      id: e.id, kind: e.qr_type === "class" ? "class" : "team", title: e.title || "", qr_code: e.qr_code, pin: e.pin, active: e.active !== false,
+      detail: e.qr_type === "class" ? `${e.class_school} ${e.class_site} ${yearLabel(e.class_year)}` : `Squadra ${e.team_target || ""}`,
+      team: e.team_target, school: e.class_school, site: e.class_site, year: e.class_year, created_at: e.created_at,
+    }));
+    const bonuses: Row[] = (bn.bonuses || []).map((b: any) => ({
+      id: b.id, kind: "recharge" as Kind, title: b.title || "", qr_code: b.code, pin: b.pin, active: b.active !== false,
+      detail: `+${b.amount} coins`, created_at: b.created_at,
+    }));
+    setRows([...events, ...bonuses].sort((a, b) => b.created_at.localeCompare(a.created_at)));
+  }, []);
+  useEffect(() => { loadRows(); }, [loadRows]);
+
   const options = site ? classesOfSite(site) : [];
   const schools = Array.from(new Set(options.map((c) => c.school)));
   const years = options.filter((c) => c.school === school).map((c) => c.year);
 
+  // Il QR che si sta per creare esiste già? Lo si dice subito e il pulsante resta spento.
+  const duplicate = useMemo<Row | null>(() => {
+    if (kind === "class" && site && school && year) {
+      return rows.find((r) => r.kind === "class" && r.site === site && r.school === school && r.year === year) || null;
+    }
+    if (kind === "team") return rows.find((r) => r.kind === "team" && r.team === team) || null;
+    if (kind === "recharge" && title.trim()) {
+      return rows.find((r) => r.kind === "recharge" && r.title.trim().toLowerCase() === title.trim().toLowerCase()) || null;
+    }
+    return null;
+  }, [rows, kind, site, school, year, team, title]);
+
+  const show = async (row: Row, note: string) => {
+    const src = await QRCode.toDataURL(row.qr_code, { width: 600, margin: 2, color: { dark: "#1E3A5F", light: "#ffffff" } });
+    setMade({ src, heading: row.title || row.detail, pin: row.pin, filename: fileName(row.title || row.detail), note });
+  };
+
   const create = async () => {
     setMessage("");
     setMade(null);
+    if (duplicate) { setMessage("❌ Questo QR esiste già: non si crea due volte."); await show(duplicate, "È già stato creato: ecco quello esistente."); return; }
+
     const uuid = crypto.randomUUID();
     let endpoint = "/api/admin/events";
     let body: Record<string, unknown>;
@@ -47,7 +103,6 @@ export default function QrGenerator() {
       body = { title: title.trim() || heading, qr_type: "class", team_target: teamForYear(year), class_school: school, class_site: site, class_year: year, qr_code: `QR:${uuid}` };
     } else if (kind === "team") {
       heading = title.trim() || `Vota ${team}`;
-      if (!confirm(`Le squadre hanno già il loro QR (PIN 1212 Matricole, 3434 Veterani). Crearne un altro per ${team}?`)) return;
       body = { title: heading, qr_type: "team", team_target: team, qr_code: `QR:${uuid}` };
     } else {
       if (!title.trim()) { setMessage("❌ Scrivi un titolo per il QR ricarica"); return; }
@@ -62,17 +117,29 @@ export default function QrGenerator() {
     const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const data = await res.json();
     setBusy(false);
+
+    if (res.status === 409 && data.existing) {
+      // creato nel frattempo da qualcun altro: lo si mostra come esistente
+      setMessage("❌ " + data.message);
+      await loadRows();
+      const e = data.existing;
+      await show({ id: e.id, kind, title: e.title || heading, detail: "", qr_code: e.qr_code || e.code, pin: e.pin, active: true, created_at: "" }, "È già stato creato: ecco quello esistente.");
+      return;
+    }
     if (!res.ok) { setMessage("❌ " + (data.message || "Errore")); return; }
 
     const row = data.event || data.bonus;
-    const qrSrc = await QRCode.toDataURL(row.qr_code, { width: 600, margin: 2, color: { dark: "#1E3A5F", light: "#ffffff" } });
-    setMade({
-      src: qrSrc,
-      heading: row.title || heading,
-      pin: row.pin || null,
-      filename: `QR_${(row.title || heading).replace(/[^A-Za-z0-9À-ɏ]+/g, "_")}.png`,
-      note: data.existing ? "Questa classe aveva già il suo QR: ecco quello esistente." : "QR creato.",
-    });
+    await show({ id: row.id, kind, title: row.title || heading, detail: "", qr_code: row.qr_code || row.code, pin: row.pin, active: true, created_at: "" }, "✅ QR creato.");
+    await loadRows();
+  };
+
+  const downloadRow = async (r: Row) => downloadDataUrl(await qrImage({ qr_code: r.qr_code, title: r.title || r.detail, pin: r.pin }), fileName(r.title || r.detail));
+
+  const toggle = async (r: Row) => {
+    const endpoint = r.kind === "recharge" ? "/api/admin/bonus" : "/api/admin/events";
+    const res = await fetch(endpoint, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id, active: !r.active }) });
+    if (!res.ok) setMessage("❌ " + ((await res.json()).message || "Errore"));
+    await loadRows();
   };
 
   const download = async () => {
@@ -81,6 +148,9 @@ export default function QrGenerator() {
     try { href = await qrWithPinImage(made.src, made.heading, made.pin); } catch { /* si scarica il solo QR */ }
     downloadDataUrl(href, made.filename);
   };
+
+  const q = search.trim().toLowerCase();
+  const filtered = rows.filter((r) => (filter === "all" || r.kind === filter) && (!q || `${r.title} ${r.detail} ${r.pin || ""}`.toLowerCase().includes(q)));
 
   return (
     <div style={{ marginTop: 20, padding: 16, background: "#f8f9fa", borderRadius: 8 }}>
@@ -123,15 +193,28 @@ export default function QrGenerator() {
             <span>coins</span>
           </>
         )}
-        <input
-          placeholder={kind === "recharge" ? "Titolo (obbligatorio)" : "Titolo (facoltativo)"}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{ ...INPUT, flex: 1, minWidth: 180 }}
-        />
+        {kind !== "team" && (
+          <input
+            placeholder={kind === "recharge" ? "Titolo (obbligatorio)" : "Titolo (facoltativo)"}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{ ...INPUT, flex: 1, minWidth: 180 }}
+          />
+        )}
       </div>
 
-      <button onClick={create} disabled={busy} style={{ marginTop: 12, padding: "10px 20px", borderRadius: 60, border: "none", background: "#1E3A5F", color: "white", fontWeight: 700, cursor: "pointer" }}>
+      {duplicate && (
+        <p style={{ marginBottom: 0, color: "#b45309", fontWeight: 600 }}>
+          ⚠️ Esiste già: «{duplicate.title || duplicate.detail}» (PIN {duplicate.pin}). Non si crea due volte.{" "}
+          <button onClick={() => show(duplicate, "È già stato creato: ecco quello esistente.")} style={{ cursor: "pointer" }}>Mostra</button>
+        </p>
+      )}
+
+      <button
+        onClick={create}
+        disabled={busy || !!duplicate}
+        style={{ marginTop: 12, padding: "10px 20px", borderRadius: 60, border: "none", background: duplicate ? "#9ca3af" : "#1E3A5F", color: "white", fontWeight: 700, cursor: duplicate ? "not-allowed" : "pointer" }}
+      >
         {busy ? "…" : "Genera QR"}
       </button>
       {message && <p style={{ marginBottom: 0 }}>{message}</p>}
@@ -147,6 +230,43 @@ export default function QrGenerator() {
           </button>
         </div>
       )}
+
+      <h3 style={{ marginBottom: 8, marginTop: 24 }}>QR esistenti ({filtered.length} di {rows.length})</h3>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+        {(["all", "class", "team", "recharge"] as const).map((f) => (
+          <button key={f} style={{ ...PILL(filter === f), padding: "4px 10px", fontSize: "0.8rem" }} onClick={() => { setFilter(f); setShown(PAGE); }}>
+            {f === "all" ? "Tutti" : KIND_LABEL[f]}
+          </button>
+        ))}
+        <input placeholder="🔍 Cerca…" value={search} onChange={(e) => { setSearch(e.target.value); setShown(PAGE); }} style={{ ...INPUT, flex: 1, minWidth: 140 }} />
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: "2px solid #ddd" }}>
+              <th style={{ padding: 6 }}>Tipo</th><th style={{ padding: 6 }}>QR</th><th style={{ padding: 6 }}>PIN</th><th style={{ padding: 6 }}>Stato</th><th style={{ padding: 6 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.slice(0, shown).map((r) => (
+              <tr key={r.kind + r.id} style={{ borderBottom: "1px solid #eee", opacity: r.active ? 1 : 0.55 }}>
+                <td style={{ padding: 6, whiteSpace: "nowrap" }}>{KIND_LABEL[r.kind]}</td>
+                <td style={{ padding: 6 }}>{r.title || r.detail}{r.title && r.detail && r.title !== r.detail && <div style={{ color: "#666" }}>{r.detail}</div>}</td>
+                <td style={{ padding: 6, fontWeight: 700 }}>{r.pin}</td>
+                <td style={{ padding: 6 }}>{r.active ? "Attivo" : "Disattivo"}</td>
+                <td style={{ padding: 6, whiteSpace: "nowrap" }}>
+                  <button onClick={() => downloadRow(r)} style={{ marginRight: 4, cursor: "pointer" }}>⬇️ QR</button>
+                  <button onClick={() => toggle(r)} style={{ cursor: "pointer" }}>{r.active ? "Disattiva" : "Attiva"}</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {filtered.length > shown && (
+        <button onClick={() => setShown((n) => n + PAGE)} style={{ marginTop: 8, cursor: "pointer" }}>Mostra altri ({filtered.length - shown})</button>
+      )}
+      {filtered.length === 0 && <p style={{ color: "#666" }}>Nessun QR trovato.</p>}
     </div>
   );
 }
