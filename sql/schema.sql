@@ -310,6 +310,7 @@ $function$;
 --   standings_aggregates(p_now)  -> jsonb {votes, event_votes, allocations}: le somme usate da
 --                                   lib/standings.ts al posto della lettura di tutte le righe
 --   karaoke_totals(p_from, p_to) -> jsonb {Matricole, Veterani}: totali della sfida karaoke
+--   coin_usage(p_user, p_since)  -> jsonb {votes, event_votes, bonus}: saldo coin in una sola lettura
 --   fantassisi_db_check()        -> jsonb con lo stato delle migrazioni (scheda "Stato del sistema")
 -- Il testo completo e' in sql/09_aggregates.sql.
 -- ---------------------------------------------------------------------------

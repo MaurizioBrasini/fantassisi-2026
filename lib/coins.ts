@@ -33,6 +33,18 @@ export async function getCoinBalance(
 ): Promise<{ remaining: number; earned: number; spent: number }> {
   const { since, days } = coinWindow();
 
+  // Una sola interrogazione (sql/09_aggregates.sql, funzione coin_usage); se non c'è, le letture separate.
+  try {
+    const { data, error } = await supabase.rpc("coin_usage", { p_user: userId, p_since: since });
+    if (!error && data && typeof data.votes === "number" && typeof data.event_votes === "number") {
+      const earned = DAILY_COINS * days + Number(data.bonus || 0);
+      const spent = data.votes + data.event_votes;
+      return { remaining: Math.max(0, earned - spent), earned, spent };
+    }
+  } catch {
+    /* si passa alle letture separate */
+  }
+
   const [votes, eventVotes, redemptions] = await Promise.all([
     supabase.from("votes").select("id", { count: "exact", head: true }).eq("voter_id", userId).gte("voted_at", since),
     supabase.from("event_votes").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("voted_at", since),

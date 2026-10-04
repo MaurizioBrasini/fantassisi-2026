@@ -64,6 +64,24 @@ as $$
   );
 $$;
 
+-- 2b) Coin usati e ricariche di una persona da una certa data, in una sola interrogazione (prima erano
+--     3-4 letture separate a ogni apertura della dashboard e a ogni voto). Stessa regola di lib/coins.ts.
+create or replace function public.coin_usage(p_user uuid, p_since timestamptz)
+returns jsonb
+language sql
+stable
+as $$
+  select jsonb_build_object(
+    'votes', (select count(*) from public.votes where voter_id = p_user and voted_at >= p_since),
+    'event_votes', (select count(*) from public.event_votes where user_id = p_user and voted_at >= p_since),
+    'bonus', coalesce((
+      select sum(coalesce(b.amount, 0))
+      from public.bonus_redemptions r join public.bonus_qr b on b.id = r.bonus_id
+      where r.user_id = p_user and r.redeemed_at >= p_since
+    ), 0)
+  );
+$$;
+
 -- 3) Controllo dello stato del database per la scheda "Stato del sistema" del pannello admin.
 create or replace function public.fantassisi_db_check()
 returns jsonb
@@ -88,6 +106,8 @@ create index if not exists idx_event_votes_voted_at on public.event_votes using 
 revoke all on function public.standings_aggregates(timestamptz) from public, anon, authenticated;
 revoke all on function public.karaoke_totals(timestamptz, timestamptz) from public, anon, authenticated;
 revoke all on function public.fantassisi_db_check() from public, anon, authenticated;
+revoke all on function public.coin_usage(uuid, timestamptz) from public, anon, authenticated;
+grant execute on function public.coin_usage(uuid, timestamptz) to service_role;
 grant execute on function public.standings_aggregates(timestamptz) to service_role;
 grant execute on function public.karaoke_totals(timestamptz, timestamptz) to service_role;
 grant execute on function public.fantassisi_db_check() to service_role;

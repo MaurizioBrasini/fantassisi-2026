@@ -19,7 +19,7 @@ Come eseguirli senza errori:
 | 06 | `06_team_pins.sql` | PIN fissi 1212 Matricole / 3434 Veterani | eseguito (verificato) |
 | 07 | `07_public_bonuses.sql` | premi palesi con banner | eseguito (verificato) |
 | 08 | `08_normalize_class_qr.sql` | QR di classe con grafie standard | eseguito (verificato) |
-| **09** | **`09_aggregates.sql`** | **classifiche calcolate dal database (velocità con molti voti) + controlli** | **DA ESEGUIRE** |
+| **09** | **`09_aggregates.sql`** | **classifiche, karaoke e saldo coin calcolati dal database (velocità con molti voti) + controlli per "Stato del sistema"** | **DA ESEGUIRE** |
 
 `schema.sql` non si esegue: è la descrizione del database com'è oggi.
 
