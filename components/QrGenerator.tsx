@@ -6,6 +6,7 @@ import { CONFIG_ISCRIZIONE } from "@/lib/config";
 import { classesOfSite, teamForYear, yearLabel } from "@/lib/publicBonus";
 import { qrWithPinImage, downloadDataUrl } from "@/lib/qrImage";
 import { sameClass, canonYear } from "@/lib/classKey";
+import { uuid } from "@/lib/uuid";
 
 type Kind = "class" | "team" | "recharge";
 type Row = {
@@ -94,7 +95,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
     setMade(null);
     if (duplicate) { setMessage("❌ Questo QR esiste già: non si crea due volte."); await show(duplicate, "È già stato creato: ecco quello esistente."); return; }
 
-    const uuid = crypto.randomUUID();
+    const rid = uuid();
     let endpoint = "/api/admin/events";
     let body: Record<string, unknown>;
     let heading: string;
@@ -102,17 +103,17 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
     if (kind === "class") {
       if (!site || !school || !year) { setMessage("❌ Scegli sede, scuola e anno"); return; }
       heading = `${school} ${site} ${yearLabel(year)}`;
-      body = { title: title.trim() || heading, qr_type: "class", team_target: teamForYear(year), class_school: school, class_site: site, class_year: year, qr_code: `QR:${uuid}` };
+      body = { title: title.trim() || heading, qr_type: "class", team_target: teamForYear(year), class_school: school, class_site: site, class_year: year, qr_code: `QR:${rid}` };
     } else if (kind === "team") {
       heading = title.trim() || `Vota ${team}`;
-      body = { title: heading, qr_type: "team", team_target: team, qr_code: `QR:${uuid}` };
+      body = { title: heading, qr_type: "team", team_target: team, qr_code: `QR:${rid}` };
     } else {
       if (!title.trim()) { setMessage("❌ Scrivi un titolo per il QR ricarica"); return; }
       const coins = Number(amount);
       if (!Number.isInteger(coins) || coins < 1) { setMessage("❌ Quanti coins? Un numero intero"); return; }
       endpoint = "/api/admin/bonus";
       heading = title.trim();
-      body = { title: heading, amount: coins, code: `QR:${uuid.slice(0, 8)}` };
+      body = { title: heading, amount: coins, code: `QR:${rid.slice(0, 8)}` };
     }
 
     setBusy(true);

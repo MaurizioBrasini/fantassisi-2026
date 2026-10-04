@@ -27,7 +27,11 @@ export async function GET(request: Request) {
   });
 
   // Escape campi CSV
-  const esc = (s: string | null | undefined) => `"${(s || "").replace(/"/g, '""')}"`;
+  // Un nome che inizia con = + - @ verrebbe eseguito come formula da Excel: si neutralizza con un apice.
+  const esc = (s: string | null | undefined) => {
+    const v = /^[=+\-@\t\r]/.test(s || "") ? `'${s}` : s || "";
+    return `"${v.replace(/"/g, '""')}"`;
+  };
 
   const rows = allUsers
     .filter((u) => u.email && u.auth_token)

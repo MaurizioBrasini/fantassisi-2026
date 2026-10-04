@@ -138,12 +138,22 @@ export async function PUT(request: Request) {
     return NextResponse.json({ message: "Accesso negato" }, { status: 403 });
   }
 
-  const body = await request.json();
-  const { id, email, first_name, last_name, team, site, school, year, is_didatta } = body;
-  let userRole = body.role;
+  const body = await readJsonObject(request);
+  if (!body) {
+    return NextResponse.json({ message: "Richiesta non valida" }, { status: 400 });
+  }
+  const { id, email, first_name, last_name, team, site, school, year, is_didatta } = body as Record<string, any>;
+  let userRole = body.role as string | undefined;
 
-  if (!id) {
+  if (!id || typeof id !== "string") {
     return NextResponse.json({ message: "ID utente obbligatorio" }, { status: 400 });
+  }
+  if (userRole !== undefined && !["student", "staff", "admin"].includes(userRole)) {
+    return NextResponse.json({ message: "Ruolo non valido" }, { status: 400 });
+  }
+  // Nessuno può cambiare il proprio ruolo (un admin che si declassa lascerebbe il pannello senza admin).
+  if (id === requester.id && userRole !== undefined && userRole !== requester.role) {
+    return NextResponse.json({ message: "Non puoi cambiare il tuo stesso ruolo" }, { status: 400 });
   }
 
   // Validazione Team ↔ Anno
@@ -197,6 +207,10 @@ export async function PUT(request: Request) {
   if (!isProtectedAccount) {
     if (email) updateData.email = String(email).trim().toLowerCase();
     if (userRole !== undefined) updateData.role = userRole;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ message: "Niente da aggiornare" }, { status: 400 });
   }
 
   const { data, error } = await supabase

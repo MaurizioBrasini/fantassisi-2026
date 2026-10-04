@@ -9,6 +9,7 @@ import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
 import PhaseCard from "@/components/PhaseCard";
 import { canonClass } from "@/lib/classKey";
+import { uuid } from "@/lib/uuid";
 import BonusGenerator from "@/components/BonusGenerator";
 
 function teamFromYear(year: string): string {
@@ -503,13 +504,13 @@ export default function AdminPage() {
 
     if (qrTab === "squadra") {
       if (!qrSquadraForm.title) { setMessage("❌ Inserisci un titolo"); return; }
-      qrCode = `QR:${crypto.randomUUID()}`;
+      qrCode = `QR:${uuid()}`;
       label = qrSquadraForm.title;
       table = "votable_events";
       insertData = { title: qrSquadraForm.title, qr_type: "team", team_target: qrSquadraForm.team, qr_code: qrCode, active: true };
     } else if (qrTab === "classe") {
       if (!qrClasseForm.school || !qrClasseForm.site || !qrClasseForm.year) { setMessage("❌ Seleziona una classe"); return; }
-      qrCode = `QR:${crypto.randomUUID()}`;
+      qrCode = `QR:${uuid()}`;
       label = `${qrClasseForm.school} ${qrClasseForm.site} ${qrClasseForm.year}`;
       table = "votable_events";
       insertData = {
@@ -524,7 +525,7 @@ export default function AdminPage() {
       };
     } else {
       if (!qrRicaricaForm.title) { setMessage("❌ Inserisci un titolo"); return; }
-      qrCode = `QR:${crypto.randomUUID().slice(0, 8)}`;
+      qrCode = `QR:${uuid().slice(0, 8)}`;
       label = qrRicaricaForm.title;
       table = "bonus_qr";
       insertData = { title: qrRicaricaForm.title, amount: qrRicaricaForm.amount, code: qrCode, active: true };
@@ -788,22 +789,14 @@ export default function AdminPage() {
     if (!isSuper) { setMessage("❌ Solo admin possono nominare staff"); return; }
     const email = adminEmail.trim();
     if (!email) { setMessage("❌ Inserisci un'email"); return; }
-    const user = users.find((u) => u.email === email);
+    const user = users.find((u) => (u.email || "").trim().toLowerCase() === email.toLowerCase());
     if (!user) { setMessage("❌ Utente non trovato"); return; }
+    // Si cambia solo il ruolo: gli altri dati del profilo non si rimandano (alcuni hanno grafie vecchie
+    // che il controllo di coerenza squadra/anno rifiuterebbe).
     const res = await fetch("/api/admin/users", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id: user.id,
-        email: user.email,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        team: user.team || null,
-        role: "staff",
-        site: user.site || null,
-        school: user.school || null,
-        year: user.year || null
-      }),
+      body: JSON.stringify({ id: user.id, role: "staff" }),
     });
     const data = await res.json();
     if (res.ok) {
