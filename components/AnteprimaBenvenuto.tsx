@@ -24,6 +24,14 @@ export default function AnteprimaBenvenuto({ opensAtLabel }: { opensAtLabel: str
         <span style={EMOJI}>🎬</span>
         <span>Intanto <strong>postate i vostri video</strong> nella community di WhatsApp: gli organizzatori premieranno i contributi più originali e divertenti!</span>
       </div>
+      <a
+        href="https://chat.whatsapp.com/JWlqvAVOTxF2qVRQX1tLKb"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ display: "block", marginTop: 14, padding: 14, borderRadius: 60, background: "#25D366", color: "white", textAlign: "center", fontWeight: 800, textDecoration: "none" }}
+      >
+        💬 Apri la community WhatsApp
+      </a>
       {when && (
         <div style={STEP}>
           <span style={EMOJI}>📅</span>

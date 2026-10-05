@@ -42,7 +42,7 @@ function QrCard({ label, heading, qr, filename }: { label: string; heading: stri
         disabled={!src}
         style={{ marginTop: 12, padding: "10px 20px", borderRadius: 60, background: "#1E3A5F", color: "white", border: "none", fontWeight: 700, cursor: "pointer", fontSize: "0.85rem" }}
       >
-        ⬇️ Scarica per le slides
+        ⬇️ Scarica l&apos;immagine
       </button>
     </div>
   );

@@ -337,7 +337,7 @@ function SlidesQrToggle() {
         onClick={() => setOpen((v) => !v)}
         style={{ width: "100%", padding: 12, borderRadius: 60, border: "2px solid #1E3A5F", background: "white", color: "#1E3A5F", fontWeight: 700, cursor: "pointer" }}
       >
-        {open ? "▲ Chiudi i QR per le slides" : "📊 QR della squadra e della classe (per le slides)"}
+        {open ? "▲ Chiudi i QR di squadra e classe" : "📊 QR della squadra e della classe"}
       </button>
       {open && (
         <div style={{ marginTop: 12 }}>
@@ -441,12 +441,12 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
         {myClass && ` · ${yearLabel(myClass)}`}
       </p>
 
-      {/* In Anteprima: solo benvenuto, classifica squadre e contributi. Punteggio personale, QR e
-          coins compaiono a voto aperto. */}
+      {/* In Anteprima: benvenuto, classifica squadre, contributi e punteggio personale (arrivano già i
+          premi palesi). QR personale e coins compaiono a voto aperto. */}
       {!votingOpen && <AnteprimaBenvenuto opensAtLabel={opensAtLabel} />}
       <ContributionLinks />
 
-      {votingOpen && <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
           <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
@@ -457,16 +457,20 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
             </div>
           </div>
         </div>
-        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
-            Mostra il QR per ricevere voti
-          </div>
-          <Link href="/myqr" style={{ ...ACTION_LINK_STYLE, background: "#A8D8A8", border: "2px solid #2E7D32" }}>
-            Il mio QR
-          </Link>
-        </div>
-      </div>}
+        {votingOpen && (
+          <>
+            <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+                Mostra il QR per ricevere voti
+              </div>
+              <Link href="/myqr" style={{ ...ACTION_LINK_STYLE, background: "#A8D8A8", border: "2px solid #2E7D32" }}>
+                Il mio QR
+              </Link>
+            </div>
+          </>
+        )}
+      </div>
 
       {votingOpen && (
         <>
