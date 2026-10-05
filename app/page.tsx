@@ -263,7 +263,7 @@ function useDashboardData(userId: string) {
 
 const PAGE_STYLE = { maxWidth: 480, margin: "0 auto", padding: 20, fontFamily: "system-ui, sans-serif" } as const;
 const ACTION_LINK_STYLE = { display: "flex", alignItems: "center", justifyContent: "center", height: 70, borderRadius: "50%", background: "#E0B8E8", border: "2px solid #7B1FA2", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", textAlign: "center", fontSize: "0.9rem" } as const;
-const CONTRIBUTION_LINK_STYLE = { flex: 1, textAlign: "center", padding: "12px 6px", borderRadius: 10, background: "#FFF3B0", color: "#1E1E1E", fontWeight: 700, textDecoration: "none", fontSize: "0.85rem" } as const;
+const RANKING_BANNER_STYLE = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", borderRadius: 16, background: "#FFF3B0", border: "2px solid #E0B800", color: "#1E1E1E", fontWeight: 800, textDecoration: "none", fontSize: "1rem" } as const;
 
 function TeamScoreboard({ teamScores, marginBottom }: { teamScores: { Matricole: number; Veterani: number }; marginBottom: number }) {
   const side = (team: "Matricole" | "Veterani") => (
@@ -284,16 +284,24 @@ function TeamScoreboard({ teamScores, marginBottom }: { teamScores: { Matricole:
   );
 }
 
-function ContributionLinks() {
+// Tre banner sotto la classifica squadre: in prima pagina si vedono solo i punteggi delle squadre,
+// le altre classifiche si aprono toccando.
+function RankingBanners() {
+  const items = [
+    { href: "/ranking/individuali", icon: "🏅", label: "Classifica individuale" },
+    { href: "/ranking/classi", icon: "🏫", label: "Classifica per classi" },
+    { href: "/ranking/sedi", icon: "📍", label: "Classifica per sedi" },
+  ];
   return (
-    <>
-      <h2 style={{ fontSize: "1.1rem", color: "#1E3A5F", marginBottom: 10 }}>Contributi</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 28 }}>
-        <Link href="/ranking/individuali" style={CONTRIBUTION_LINK_STYLE}>Individuali</Link>
-        <Link href="/ranking/sedi" style={CONTRIBUTION_LINK_STYLE}>Per sede</Link>
-        <Link href="/ranking/classi" style={CONTRIBUTION_LINK_STYLE}>Per classe</Link>
-      </div>
-    </>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
+      {items.map((i) => (
+        <Link key={i.href} href={i.href} style={RANKING_BANNER_STYLE}>
+          <span style={{ fontSize: "1.5rem" }}>{i.icon}</span>
+          <span style={{ flex: 1 }}>{i.label}</span>
+          <span style={{ fontSize: "1.2rem" }}>›</span>
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -393,8 +401,8 @@ function DashboardDidatti({ userName, userId, userRole, votingOpen, opensAtLabel
         Ciao <strong>{userName || "Partecipante"}</strong> · Didatti&amp;Docenti
       </p>
 
+      <RankingBanners />
       {!votingOpen && <AnteprimaBenvenuto opensAtLabel={opensAtLabel} />}
-      <ContributionLinks />
       {votingOpen && (
         <>
           <CoinsAndRecharge remainingCoins={remainingCoins} />
@@ -443,8 +451,8 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
 
       {/* In Anteprima: benvenuto, classifica squadre, contributi e punteggio personale (arrivano già i
           premi palesi). QR personale e coins compaiono a voto aperto. */}
+      <RankingBanners />
       {!votingOpen && <AnteprimaBenvenuto opensAtLabel={opensAtLabel} />}
-      <ContributionLinks />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
