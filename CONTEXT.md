@@ -21,9 +21,10 @@ Questo documento descrive l'intero progetto da zero, non solo le ultime modifich
 | Fase Anteprima / Voto aperto | `lib/phase.ts` (tabella `app_settings`) |
 | Classe = (scuola, sede, anno); solo studenti in corso 1°-4° anno; grafie vecchie riconosciute | `lib/classKey.ts`, `lib/standings.ts` |
 | Bonus nascosti (a tempo) e premi palesi (persona/classe/sede, con banner) | `lib/boosts.ts`, `lib/publicBonus.ts`, `components/BonusGenerator.tsx` |
+| QR di voto: squadra (uno per squadra, PIN fissi), classe (uno per classe, creato anche dall'Anteprima) e sede (uno per sede, solo classifica sedi; `sql/10_site_qr.sql`). Un solo generatore, `components/QrGenerator.tsx`, usato da `/staff` e dal pannello admin (l'eliminazione è solo admin) | `app/api/admin/events/route.ts`, `lib/qrActions.ts` |
 | Punteggi e classifiche (squadre, individuali, classi, sedi), anche per i tabelloni | `lib/standings.ts` (somme dal database, `sql/09_aggregates.sql`) |
 
-**Ruoli.** `admin`: tutto (pannello `/admin`). `staff`: pagina `/staff` con QR ricarica, bonus, nuovi partecipanti, elenco e download dei QR esistenti; niente token/PIN altrui, niente QR di voto, niente reset/import. `student` (mostrato come "partecipante"): app.
+**Ruoli.** `admin`: tutto (pannello `/admin`). `staff`: pagina `/staff` con QR ricarica, bonus, nuovi partecipanti, elenco e download dei QR esistenti; niente token/PIN altrui, niente QR di voto (classe, squadra, sede), niente reset/import. `student` (mostrato come "partecipante"): app.
 
 **Protezioni da non togliere.** Voti serializzati per persona (`lib/userLock.ts`: niente doppi voti simultanei); input validati (`lib/http.ts`); intestazioni di sicurezza (`next.config.js`); classifiche con cache e ricalcolo in sottofondo; pagine di errore (`app/error.tsx`, `app/global-error.tsx`).
 

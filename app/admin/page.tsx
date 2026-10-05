@@ -8,15 +8,9 @@ import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
 import PhaseCard from "@/components/PhaseCard";
 import SystemCheck from "@/components/SystemCheck";
-import { downloadQrImage, qrFileName } from "@/lib/qrImage";
 import BonusGenerator from "@/components/BonusGenerator";
 import QrGenerator from "@/components/QrGenerator";
 
-
-// Scarica il QR di un evento o di una ricarica: titolo + QR + codice (lib/qrImage.ts).
-function downloadQR(code: string, label: string, pin?: string | null) {
-  return downloadQrImage(code, label, pin ?? null, qrFileName(label), "Se non riesce a scansionare, vota o ricarica con il codice");
-}
 
 // Componente per la selezione della scuola con input custom
 const SchoolSelect = ({ value, onChange, suggested, site }: any) => {
@@ -198,22 +192,14 @@ export default function AdminPage() {
   const [userRoleFilter, setUserRoleFilter] = useState("all");
   const [userSortBy, setUserSortBy] = useState<UserSortCol>("name");
   const [userSortDir, setUserSortDir] = useState<"asc" | "desc">("asc");
-  const [events, setEvents] = useState<any[]>([]);
-  const [bonuses, setBonuses] = useState<any[]>([]);
   const [message, setMessage] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [sendingBulk, setSendingBulk] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 
   // Filtri, ricerca e paginazione per QR Voto
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [sortBy, setSortBy] = useState("created_desc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
 
   // Modali
-  const [showQRModal, setShowQRModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -307,11 +293,8 @@ export default function AdminPage() {
       setMessage("❌ Non riesco a caricare i dati del pannello. Ricarica la pagina.");
       return;
     }
-    const { users: allUsersData, events: ev, bonuses: bn } = await res.json();
+    const { users: allUsersData } = await res.json();
     setUsers(allUsersData);
-
-    setEvents(ev || []);
-    setBonuses(bn || []);
   };
 
   const filteredUsers = users
@@ -382,77 +365,6 @@ export default function AdminPage() {
   const sortArrow = (col: UserSortCol) => {
     if (userSortBy !== col) return "";
     return userSortDir === "asc" ? " ▲" : " ▼";
-  };
-
-  // Filtra e ordina i QR Voto
-  const filteredEvents = events
-    .filter((e) => {
-      if (filterType !== "all" && e.qr_type !== filterType) return false;
-      if (searchTerm.trim()) {
-        const search = searchTerm.toLowerCase().trim();
-        const title = (e.title || "").toLowerCase();
-        const school = (e.class_school || "").toLowerCase();
-        const site = (e.class_site || "").toLowerCase();
-        const year = (e.class_year || "").toLowerCase();
-        const team = (e.team_target || "").toLowerCase();
-        return title.includes(search) || school.includes(search) || site.includes(search) || year.includes(search) || team.includes(search);
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "title_asc": return (a.title || "").localeCompare(b.title || "");
-        case "title_desc": return (b.title || "").localeCompare(a.title || "");
-        case "created_desc": return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case "created_asc": return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case "team_asc": return (a.team_target || "").localeCompare(b.team_target || "");
-        case "team_desc": return (b.team_target || "").localeCompare(a.team_target || "");
-        default: return 0;
-      }
-    });
-
-  const totalPages = Math.ceil(filteredEvents.length / pageSize);
-  const paginatedEvents = filteredEvents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  const handleToggleEvent = async (id: string, current: boolean) => {
-    const res = await fetch("/api/admin/events", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, active: !current }),
-    });
-    const data = await res.json();
-    if (!res.ok) { setMessage("❌ " + data.message); return; }
-    await loadData();
-  };
-
-  const handleToggleBonus = async (id: string, current: boolean) => {
-    const res = await fetch("/api/admin/bonus", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, active: !current }),
-    });
-    const data = await res.json();
-    if (!res.ok) { setMessage("❌ " + data.message); return; }
-    await loadData();
-  };
-
-  // ── Elimina QR (SOLO ADMIN) ──────────────────────────────
-  const handleDeleteEvent = async (id: string, title: string) => {
-    if (!isSuper) { setMessage("❌ Solo admin possono eliminare QR"); return; }
-    if (!confirm(`Eliminare "${title}"?`)) return;
-    const res = await fetch(`/api/admin/events?id=${id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (!res.ok) setMessage("❌ " + data.message);
-    else { setMessage("✅ QR eliminato"); loadData(); }
-  };
-
-  const handleDeleteBonus = async (id: string, title: string) => {
-    if (!isSuper) { setMessage("❌ Solo admin possono eliminare QR"); return; }
-    if (!confirm(`Eliminare "${title}"?`)) return;
-    const res = await fetch(`/api/admin/bonus?id=${id}`, { method: "DELETE" });
-    const data = await res.json();
-    if (!res.ok) setMessage("❌ " + data.message);
-    else { setMessage("✅ QR eliminato"); loadData(); }
   };
 
   // ── Reset (SOLO ADMIN) ────────────────────────────────────
@@ -704,11 +616,6 @@ export default function AdminPage() {
       {/* 🔥 Bottoni principali: solo ADMIN può vedere Genera QR, Reset, Import */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 20 }}>
         {isSuper && (
-          <button onClick={() => setShowQRModal(true)} style={{ padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
-            🎯 Genera QR
-          </button>
-        )}
-        {isSuper && (
           <button onClick={() => setShowResetModal(true)} style={{ padding: 12, background: "#dc3545", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
             🔄 Reset
           </button>
@@ -743,148 +650,8 @@ export default function AdminPage() {
       {/* 🎁 Generatore unico di bonus (nascosti e palesi) */}
       {isSuper && <BonusGenerator canDelete />}
 
-      {/* Sezione QR Voto */}
-      <div style={{ marginTop: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <h2 style={{ margin: 0 }}>🎯 QR Voto ({filteredEvents.length} di {events.length})</h2>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <input
-              type="text"
-              placeholder="🔍 Cerca QR..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: "0.85rem", minWidth: 180 }}
-            />
-            <select
-              value={filterType}
-              onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); }}
-              style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: "0.85rem", background: "white" }}
-            >
-              <option value="all">Tutti</option>
-              <option value="team">Squadra</option>
-              <option value="class">Classe</option>
-              <option value="site">Sede</option>
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
-              style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #ccc", fontSize: "0.85rem", background: "white" }}
-            >
-              <option value="created_desc">Più recenti</option>
-              <option value="created_asc">Più vecchi</option>
-              <option value="title_asc">Titolo A→Z</option>
-              <option value="title_desc">Titolo Z→A</option>
-              <option value="team_asc">Squadra A→Z</option>
-              <option value="team_desc">Squadra Z→A</option>
-            </select>
-          </div>
-        </div>
-
-        {filteredEvents.length === 0 ? (
-          <p style={{ color: "#999", textAlign: "center", padding: 20 }}>
-            {searchTerm ? "Nessun QR corrisponde alla ricerca" : "Nessun QR voto generato"}
-          </p>
-        ) : (
-          <>
-            <div style={{ maxHeight: 400, overflowY: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-                <thead>
-                  <tr style={{ borderBottom: "2px solid #ddd", position: "sticky", top: 0, background: "white", zIndex: 1 }}>
-                    <th style={{ textAlign: "left", padding: 8 }}>Titolo</th>
-                    <th style={{ textAlign: "left", padding: 8 }}>Tipo</th>
-                    <th style={{ textAlign: "left", padding: 8 }}>Target</th>
-                    <th style={{ textAlign: "center", padding: 8 }}>Stato</th>
-                    <th style={{ textAlign: "center", padding: 8 }}>Azioni</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedEvents.map((e) => (
-                    <tr key={e.id} style={{ borderBottom: "1px solid #eee", opacity: e.active === false ? 0.5 : 1 }}>
-                      <td style={{ padding: 8 }}>{e.title}</td>
-                      <td style={{ padding: 8, fontSize: "0.8rem" }}>
-                        {e.qr_type === "class" 
-                          ? `🏫 ${e.class_school || ""} ${e.class_site || ""} ${e.class_year || ""}`.trim() || "Classe"
-                          : e.qr_type === "site" ? `📍 ${e.class_site || "Sede"}` : `🏆 ${e.team_target || "Squadra"}`}
-                      </td>
-                      <td style={{ padding: 8 }}>{e.team_target || "-"}</td>
-                      <td style={{ padding: 8, textAlign: "center" }}>
-                        <span style={{ padding: "2px 8px", borderRadius: 4, background: e.active !== false ? "#28a745" : "#dc3545", color: "white", fontSize: "0.75rem" }}>
-                          {e.active !== false ? "Attivo" : "Inattivo"}
-                        </span>
-                      </td>
-                      <td style={{ padding: 8, textAlign: "center", whiteSpace: "nowrap" }}>
-                        <button onClick={() => handleToggleEvent(e.id, e.active !== false)} style={{ padding: "4px 8px", marginRight: 4, background: e.active !== false ? "#dc3545" : "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                          {e.active !== false ? "Disattiva" : "Attiva"}
-                        </button>
-                        <button onClick={() => downloadQR(e.qr_code, e.title, e.pin)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                          ⬇️ QR
-                        </button>
-                        {isSuper && (
-                          <button onClick={() => handleDeleteEvent(e.id, e.title)} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                            🗑️
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {totalPages > 1 && (
-              <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
-                <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: currentPage === 1 ? "#f0f0f0" : "white", cursor: currentPage === 1 ? "not-allowed" : "pointer" }}>◀</button>
-                <span style={{ padding: "4px 12px", color: "#666", fontSize: "0.85rem" }}>{currentPage} / {totalPages}</span>
-                <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} style={{ padding: "4px 12px", borderRadius: 4, border: "1px solid #ccc", background: currentPage === totalPages ? "#f0f0f0" : "white", cursor: currentPage === totalPages ? "not-allowed" : "pointer" }}>▶</button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Lista QR Ricarica */}
-      <div style={{ marginTop: 20 }}>
-        <h2>⚡ QR Ricarica ({bonuses.length})</h2>
-        <div style={{ maxHeight: 300, overflowY: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #ddd" }}>
-                <th style={{ textAlign: "left", padding: 8 }}>Titolo</th>
-                <th style={{ textAlign: "left", padding: 8 }}>Coins</th>
-                <th style={{ textAlign: "center", padding: 8 }}>Stato</th>
-                <th style={{ textAlign: "center", padding: 8 }}>Azioni</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bonuses.map((b) => (
-                <tr key={b.id} style={{ borderBottom: "1px solid #eee", opacity: b.active === false ? 0.5 : 1 }}>
-                  <td style={{ padding: 8 }}>{b.title}</td>
-                  <td style={{ padding: 8 }}>+{b.amount}</td>
-                  <td style={{ padding: 8, textAlign: "center" }}>
-                    <span style={{ padding: "2px 8px", borderRadius: 4, background: b.active !== false ? "#28a745" : "#dc3545", color: "white", fontSize: "0.75rem" }}>
-                      {b.active !== false ? "Attivo" : "Inattivo"}
-                    </span>
-                  </td>
-                  <td style={{ padding: 8, textAlign: "center", whiteSpace: "nowrap" }}>
-                    <button onClick={() => handleToggleBonus(b.id, b.active !== false)} style={{ padding: "4px 8px", marginRight: 4, background: b.active !== false ? "#dc3545" : "#28a745", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                      {b.active !== false ? "Disattiva" : "Attiva"}
-                    </button>
-                    <button onClick={() => downloadQR(b.code, b.title, b.pin)} style={{ padding: "4px 8px", marginRight: 4, background: "#1E3A5F", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                      ⬇️ QR
-                    </button>
-                    {isSuper && (
-                      <button onClick={() => handleDeleteBonus(b.id, b.title)} style={{ padding: "4px 8px", background: "#dc3545", color: "white", border: "none", borderRadius: 4, cursor: "pointer", fontSize: "0.75rem" }}>
-                        🗑️
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
+      {/* 🎯 QR (squadra, classe, sede, ricarica): lo stesso generatore e lo stesso elenco della dashboard staff */}
+      {isSuper && <QrGenerator isAdmin />}
       {/* Lista Utenti */}
       <div style={{ marginTop: 20 }}>
         <h2>👥 Utenti ({filteredUsers.length} di {users.length})</h2>
@@ -1001,16 +768,6 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
-
-      {/* MODAL: Genera QR (solo ADMIN): lo stesso generatore della dashboard staff */}
-      {isSuper && showQRModal && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-          <div style={{ background: "white", padding: 16, borderRadius: 16, maxWidth: 640, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
-            <QrGenerator canCreateVote />
-            <button onClick={() => { setShowQRModal(false); loadData(); }} style={{ marginTop: 12, padding: 12, background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Chiudi</button>
-          </div>
-        </div>
-      )}
 
       {/* MODAL: Reset (solo ADMIN) */}
       {isSuper && showResetModal && (

@@ -23,9 +23,9 @@ const fileName = qrFileName;
 // Generatore di QR (dashboard staff e pannello admin): classe, sede, squadra e ricarica coins, con l'elenco di quelli
 // che esistono già. Non si può creare un QR che c'è già (lo impone anche il server, con una risposta
 // 409 che restituisce quello esistente). Usa /api/admin/events e /api/admin/bonus.
-export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean }) {
+export default function QrGenerator({ isAdmin }: { isAdmin: boolean }) {
   // Lo staff crea solo QR ricarica; i QR di voto (classe, squadra) li crea l'admin. Lo staff li vede e li scarica.
-  const [kind, setKind] = useState<Kind>(canCreateVote ? "class" : "recharge");
+  const [kind, setKind] = useState<Kind>(isAdmin ? "class" : "recharge");
   const [site, setSite] = useState("");
   const [school, setSchool] = useState("");
   const [year, setYear] = useState("");
@@ -158,6 +158,16 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
     await loadRows();
   };
 
+  // Solo l'admin. Il QR sparisce con i voti o le ricariche che ha registrato (cancellazione a cascata).
+  const remove = async (r: Row) => {
+    const effetto = r.kind === "recharge" ? "le ricariche già riscattate" : "i voti già dati";
+    if (!confirm(`Eliminare "${r.title || r.detail}"? Spariscono anche ${effetto} con questo QR. Per fermarlo senza perdere nulla usa Disattiva.`)) return;
+    const endpoint = r.kind === "recharge" ? "/api/admin/bonus" : "/api/admin/events";
+    const res = await fetch(`${endpoint}?id=${r.id}`, { method: "DELETE" });
+    setMessage(res.ok ? "✅ QR eliminato" : "❌ " + ((await res.json()).message || "Errore"));
+    await loadRows();
+  };
+
   const download = async () => {
     if (!made) return;
     let href = made.src;
@@ -172,9 +182,9 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
     <div style={PANEL}>
       <h2 style={{ marginTop: 0 }}>🎯 Genera QR</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        {canCreateVote && <button style={pill(kind === "class")} onClick={() => setKind("class")}>🏫 Classe</button>}
-        {canCreateVote && <button style={pill(kind === "site")} onClick={() => setKind("site")}>📍 Sede</button>}
-        {canCreateVote && <button style={pill(kind === "team")} onClick={() => setKind("team")}>🏆 Squadra</button>}
+        {isAdmin && <button style={pill(kind === "class")} onClick={() => setKind("class")}>🏫 Classe</button>}
+        {isAdmin && <button style={pill(kind === "site")} onClick={() => setKind("site")}>📍 Sede</button>}
+        {isAdmin && <button style={pill(kind === "team")} onClick={() => setKind("team")}>🏆 Squadra</button>}
         <button style={pill(kind === "recharge")} onClick={() => setKind("recharge")}>⚡ Ricarica coins</button>
       </div>
 
@@ -284,9 +294,10 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
                 <td style={{ padding: 6 }}>{r.active ? "Attivo" : "Disattivo"}</td>
                 <td style={{ padding: 6, whiteSpace: "nowrap" }}>
                   <button onClick={() => downloadRow(r)} style={{ marginRight: 4, cursor: "pointer" }}>⬇️ QR</button>
-                  {(canCreateVote || r.kind === "recharge") && (
+                  {(isAdmin || r.kind === "recharge") && (
                     <button onClick={() => toggle(r)} style={{ cursor: "pointer" }}>{r.active ? "Disattiva" : "Attiva"}</button>
                   )}
+                  {isAdmin && <button onClick={() => remove(r)} title="Elimina" style={{ marginLeft: 4, cursor: "pointer" }}>🗑️</button>}
                 </td>
               </tr>
             ))}
