@@ -7,7 +7,7 @@ Questo documento descrive l'intero progetto da zero, non solo le ultime modifich
 
 ## 0. In breve (stato al 4 ottobre 2026)
 
-**Calendario.** Forum di Assisi 16-18 ottobre 2026. Fase **Anteprima** fino a giovedì 15 ottobre ore 00:00 (solo benvenuto con le regole, classifica squadre e contributi individuali/classe/sede: niente QR per le slides, coins o voto; decisione del direttore, 5 ott); poi **voto aperto** in automatico. La data di apertura la sceglie l'admin nella scheda "Fase del gioco". Il 16 ottobre reset "full" dei voti di prova. Sfida karaoke sabato 17 ottobre 16-19 (`lib/karaoke.ts`).
+**Calendario.** Forum di Assisi 16-18 ottobre 2026. Fase **Anteprima** fino a giovedì 15 ottobre ore 00:00 (solo benvenuto con le regole, classifica squadre e contributi individuali/classe/sede: niente QR, coins o voto; decisione del direttore, 5 ott); poi **voto aperto** in automatico, e dalla dashboard si possono mostrare e scaricare QR e codice della propria squadra e classe, per far votare la sede o la classe e non se stessi. La data di apertura la sceglie l'admin nella scheda "Fase del gioco". Il 16 ottobre reset "full" dei voti di prova. Sfida karaoke sabato 17 ottobre 16-19 (`lib/karaoke.ts`).
 
 **Architettura.** Next.js 14 (App Router) su Render, Postgres su Supabase. Il browser **non** legge mai il database: ogni dato passa da una route in `app/api` che usa la chiave service role (`lib/supabaseAdmin.ts`). Identità = cookie httpOnly firmato (`lib/session.ts`); autorizzazione = `requireRole()` che rilegge sempre il ruolo dal database.
 

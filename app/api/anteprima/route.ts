@@ -33,7 +33,7 @@ async function findClassEvents(mine: { school: string | null; site: string | nul
   return classCache.rows.filter((r) => sameClass({ school: r.class_school, site: r.class_site, year: r.class_year }, mine));
 }
 // Fase Anteprima: a ogni partecipante servono il QR (e il PIN) della propria squadra e della propria
-// classe, da mettere nelle slides delle relazioni. Sono i normali QR di voto (votable_events), che
+// classe, da far votare a chi li scansiona. Sono i normali QR di voto (votable_events), che
 // scansionati votano solo quando il voto è aperto. Il QR di classe, se manca, si crea qui al primo
 // bisogno: così ogni classe ha il suo senza doverli generare uno per uno dal pannello.
 export async function GET() {

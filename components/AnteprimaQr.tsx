@@ -48,7 +48,8 @@ function QrCard({ label, heading, qr, filename }: { label: string; heading: stri
   );
 }
 
-// I QR di squadra e di classe di chi guarda, da proiettare nelle slides (dashboard, a voto aperto).
+// QR e codice della squadra e della classe di chi guarda, per far votare la sede o la classe e non se
+// stesso (dashboard, a voto aperto).
 export default function AnteprimaQr() {
   const [data, setData] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);

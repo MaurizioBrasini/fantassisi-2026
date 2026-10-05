@@ -335,8 +335,9 @@ function VoteButton() {
   );
 }
 
-// A voto aperto i QR di squadra e classe per le slides restano disponibili (i relatori li proiettano
-// durante il congresso), ma si caricano solo quando li si apre: niente peso in più sulla dashboard.
+// A voto aperto restano disponibili il QR e il codice della propria squadra e classe, per chi vuole far
+// votare la sua sede o la sua classe e non se stesso (si mostrano, si scaricano, si condividono). Si
+// caricano solo quando li si apre: niente peso in più sulla dashboard.
 function SlidesQrToggle() {
   const [open, setOpen] = useState(false);
   return (

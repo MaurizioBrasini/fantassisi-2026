@@ -27,7 +27,7 @@ export async function GET() {
 }
 
 // POST: crea un QR voto (squadra, classe o sede) — solo admin. Mai due QR per la stessa classe, sede o
-// squadra (l'Anteprima e le slides usano quello esistente): se c'è già, risposta 409 con il QR
+// squadra (l'app mostra a tutti quello esistente): se c'è già, risposta 409 con il QR
 // esistente, così chi ha provato a rifarlo lo vede.
 export async function POST(request: Request) {
   // I QR di voto muovono i punteggi di squadre e classi: li crea solo l'admin (lo staff li vede e li scarica).
