@@ -58,10 +58,10 @@ Usare il link personale di un account di prova o di un membro dello staff.
 | 1 | Aprire il link personale ricevuto per mail | Si entra nella dashboard; sotto il titolo c'è l'etichetta ANTEPRIMA |
 | 2 | Tasto Condividi → "Aggiungi a schermata Home" | Compare l'icona FantAssisi; aprendola, l'app si apre a schermo intero e si è già dentro |
 | 3 | Chiudere e riaprire l'app dall'icona | Si resta collegati (non chiede di nuovo il link) |
-| 4 | In Anteprima: "Scarica per le slides" sotto il QR di squadra | L'immagine (titolo, QR, codice) si salva o si apre e si può salvare in Foto |
-| 5 | Pagina Vota → "Scan QR Code" | Chiede il permesso della fotocamera; si apre la fotocamera **posteriore** |
-| 6 | Inquadrare un QR (es. quello di squadra sul PC) | In Anteprima: messaggio "Il voto non è ancora aperto…" (giusto così) |
-| 7 | Pagina Vota → scrivere il codice 1212 → Conferma | Stesso messaggio "Il voto non è ancora aperto…" |
+| 4 | In Anteprima: leggere il box di benvenuto e aprire "Individuali" / "Per sede" / "Per classe" | Il testo è leggibile senza zoom e le classifiche si aprono (in Anteprima non ci sono QR, coins né pulsante Vota) |
+| 5 | Con voto aperto: Vota → "Scan QR Code" | Chiede il permesso della fotocamera; si apre la fotocamera **posteriore** |
+| 6 | Con voto aperto: inquadrare un QR (es. quello di squadra sul PC) | Il voto viene registrato |
+| 7 | Con voto aperto: Vota → scrivere il codice 1212 → Conferma | Il voto viene registrato |
 | 8 | Tornare alla dashboard mentre la fotocamera è accesa | La fotocamera si spegne (sparisce l'indicatore verde in alto) |
 | 9 | Aprire lo stesso link da **Chrome** su iPhone | Funziona; il banner di installazione consiglia di usare Safari |
 | 10 | "Il mio QR" (a voto aperto) → "Scarica QR" | Immagine con nome, QR e codice |

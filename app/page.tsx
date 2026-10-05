@@ -9,6 +9,7 @@ import { RoosterIcon, CowIcon, TeamIcon } from "@/components/TeamIcons";
 import GameHeader from "@/components/GameHeader";
 import NoAccess from "@/components/NoAccess";
 import AnteprimaQr from "@/components/AnteprimaQr";
+import AnteprimaBenvenuto from "@/components/AnteprimaBenvenuto";
 import PrizeBanner from "@/components/PrizeBanner";
 import { getCookie, setCookie, logout } from "@/lib/clientCookies";
 
@@ -392,12 +393,13 @@ function DashboardDidatti({ userName, userId, userRole, votingOpen, opensAtLabel
         Ciao <strong>{userName || "Partecipante"}</strong> · Didatti&amp;Docenti
       </p>
 
+      {!votingOpen && <AnteprimaBenvenuto opensAtLabel={opensAtLabel} />}
       <ContributionLinks />
-      <CoinsAndRecharge remainingCoins={remainingCoins} />
-      {votingOpen ? (
-        <VoteButton />
-      ) : (
-        <p style={{ textAlign: "center", color: "#666", fontSize: "0.9rem" }}>{opensAtLabel.charAt(0).toUpperCase() + opensAtLabel.slice(1)} inizia il gioco vero e proprio: potrai votare e farti votare!</p>
+      {votingOpen && (
+        <>
+          <CoinsAndRecharge remainingCoins={remainingCoins} />
+          <VoteButton />
+        </>
       )}
 
       {/* Bottone arruolamento */}
@@ -439,11 +441,12 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
         {myClass && ` · ${yearLabel(myClass)}`}
       </p>
 
+      {/* In Anteprima: solo benvenuto, classifica squadre e contributi. Punteggio personale, QR e
+          coins compaiono a voto aperto. */}
+      {!votingOpen && <AnteprimaBenvenuto opensAtLabel={opensAtLabel} />}
       <ContributionLinks />
 
-      {/* Il proprio punteggio si vede sempre (in Anteprima arrivano già i premi palesi); il QR personale
-          per farsi votare solo a voto aperto. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+      {votingOpen && <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8 }}>Il mio punteggio</div>
           <div style={{ background: "#FF6B35", color: "white", borderRadius: 16, padding: 14, textAlign: "center" }}>
@@ -454,26 +457,24 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
             </div>
           </div>
         </div>
-        {votingOpen && (
-          <>
-            <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
-                Mostra il QR per ricevere voti
-              </div>
-              <Link href="/myqr" style={{ ...ACTION_LINK_STYLE, background: "#A8D8A8", border: "2px solid #2E7D32" }}>
-                Il mio QR
-              </Link>
-            </div>
-          </>
-        )}
-      </div>
+        <div style={{ width: 2, height: 80, background: "#1E3A5F" }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: 8, textAlign: "center" }}>
+            Mostra il QR per ricevere voti
+          </div>
+          <Link href="/myqr" style={{ ...ACTION_LINK_STYLE, background: "#A8D8A8", border: "2px solid #2E7D32" }}>
+            Il mio QR
+          </Link>
+        </div>
+      </div>}
 
-      {!votingOpen && <AnteprimaQr opensAtLabel={opensAtLabel} />}
-
-      <CoinsAndRecharge remainingCoins={remainingCoins} />
-      {votingOpen && <VoteButton />}
-      {votingOpen && <SlidesQrToggle />}
+      {votingOpen && (
+        <>
+          <CoinsAndRecharge remainingCoins={remainingCoins} />
+          <VoteButton />
+          <SlidesQrToggle />
+        </>
+      )}
 
       {/* Solo chi è (o è stato) Didatti&Docenti può cambiare squadra o uscirne */}
       {isDidatta && (

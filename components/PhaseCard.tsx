@@ -9,7 +9,7 @@ type Phase = { open: boolean; mode: Mode; opensAt: string };
 
 const OPTIONS: { mode: Mode; label: string; hint: string }[] = [
   { mode: "auto", label: "Automatico", hint: "il voto si apre da solo alla data scelta qui sotto" },
-  { mode: "preview", label: "Anteprima", hint: "nessuno può votare, i partecipanti vedono QR e codici" },
+  { mode: "preview", label: "Anteprima", hint: "nessuno può votare, i partecipanti vedono il benvenuto e le classifiche" },
   { mode: "open", label: "Voto aperto", hint: "si vota subito" },
 ];
 

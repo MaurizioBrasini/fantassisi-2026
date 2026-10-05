@@ -22,7 +22,7 @@ function buildInviteEmail(
   // stesse parole per tutto il periodo prima e durante il Forum.
   const intro = "ecco il tuo link personale a FantAssisi, il social game del Forum di Assisi. Aprilo dal telefono e aggiungi l'app alla schermata Home.";
   const anteprima =
-    "In questi giorni è partita l'anteprima, ma il gioco entrerà presto nel vivo e potrai iniziare a votare e farti votare! Troverai anche il QR e il codice della tua squadra (e della tua classe, se ne hai una) da mettere nelle slides della tua relazione.";
+    "In questi giorni è partita l'anteprima, ma il gioco entrerà presto nel vivo e potrai iniziare a votare e farti votare! Intanto inizia a postare i tuoi contributi video nella community di WhatsApp: gli organizzatori premieranno i più originali e divertenti.";
   const docenti = "Se sei un docente o un didatta, puoi scegliere se arruolarti con le Matricole o con i Veterani.";
   const personale = "Il link è solo tuo: non condividerlo.";
   return {
