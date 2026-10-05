@@ -175,7 +175,7 @@ CREATE TABLE public.team_boosts (
   CONSTRAINT team_boosts_pkey PRIMARY KEY (id),
   CONSTRAINT team_boosts_team_check CHECK ((team IS NULL OR team = ANY (ARRAY['Matricole'::text, 'Veterani'::text]))),
   CONSTRAINT team_boosts_kind_check CHECK ((kind = ANY (ARRAY['hidden'::text, 'public'::text]))),
-  CONSTRAINT team_boosts_target_type_check CHECK ((target_type IS NULL OR target_type = ANY (ARRAY['person'::text, 'class'::text, 'site'::text]))),
+  CONSTRAINT team_boosts_target_type_check CHECK ((target_type IS NULL OR target_type = ANY (ARRAY['person'::text, 'class'::text, 'site'::text, 'team'::text]))),
   CONSTRAINT team_boosts_total_points_check CHECK ((total_points > 0))
 );
 CREATE INDEX idx_team_boosts_public ON public.team_boosts USING btree (created_at DESC) WHERE (kind = 'public'::text);

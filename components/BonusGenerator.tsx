@@ -10,7 +10,7 @@ type Boost = {
   id: string; team: string | null; total_points: number; start_at: string; end_at: string; created_at: string;
   distributed?: boolean; accrued?: number; kind?: string; reason?: string | null; target_label?: string | null;
 };
-type TargetType = "person" | "class" | "site";
+type TargetType = "team" | "person" | "class" | "site";
 
 const time = (iso: string) => new Date(iso).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -28,7 +28,8 @@ export default function BonusGenerator({ canDelete }: { canDelete: boolean }) {
   const [minutes, setMinutes] = useState("60");
 
   // palese
-  const [targetType, setTargetType] = useState<TargetType>("person");
+  const [targetType, setTargetType] = useState<TargetType>("team");
+  const [prizeTeam, setPrizeTeam] = useState<"Matricole" | "Veterani">("Veterani");
   const [reason, setReason] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Person[]>([]);
@@ -62,10 +63,10 @@ export default function BonusGenerator({ canDelete }: { canDelete: boolean }) {
   const nameOf = (p: Person) => `${p.first_name || ""} ${p.last_name || ""}`.trim();
 
   const targetReady =
-    targetType === "person" ? !!person : targetType === "class" ? !!(site && school && year) : !!site;
+    targetType === "team" ? true : targetType === "person" ? !!person : targetType === "class" ? !!(site && school && year) : !!site;
 
   const describeTarget = () =>
-    targetType === "person" ? nameOf(person!) : targetType === "class" ? `${school} ${site} ${yearLabel(year)}` : `la sede di ${site}`;
+    targetType === "team" ? `la squadra ${prizeTeam}` : targetType === "person" ? nameOf(person!) : targetType === "class" ? `${school} ${site} ${yearLabel(year)}` : `la sede di ${site}`;
 
   const submit = async () => {
     const p = Number(points);
@@ -79,12 +80,14 @@ export default function BonusGenerator({ canDelete }: { canDelete: boolean }) {
       if (!targetReady) { setMessage("❌ Scegli a chi dare il premio"); return; }
       if (!reason.trim()) { setMessage("❌ Scrivi il motivo: compare nel banner"); return; }
       const how =
-        targetType === "person" ? "Salgono anche la sua squadra, classe e sede."
+        targetType === "team" ? "Salgono solo i punti della squadra."
+        : targetType === "person" ? "Salgono anche la sua squadra, classe e sede."
         : targetType === "class" ? "Salgono anche la sede e la squadra della classe."
         : "Metà alle squadre (50/50) e metà alle classi della sede.";
       if (!confirm(`Assegnare SUBITO ${p} punti a ${describeTarget()} per «${reason.trim()}»? ${how} Tutti i partecipanti vedranno il banner del premio.`)) return;
       const target =
-        targetType === "person" ? { type: "person", userId: person!.id }
+        targetType === "team" ? { type: "team", team: prizeTeam }
+        : targetType === "person" ? { type: "person", userId: person!.id }
         : targetType === "class" ? { type: "class", school, site, year }
         : { type: "site", site };
       body = { mode: "public", target, points: p, reason: reason.trim() };
@@ -143,13 +146,21 @@ export default function BonusGenerator({ canDelete }: { canDelete: boolean }) {
       ) : (
         <>
           <p style={{ color: "#666", fontSize: "0.85rem", marginTop: 0 }}>
-            Premio visibile a tutti, assegnato subito, con un banner celebrativo. A una persona sale anche la sua squadra, classe e sede; a una classe salgono sede e squadra; a una sede metà va alle squadre e metà alle classi.
+            Premio visibile a tutti, assegnato subito, con un banner celebrativo. A una squadra salgono solo i suoi punti; a una persona sale anche la sua squadra, classe e sede; a una classe salgono sede e squadra; a una sede metà va alle squadre e metà alle classi.
           </p>
           <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-            {([["person", "👤 Persona"], ["class", "🏫 Classe"], ["site", "📍 Sede"]] as [TargetType, string][]).map(([t, label]) => (
+            {([["team", "⚔️ Squadra"], ["person", "👤 Persona"], ["class", "🏫 Classe"], ["site", "📍 Sede"]] as [TargetType, string][]).map(([t, label]) => (
               <button key={t} style={pill(targetType === t)} onClick={() => setTargetType(t)}>{label}</button>
             ))}
           </div>
+
+          {targetType === "team" && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              {(["Matricole", "Veterani"] as const).map((t) => (
+                <button key={t} style={pill(prizeTeam === t)} onClick={() => setPrizeTeam(t)}>{t}</button>
+              ))}
+            </div>
+          )}
 
           {targetType === "person" && (
             <div style={{ marginBottom: 10 }}>
@@ -177,7 +188,7 @@ export default function BonusGenerator({ canDelete }: { canDelete: boolean }) {
             </div>
           )}
 
-          {targetType !== "person" && (
+          {(targetType === "class" || targetType === "site") && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
               <select value={site} onChange={(e) => { setSite(e.target.value); setSchool(""); setYear(""); }} style={INPUT}>
                 <option value="">Sede…</option>

@@ -13,7 +13,7 @@ const EMOJI = ["🎉", "⭐", "🏆", "✨", "🎊", "🥇"];
 const readSeen = (): string | null => { try { return localStorage.getItem(SEEN_KEY); } catch { return null; } };
 const writeSeen = (id: string) => { try { localStorage.setItem(SEEN_KEY, id); } catch { /* senza storage il banner può ripetersi: pazienza */ } };
 
-const WHO: Record<string, string> = { person: "Premio a", class: "Premio alla classe", site: "Premio alla sede" };
+const WHO: Record<string, string> = { person: "Premio a", class: "Premio alla classe", site: "Premio alla sede", team: "Premio alla squadra" };
 
 // Banner trionfale per i premi palesi. Chiede l'ultimo premio ogni 20 secondi (a pagina visibile) e
 // lo mostra una volta sola per dispositivo; si chiude toccando. Sul tabellone del proiettore nessuno

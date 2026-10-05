@@ -11,7 +11,8 @@ import { CONFIG_ISCRIZIONE, CLASS_YEARS, teamForYear, yearLabel } from "./config
 export type PublicTarget =
   | { type: "person"; userId: string }
   | { type: "class"; school: string; site: string; year: string }
-  | { type: "site"; site: string };
+  | { type: "site"; site: string }
+  | { type: "team"; team: "Matricole" | "Veterani" };
 
 export type PublicAllocation = {
   user_id: string | null;
@@ -56,6 +57,13 @@ export function planPublicBonus(
     return {
       allocations: [row({ user_id: target.userId, team: personTeam, points })],
       summary: `${points} punti alla persona (salgono anche squadra, classe e sede)`,
+    };
+  }
+
+  if (target.type === "team") {
+    return {
+      allocations: [row({ team: target.team, points })],
+      summary: `${points} punti alla squadra ${target.team}`,
     };
   }
 

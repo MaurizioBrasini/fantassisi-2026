@@ -135,6 +135,11 @@ async function createPublicBonus(body: any, p: number, requesterId: string) {
     target = { type: "class", school, site, year };
     label = `${school} ${site} ${yearLabel(year)}`;
     team = teamForYear(year);
+  } else if (t.type === "team") {
+    if (t.team !== "Matricole" && t.team !== "Veterani") return bad("Squadra non valida");
+    target = { type: "team", team: t.team };
+    label = `la squadra ${t.team}`;
+    team = t.team;
   } else if (t.type === "site") {
     const site = String(t.site || "");
     if (!CONFIG_ISCRIZIONE.sedi.includes(site)) return bad("Sede non valida");
