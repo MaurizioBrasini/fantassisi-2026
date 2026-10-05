@@ -8,19 +8,19 @@ import { sameClass, canonYear } from "@/lib/classKey";
 import { uuid } from "@/lib/uuid";
 import { INPUT, PANEL, pill } from "./ui";
 
-type Kind = "class" | "team" | "recharge";
+type Kind = "class" | "site" | "team" | "recharge";
 type Row = {
   id: string; kind: Kind; title: string; detail: string; qr_code: string; pin: string | null; active: boolean;
   team?: string | null; school?: string | null; site?: string | null; year?: string | null; created_at: string;
 };
 type Made = { src: string; heading: string; pin: string | null; filename: string; note: string };
 
-const KIND_LABEL: Record<Kind, string> = { class: "🏫 Classe", team: "🏆 Squadra", recharge: "⚡ Ricarica" };
+const KIND_LABEL: Record<Kind, string> = { class: "🏫 Classe", site: "📍 Sede", team: "🏆 Squadra", recharge: "⚡ Ricarica" };
 const PAGE = 25;
 
 const fileName = qrFileName;
 
-// Generatore di QR per la dashboard staff: classe, squadra e ricarica coins, con l'elenco di quelli
+// Generatore di QR (dashboard staff e pannello admin): classe, sede, squadra e ricarica coins, con l'elenco di quelli
 // che esistono già. Non si può creare un QR che c'è già (lo impone anche il server, con una risposta
 // 409 che restituisce quello esistente). Usa /api/admin/events e /api/admin/bonus.
 export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean }) {
@@ -47,8 +47,8 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
       fetch("/api/admin/bonus", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { bonuses: [] })),
     ]);
     const events: Row[] = (ev.events || []).map((e: any) => ({
-      id: e.id, kind: e.qr_type === "class" ? "class" : "team", title: e.title || "", qr_code: e.qr_code, pin: e.pin, active: e.active !== false,
-      detail: e.qr_type === "class" ? `${e.class_school} ${e.class_site} ${yearLabel(canonYear(e.class_year) || "")}` : `Squadra ${e.team_target || ""}`,
+      id: e.id, kind: e.qr_type === "class" ? "class" : e.qr_type === "site" ? "site" : "team", title: e.title || "", qr_code: e.qr_code, pin: e.pin, active: e.active !== false,
+      detail: e.qr_type === "class" ? `${e.class_school} ${e.class_site} ${yearLabel(canonYear(e.class_year) || "")}` : e.qr_type === "site" ? `Sede ${e.class_site}` : `Squadra ${e.team_target || ""}`,
       team: e.team_target, school: e.class_school, site: e.class_site, year: e.class_year, created_at: e.created_at,
     }));
     const bonuses: Row[] = (bn.bonuses || []).map((b: any) => ({
@@ -68,12 +68,31 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
     if (kind === "class" && site && school && year) {
       return rows.find((r) => r.kind === "class" && sameClass({ school: r.school ?? null, site: r.site ?? null, year: r.year ?? null }, { school, site, year })) || null;
     }
+    if (kind === "site" && site) return rows.find((r) => r.kind === "site" && r.site === site) || null;
     if (kind === "team") return rows.find((r) => r.kind === "team" && r.team === team) || null;
     if (kind === "recharge" && title.trim()) {
       return rows.find((r) => r.kind === "recharge" && r.title.trim().toLowerCase() === title.trim().toLowerCase()) || null;
     }
     return null;
   }, [rows, kind, site, school, year, team, title]);
+
+  // Le sedi senza QR: si creano tutte insieme con un solo pulsante.
+  const missingSites = CONFIG_ISCRIZIONE.sedi.filter((s) => !rows.some((r) => r.kind === "site" && r.site === s));
+  const createMissingSites = async () => {
+    setMessage("");
+    setBusy(true);
+    let made = 0;
+    for (const s of missingSites) {
+      const res = await fetch("/api/admin/events", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: `Sede ${s}`, qr_type: "site", class_site: s, qr_code: `QR:${uuid()}` }),
+      });
+      if (res.ok) made++;
+    }
+    setBusy(false);
+    setMessage(made === missingSites.length ? `✅ Creati ${made} QR di sede.` : `❌ Creati ${made} su ${missingSites.length}: riprova per le sedi mancanti.`);
+    await loadRows();
+  };
 
   const show = async (row: Row, note: string) => {
     const src = await qrDataUrl(row.qr_code);
@@ -94,6 +113,10 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
       if (!site || !school || !year) { setMessage("❌ Scegli sede, scuola e anno"); return; }
       heading = `${school} ${site} ${yearLabel(year)}`;
       body = { title: title.trim() || heading, qr_type: "class", team_target: teamForYear(year), class_school: school, class_site: site, class_year: year, qr_code: `QR:${rid}` };
+    } else if (kind === "site") {
+      if (!site) { setMessage("❌ Scegli la sede"); return; }
+      heading = title.trim() || `Sede ${site}`;
+      body = { title: heading, qr_type: "site", class_site: site, qr_code: `QR:${rid}` };
     } else if (kind === "team") {
       heading = title.trim() || `Vota ${team}`;
       body = { title: heading, qr_type: "team", team_target: team, qr_code: `QR:${rid}` };
@@ -150,6 +173,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
       <h2 style={{ marginTop: 0 }}>🎯 Genera QR</h2>
       <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         {canCreateVote && <button style={pill(kind === "class")} onClick={() => setKind("class")}>🏫 Classe</button>}
+        {canCreateVote && <button style={pill(kind === "site")} onClick={() => setKind("site")}>📍 Sede</button>}
         {canCreateVote && <button style={pill(kind === "team")} onClick={() => setKind("team")}>🏆 Squadra</button>}
         <button style={pill(kind === "recharge")} onClick={() => setKind("recharge")}>⚡ Ricarica coins</button>
       </div>
@@ -174,6 +198,12 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
               </select>
             )}
           </>
+        )}
+        {kind === "site" && (
+          <select value={site} onChange={(e) => setSite(e.target.value)} style={INPUT}>
+            <option value="">Sede…</option>
+            {CONFIG_ISCRIZIONE.sedi.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
         )}
         {kind === "team" && (
           <select value={team} onChange={(e) => setTeam(e.target.value)} style={INPUT}>
@@ -210,6 +240,11 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
       >
         {busy ? "…" : "Genera QR"}
       </button>
+      {kind === "site" && missingSites.length > 0 && (
+        <button onClick={createMissingSites} disabled={busy} style={{ marginTop: 12, marginLeft: 8, padding: "10px 20px", borderRadius: 60, border: "1px solid #1E3A5F", background: "white", color: "#1E3A5F", fontWeight: 700, cursor: "pointer" }}>
+          Crea le {missingSites.length} sedi mancanti
+        </button>
+      )}
       {message && <p style={{ marginBottom: 0 }}>{message}</p>}
 
       {made && (
@@ -226,7 +261,7 @@ export default function QrGenerator({ canCreateVote }: { canCreateVote: boolean 
 
       <h3 style={{ marginBottom: 8, marginTop: 24 }}>QR esistenti ({filtered.length} di {rows.length})</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
-        {(["all", "class", "team", "recharge"] as const).map((f) => (
+        {(["all", "class", "site", "team", "recharge"] as const).map((f) => (
           <button key={f} style={{ ...pill(filter === f), padding: "4px 10px", fontSize: "0.8rem" }} onClick={() => { setFilter(f); setShown(PAGE); }}>
             {f === "all" ? "Tutti" : KIND_LABEL[f]}
           </button>

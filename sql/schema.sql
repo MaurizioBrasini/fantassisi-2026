@@ -109,7 +109,7 @@ CREATE TABLE public.votable_events (
   CONSTRAINT votable_events_qr_code_key UNIQUE (qr_code),
   CONSTRAINT votable_events_pkey PRIMARY KEY (id),
   CONSTRAINT votable_events_event_type_check CHECK ((event_type = ANY (ARRAY['presentation'::text, 'song'::text]))),
-  CONSTRAINT votable_events_qr_type_check CHECK ((qr_type = ANY (ARRAY['team'::text, 'class'::text]))),
+  CONSTRAINT votable_events_qr_type_check CHECK ((qr_type = ANY (ARRAY['team'::text, 'class'::text, 'site'::text]))),  -- 10: aggiunto 'site'
   CONSTRAINT votable_events_team_target_check CHECK ((team_target = ANY (ARRAY['Matricole'::text, 'Veterani'::text])))
 );
 CREATE UNIQUE INDEX votable_events_pin_key ON public.votable_events USING btree (pin) WHERE (pin IS NOT NULL);

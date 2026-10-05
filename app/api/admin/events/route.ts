@@ -5,7 +5,7 @@ import { generateUnusedPin } from "@/lib/pins";
 import { patchActive, deleteById } from "@/lib/adminCrud";
 import { sameClass, canonClass } from "@/lib/classKey";
 import { validateClass } from "@/lib/publicBonus";
-import { teamForYear } from "@/lib/config";
+import { CONFIG_ISCRIZIONE, teamForYear } from "@/lib/config";
 import { forbidden, asShortText, readJsonObject } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -26,8 +26,8 @@ export async function GET() {
   return NextResponse.json({ events: data || [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
-// POST: crea un QR voto (squadra o classe) — solo admin. Mai due QR per la stessa classe o per la
-// stessa squadra (l'Anteprima e le slides usano quello esistente): se c'è già, risposta 409 con il QR
+// POST: crea un QR voto (squadra, classe o sede) — solo admin. Mai due QR per la stessa classe, sede o
+// squadra (l'Anteprima e le slides usano quello esistente): se c'è già, risposta 409 con il QR
 // esistente, così chi ha provato a rifarlo lo vede.
 export async function POST(request: Request) {
   // I QR di voto muovono i punteggi di squadre e classi: li crea solo l'admin (lo staff li vede e li scarica).
@@ -68,6 +68,12 @@ export async function POST(request: Request) {
     class_site = c.site;
     class_year = c.year;
     team_target = teamForYear(c.year as string);
+  } else if (qr_type === "site") {
+    // QR di sede: nessuna squadra, i punti vanno solo alla sede.
+    if (!(CONFIG_ISCRIZIONE.sedi as readonly string[]).includes(String(body.class_site))) {
+      return NextResponse.json({ message: "Sede non valida" }, { status: 400 });
+    }
+    class_site = String(body.class_site);
   } else {
     return NextResponse.json({ message: "Tipo di QR non valido" }, { status: 400 });
   }
@@ -92,6 +98,11 @@ export async function POST(request: Request) {
     const already = (classQrs || []).find((e: any) => sameClass({ school: e.class_school, site: e.class_site, year: e.class_year }, wanted));
     if (already) {
       return NextResponse.json({ message: `Esiste già il QR di questa classe: ${already.title}`, existing: already }, { status: 409 });
+    }
+  } else if (qr_type === "site") {
+    const already = await findExisting((q) => q.eq("qr_type", "site").eq("class_site", class_site));
+    if (already) {
+      return NextResponse.json({ message: `Esiste già il QR della sede ${class_site}: ${already.title}`, existing: already }, { status: 409 });
     }
   } else {
     const already = await findExisting((q) => q.eq("qr_type", "team").eq("team_target", team_target));

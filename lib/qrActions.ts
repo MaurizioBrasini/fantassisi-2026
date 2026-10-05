@@ -102,7 +102,7 @@ async function castEventVoteUnlocked(supabase: SupabaseClient, userId: string, e
     const cooldownMin = cooldownMinutes(event.qr_type);
     const waitMs = Date.parse(existing.voted_at) + cooldownMin * 60_000 - Date.now();
     if (waitMs > 0) {
-      const what = event.qr_type === "team" ? "la squadra" : "questa classe";
+      const what = event.qr_type === "team" ? "la squadra" : event.qr_type === "site" ? "questa sede" : "questa classe";
       const left = Math.ceil(waitMs / 60_000);
       return fail(429, `Hai già votato ${what} da poco: potrai rivotare tra ${left} ${left === 1 ? "minuto" : "minuti"}.`);
     }

@@ -2,16 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CONFIG_ISCRIZIONE, CLASS_YEARS, isYearValidForTeam, teamForYear, yearLabel } from "@/lib/config";
+import { CONFIG_ISCRIZIONE, isYearValidForTeam, yearLabel } from "@/lib/config";
 import { TEAM_COLORS } from "@/lib/teamColors";
 import { personalLink } from "@/lib/urls";
 import { getCookie } from "@/lib/clientCookies";
 import PhaseCard from "@/components/PhaseCard";
 import SystemCheck from "@/components/SystemCheck";
-import { canonClass } from "@/lib/classKey";
-import { uuid } from "@/lib/uuid";
-import { downloadQrImage, qrDataUrl, qrFileName } from "@/lib/qrImage";
+import { downloadQrImage, qrFileName } from "@/lib/qrImage";
 import BonusGenerator from "@/components/BonusGenerator";
+import QrGenerator from "@/components/QrGenerator";
 
 
 // Scarica il QR di un evento o di una ricarica: titolo + QR + codice (lib/qrImage.ts).
@@ -221,17 +220,6 @@ export default function AdminPage() {
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  // QR generator
-  const [qrTab, setQrTab] = useState<"squadra" | "classe" | "ricarica">("squadra");
-  const [qrSquadraForm, setQrSquadraForm] = useState({ title: "", team: "Matricole" });
-  const [qrClasseForm, setQrClasseForm] = useState({ title: "", school: "", site: "", year: "" });
-  const [qrRicaricaForm, setQrRicaricaForm] = useState({ title: "", amount: 5 });
-  const [classiDisponibili, setClassiDisponibili] = useState<{ school: string; site: string; year: string }[]>([]);
-  const [previewQR, setPreviewQR] = useState<string | null>(null);
-  const [previewLabel, setPreviewLabel] = useState("");
-  const [previewCode, setPreviewCode] = useState("");
-  const [previewPin, setPreviewPin] = useState<string | null>(null);
-
   // Form utente
   const [userForm, setUserForm] = useState<UserForm>({ 
     email: "", 
@@ -321,20 +309,6 @@ export default function AdminPage() {
     }
     const { users: allUsersData, events: ev, bonuses: bn } = await res.json();
     setUsers(allUsersData);
-
-    // Classi disponibili per QR classe
-    const classiSet = new Map<string, { school: string; site: string; year: string }>();
-    for (const u of allUsersData) {
-      // Solo classi vere: studenti in corso (1°-4° anno), con scuola/sede/anno nella forma standard.
-      const c = canonClass(u.school, u.site, u.year);
-      if (c.school && c.site && c.year && CLASS_YEARS.includes(c.year)) {
-        const key = `${c.school}||${c.site}||${c.year}`;
-        if (!classiSet.has(key)) classiSet.set(key, { school: c.school, site: c.site, year: c.year });
-      }
-    }
-    setClassiDisponibili(Array.from(classiSet.values()).sort((a, b) =>
-      `${a.school} ${a.site} ${a.year}`.localeCompare(`${b.school} ${b.site} ${b.year}`)
-    ));
 
     setEvents(ev || []);
     setBonuses(bn || []);
@@ -439,64 +413,6 @@ export default function AdminPage() {
 
   const totalPages = Math.ceil(filteredEvents.length / pageSize);
   const paginatedEvents = filteredEvents.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  // ── Crea QR (SOLO ADMIN) ──────────────────────────────────
-  const handleCreaQR = async () => {
-    if (!isSuper) { setMessage("❌ Solo admin possono creare QR"); return; }
-    let qrCode = "";
-    let insertData: any = null;
-    let table = "";
-    let label = "";
-
-    if (qrTab === "squadra") {
-      if (!qrSquadraForm.title) { setMessage("❌ Inserisci un titolo"); return; }
-      qrCode = `QR:${uuid()}`;
-      label = qrSquadraForm.title;
-      table = "votable_events";
-      insertData = { title: qrSquadraForm.title, qr_type: "team", team_target: qrSquadraForm.team, qr_code: qrCode, active: true };
-    } else if (qrTab === "classe") {
-      if (!qrClasseForm.school || !qrClasseForm.site || !qrClasseForm.year) { setMessage("❌ Seleziona una classe"); return; }
-      qrCode = `QR:${uuid()}`;
-      label = `${qrClasseForm.school} ${qrClasseForm.site} ${qrClasseForm.year}`;
-      table = "votable_events";
-      insertData = {
-        title: qrClasseForm.title || label,
-        qr_type: "class",
-        team_target: teamForYear(qrClasseForm.year),
-        class_school: qrClasseForm.school,
-        class_site: qrClasseForm.site,
-        class_year: qrClasseForm.year,
-        qr_code: qrCode,
-        active: true,
-      };
-    } else {
-      if (!qrRicaricaForm.title) { setMessage("❌ Inserisci un titolo"); return; }
-      qrCode = `QR:${uuid().slice(0, 8)}`;
-      label = qrRicaricaForm.title;
-      table = "bonus_qr";
-      insertData = { title: qrRicaricaForm.title, amount: qrRicaricaForm.amount, code: qrCode, active: true };
-    }
-
-    const endpoint = table === "votable_events" ? "/api/admin/events" : "/api/admin/bonus";
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(insertData),
-    });
-    const resData = await res.json();
-    if (!res.ok) { setMessage("❌ Errore creazione QR: " + resData.message); return; }
-
-    const createdPin: string | null = resData.event?.pin || resData.bonus?.pin || null;
-
-    const dataUrl = await qrDataUrl(qrCode, 300);
-    setPreviewQR(dataUrl);
-    setPreviewLabel(label);
-    setPreviewCode(qrCode);
-    setPreviewPin(createdPin);
-    setMessage(`✅ QR "${label}" creato!`);
-    await loadData();
-    setCurrentPage(1);
-  };
 
   const handleToggleEvent = async (id: string, current: boolean) => {
     const res = await fetch("/api/admin/events", {
@@ -788,7 +704,7 @@ export default function AdminPage() {
       {/* 🔥 Bottoni principali: solo ADMIN può vedere Genera QR, Reset, Import */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 20 }}>
         {isSuper && (
-          <button onClick={() => { setShowQRModal(true); setPreviewQR(null); }} style={{ padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
+          <button onClick={() => setShowQRModal(true)} style={{ padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer" }}>
             🎯 Genera QR
           </button>
         )}
@@ -847,6 +763,7 @@ export default function AdminPage() {
               <option value="all">Tutti</option>
               <option value="team">Squadra</option>
               <option value="class">Classe</option>
+              <option value="site">Sede</option>
             </select>
             <select
               value={sortBy}
@@ -887,7 +804,7 @@ export default function AdminPage() {
                       <td style={{ padding: 8, fontSize: "0.8rem" }}>
                         {e.qr_type === "class" 
                           ? `🏫 ${e.class_school || ""} ${e.class_site || ""} ${e.class_year || ""}`.trim() || "Classe"
-                          : `🏆 ${e.team_target || "Squadra"}`}
+                          : e.qr_type === "site" ? `📍 ${e.class_site || "Sede"}` : `🏆 ${e.team_target || "Squadra"}`}
                       </td>
                       <td style={{ padding: 8 }}>{e.team_target || "-"}</td>
                       <td style={{ padding: 8, textAlign: "center" }}>
@@ -1085,93 +1002,12 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* MODAL: Genera QR (solo ADMIN) */}
+      {/* MODAL: Genera QR (solo ADMIN): lo stesso generatore della dashboard staff */}
       {isSuper && showQRModal && (
         <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-          <div style={{ background: "white", padding: 24, borderRadius: 16, maxWidth: 520, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
-            <h2 style={{ marginBottom: 16 }}>🎯 Genera QR</h2>
-
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-              {(["squadra", "classe", "ricarica"] as const).map((tab) => (
-                <button key={tab} onClick={() => { setQrTab(tab); setPreviewQR(null); }}
-                  style={{ flex: 1, padding: 10, borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", background: qrTab === tab ? "#1E3A5F" : "#f0f0f0", color: qrTab === tab ? "white" : "#333" }}>
-                  {tab === "squadra" ? "🏆 Squadra" : tab === "classe" ? "🏫 Classe" : "⚡ Ricarica"}
-                </button>
-              ))}
-            </div>
-
-            {qrTab === "squadra" && (
-              <div>
-                <input type="text" placeholder="Titolo (es. Talk di Mario Rossi)" value={qrSquadraForm.title} onChange={(e) => setQrSquadraForm({ ...qrSquadraForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-                <select value={qrSquadraForm.team} onChange={(e) => setQrSquadraForm({ ...qrSquadraForm, team: e.target.value })} style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #ccc" }}>
-                  <option value="Matricole">🐓 Matricole</option>
-                  <option value="Veterani">🐄 Veterani</option>
-                </select>
-                <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 8 }}>Chi scansiona questo QR assegna 1 punto alle {qrSquadraForm.team} (2 punti se è della squadra avversaria).</p>
-              </div>
-            )}
-
-            {qrTab === "classe" && (
-              <div>
-                <input type="text" placeholder="Titolo (facoltativo)" value={qrClasseForm.title} onChange={(e) => setQrClasseForm({ ...qrClasseForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-                <select
-                  value={qrClasseForm.school && qrClasseForm.site && qrClasseForm.year ? `${qrClasseForm.school}||${qrClasseForm.site}||${qrClasseForm.year}` : ""}
-                  onChange={(e) => {
-                    if (!e.target.value) { setQrClasseForm({ ...qrClasseForm, school: "", site: "", year: "" }); return; }
-                    const [school, site, year] = e.target.value.split("||");
-                    setQrClasseForm({ ...qrClasseForm, school, site, year });
-                  }}
-                  style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #ccc" }}
-                >
-                  <option value="">Seleziona una classe...</option>
-                  {classiDisponibili.map((c) => (
-                    <option key={`${c.school}||${c.site}||${c.year}`} value={`${c.school}||${c.site}||${c.year}`}>
-                      {c.school} {c.site} – {yearLabel(c.year)}
-                    </option>
-                  ))}
-                </select>
-                {qrClasseForm.year && (
-                  <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 8 }}>
-                    Team assegnato: <strong>{teamForYear(qrClasseForm.year)}</strong>. I voti aggiornano anche la classifica per sede.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {qrTab === "ricarica" && (
-              <div>
-                <input type="text" placeholder="Titolo (es. Sessione mattutina)" value={qrRicaricaForm.title} onChange={(e) => setQrRicaricaForm({ ...qrRicaricaForm, title: e.target.value })} style={{ width: "100%", padding: 8, marginBottom: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <label style={{ fontWeight: 600, whiteSpace: "nowrap" }}>CBT coins da assegnare:</label>
-                  <input type="number" min={1} max={100} value={qrRicaricaForm.amount} onChange={(e) => setQrRicaricaForm({ ...qrRicaricaForm, amount: parseInt(e.target.value) || 1 })} style={{ width: 80, padding: 8, borderRadius: 6, border: "1px solid #ccc" }} />
-                </div>
-                <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 8 }}>Ogni utente può riscattare questo QR una sola volta. Puoi disattivarlo in qualsiasi momento.</p>
-              </div>
-            )}
-
-            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              {!previewQR ? (
-                <button onClick={handleCreaQR} style={{ flex: 1, padding: 12, background: "#1E3A5F", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>Genera QR</button>
-              ) : (
-                <button onClick={() => { setPreviewQR(null); setPreviewPin(null); }} style={{ flex: 1, padding: 12, background: "#6c757d", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>+ Genera un altro</button>
-              )}
-              <button onClick={() => { setShowQRModal(false); setPreviewQR(null); setPreviewPin(null); }} style={{ padding: 12, background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Chiudi</button>
-            </div>
-
-            {previewQR && (
-              <div style={{ marginTop: 20, textAlign: "center", borderTop: "1px solid #eee", paddingTop: 16 }}>
-                <p style={{ fontWeight: 700, color: "#1E3A5F" }}>QR generato: {previewLabel}</p>
-                <img src={previewQR} alt="QR" style={{ width: 200, height: 200, margin: "12px auto", display: "block", borderRadius: 8 }} />
-                {previewPin && (
-                  <p style={{ fontSize: "0.8rem", color: "#666", marginTop: 4 }}>
-                    Codice: <strong style={{ fontSize: "1.3rem", letterSpacing: 4, color: "#1E3A5F" }}>{previewPin}</strong>
-                  </p>
-                )}
-                <button onClick={() => downloadQR(previewCode, previewLabel, previewPin)} style={{ padding: "10px 20px", background: "#FF6B35", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 700 }}>
-                  ⬇️ Scarica QR
-                </button>
-              </div>
-            )}
+          <div style={{ background: "white", padding: 16, borderRadius: 16, maxWidth: 640, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
+            <QrGenerator canCreateVote />
+            <button onClick={() => { setShowQRModal(false); loadData(); }} style={{ marginTop: 12, padding: 12, background: "#ccc", border: "none", borderRadius: 8, cursor: "pointer" }}>Chiudi</button>
           </div>
         </div>
       )}

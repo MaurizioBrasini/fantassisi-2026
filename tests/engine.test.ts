@@ -48,6 +48,14 @@ test("grafie vecchie: '4° ANNO 2026' e 'quarto' sono la stessa classe", () => {
   assert.ok(!sameClass({ school: "SPC", site: "Roma", year: "terzo" }, { school: "SPC", site: "Roma", year: "quarto" }));
 });
 
+test("QR di sede: i punti vanno solo alla sede, non a squadre né classi", () => {
+  const qr = [{ team_target: null, qr_type: "site", class_school: null, class_site: "Roma", class_year: null, points: 1 }];
+  const s = buildStandings([], [], qr, [], []);
+  assert.equal(s.sites.find((x) => x.site === "Roma")!.points, 1);
+  assert.deepEqual(s.teams, { Matricole: 0, Veterani: 0 });
+  assert.equal(s.classes.length, 0);
+});
+
 test("somme del database (sql/09) = calcolo riga per riga", () => {
   const users = [user("a", "Veterani", "SPC", "Roma", "quarto"), user("b", "Matricole", "AIPC", "Bari", "primo")];
   const votes = [{ recipient_id: "a", points: 2 }, { recipient_id: "a", points: 1 }, { recipient_id: "b", points: 2 }];

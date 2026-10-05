@@ -110,6 +110,8 @@ export function buildStandings(
     if (ev.qr_type === "class") {
       if (ev.class_school && ev.class_site && ev.class_year) addClass(ev.class_school, ev.class_site, ev.class_year, ev.points || 1);
       if (ev.class_site) pointsBySite.set(ev.class_site, (pointsBySite.get(ev.class_site) || 0) + (ev.points || 0));
+    } else if (ev.qr_type === "site" && ev.class_site) {
+      pointsBySite.set(ev.class_site, (pointsBySite.get(ev.class_site) || 0) + (ev.points || 1));
     }
   }
   addBoostsToScores(teams, boosts);

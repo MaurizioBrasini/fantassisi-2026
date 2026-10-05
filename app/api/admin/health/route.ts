@@ -6,6 +6,7 @@ import { getVotingPhase } from "@/lib/phase";
 import { getStandings, standingsStats } from "@/lib/standings";
 import { TEAM_PINS } from "@/lib/pins";
 import { canonClass } from "@/lib/classKey";
+import { CONFIG_ISCRIZIONE } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,9 @@ export async function GET() {
     }
     const dups = Array.from(seen.entries()).filter(([, n]) => n > 1).map(([k]) => k.replace(/\|/g, " "));
     add("QR", "QR di classe", dups.length ? "warn" : "ok", `${classes.length} QR${dups.length ? `; DOPPI: ${dups.join(", ")}` : ", nessun doppione"}`);
+    const siteQrs = events.filter((e: any) => e.qr_type === "site");
+    const missing = CONFIG_ISCRIZIONE.sedi.filter((s) => !siteQrs.some((e: any) => e.class_site === s));
+    add("QR", "QR di sede", missing.length ? "warn" : "ok", missing.length ? `mancano: ${missing.join(", ")} (Genera QR, scheda Sede; prima eseguire sql/10)` : `${siteQrs.length} QR, una per sede`);
     add("QR", "grafie standard", legacy ? "warn" : "ok", legacy ? `${legacy} QR di classe con grafie vecchie: eseguire sql/08 (funzionano comunque)` : "tutti in forma standard");
   }
 
