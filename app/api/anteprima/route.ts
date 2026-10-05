@@ -3,8 +3,8 @@ import { randomUUID } from "crypto";
 import { getVerifiedUserId } from "@/lib/session";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { generateUnusedPin, TEAM_PINS } from "@/lib/pins";
-import { CLASS_YEARS, teamForYear, yearLabel } from "@/lib/config";
-import { canonClass, sameClass } from "@/lib/classKey";
+import { CLASS_YEARS, CONFIG_ISCRIZIONE, teamForYear, yearLabel } from "@/lib/config";
+import { canonClass, canonSite, sameClass } from "@/lib/classKey";
 import { withLock } from "@/lib/userLock";
 
 export const dynamic = "force-dynamic";
@@ -97,9 +97,23 @@ export async function GET() {
     // Un QR di classe spento dall'admin conta come esistente (non se ne crea un altro) ma non si mostra.
     classEvent = rows.find((r) => r.active !== false) || null;
   }
+  // QR di sede: uno per sede, creato dall'admin. Lo mostra a chiunque abbia una sede.
+  const mySite = canonSite(user.site);
+  let siteEvent: EventRow | null = null;
+  if (mySite && (CONFIG_ISCRIZIONE.sedi as readonly string[]).includes(mySite)) {
+    const { data: siteRows } = await supabase
+      .from("votable_events")
+      .select(FIELDS)
+      .eq("qr_type", "site")
+      .eq("class_site", mySite)
+      .neq("active", false)
+      .order("created_at", { ascending: true })
+      .limit(1);
+    siteEvent = ((siteRows || [])[0] as EventRow | undefined) || null;
+  }
   const pick = (e: EventRow | null) => (e ? { title: e.title, qr_code: e.qr_code, pin: e.pin } : null);
   return NextResponse.json(
-    { team: pick(teamEvent), class: pick(classEvent), className: classLabel },
+    { team: pick(teamEvent), class: pick(classEvent), site: pick(siteEvent), className: classLabel, siteName: mySite || "" },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

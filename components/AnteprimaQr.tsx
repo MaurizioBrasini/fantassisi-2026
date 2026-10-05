@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { downloadDataUrl, qrDataUrl, qrWithPinImage } from "@/lib/qrImage";
 
 type Qr = { title: string | null; qr_code: string; pin: string | null };
-type Data = { team: Qr | null; class: Qr | null; className: string };
+type Data = { team: Qr | null; class: Qr | null; site?: Qr | null; className: string; siteName?: string };
 
 function QrCard({ label, heading, qr, filename }: { label: string; heading: string; qr: Qr; filename: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -67,9 +67,10 @@ export default function AnteprimaQr() {
       {failed && <p style={{ textAlign: "center", color: "#666" }}>Non riesco a caricare i QR. Riprova tra poco.</p>}
       {data?.team && <QrCard label="QR della tua squadra" heading={data.team.title || "Squadra"} qr={data.team} filename="QR_squadra.png" />}
       {data?.class && <QrCard label="QR della tua classe" heading={`Vota ${data.className}`} qr={data.class} filename="QR_classe.png" />}
+      {data?.site && <QrCard label="QR della tua sede" heading={`Vota ${data.siteName}`} qr={data.site} filename="QR_sede.png" />}
       {data && !data.class && (
         <p style={{ textAlign: "center", color: "#666", fontSize: "0.85rem" }}>
-          Il QR di classe è riservato agli studenti in corso: per te vale il QR della squadra qui sopra.
+          Il QR di classe è riservato agli studenti in corso.
         </p>
       )}
     </div>

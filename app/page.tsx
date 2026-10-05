@@ -335,18 +335,18 @@ function VoteButton() {
   );
 }
 
-// A voto aperto restano disponibili il QR e il codice della propria squadra e classe, per chi vuole far
-// votare la sua sede o la sua classe e non se stesso (si mostrano, si scaricano, si condividono). Si
-// caricano solo quando li si apre: niente peso in più sulla dashboard.
-function SlidesQrToggle() {
+// In secondo piano rispetto al QR personale ("Il mio QR"): a voto aperto restano disponibili il QR e il
+// codice della propria squadra, classe e sede, per chi vuole far votare loro e non se stesso (si
+// mostrano, si scaricano, si condividono). Si caricano solo quando li si apre: niente peso in più.
+function GroupQrToggle() {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ marginTop: 16 }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        style={{ width: "100%", padding: 12, borderRadius: 60, border: "2px solid #1E3A5F", background: "white", color: "#1E3A5F", fontWeight: 700, cursor: "pointer" }}
+        style={{ width: "100%", padding: 8, borderRadius: 60, border: "1px solid #ccc", background: "transparent", color: "#666", fontSize: "0.85rem", cursor: "pointer" }}
       >
-        {open ? "▲ Chiudi i QR di squadra e classe" : "📊 QR della squadra e della classe"}
+        {open ? "▲ Chiudi" : "QR di squadra, classe e sede (per far votare loro e non te)"}
       </button>
       {open && (
         <div style={{ marginTop: 12 }}>
@@ -485,7 +485,7 @@ function DashboardNormale({ userId, userName, myTeam, myClass, userRole, isDidat
         <>
           <CoinsAndRecharge remainingCoins={remainingCoins} />
           <VoteButton />
-          <SlidesQrToggle />
+          <GroupQrToggle />
         </>
       )}
 
