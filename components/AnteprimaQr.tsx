@@ -48,9 +48,8 @@ function QrCard({ label, heading, qr, filename }: { label: string; heading: stri
   );
 }
 
-// Fase Anteprima: al posto di "Vota" e del QR personale, i QR di squadra e di classe per le slides.
-// Con `opensAtLabel` vuoto (voto già aperto) si mostrano solo i QR, senza l'annuncio dell'apertura.
-export default function AnteprimaQr({ opensAtLabel }: { opensAtLabel: string }) {
+// I QR di squadra e di classe di chi guarda, da proiettare nelle slides (dashboard, a voto aperto).
+export default function AnteprimaQr() {
   const [data, setData] = useState<Data | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -63,14 +62,6 @@ export default function AnteprimaQr({ opensAtLabel }: { opensAtLabel: string }) 
 
   return (
     <div style={{ marginBottom: 24 }}>
-      {opensAtLabel && (
-        <div style={{ background: "linear-gradient(135deg, #FF6B35, #1E3A5F)", color: "white", borderRadius: 16, padding: 16, textAlign: "center", marginBottom: 16 }}>
-          <div style={{ fontWeight: 800, fontSize: "1.1rem" }}>Anteprima FantAssisi</div>
-          <div style={{ fontSize: "0.85rem", marginTop: 4 }}>
-            {opensAtLabel.charAt(0).toUpperCase() + opensAtLabel.slice(1)} inizia il gioco vero e proprio e si sbloccheranno nuove funzioni: potrai votare e farti votare! Intanto metti il QR della tua squadra e della tua classe nelle slides della tua relazione: potrai sostenere la tua squadra anche con il tuo contributo ai lavori!
-          </div>
-        </div>
-      )}
       {!data && !failed && <p style={{ textAlign: "center", color: "#999" }}>Caricamento dei QR…</p>}
       {failed && <p style={{ textAlign: "center", color: "#666" }}>Non riesco a caricare i QR. Riprova tra poco.</p>}
       {data?.team && <QrCard label="QR della tua squadra" heading={data.team.title || "Squadra"} qr={data.team} filename="QR_squadra.png" />}

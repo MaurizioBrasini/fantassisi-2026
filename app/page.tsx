@@ -349,7 +349,7 @@ function SlidesQrToggle() {
       </button>
       {open && (
         <div style={{ marginTop: 12 }}>
-          <AnteprimaQr opensAtLabel="" />
+          <AnteprimaQr />
         </div>
       )}
     </div>
