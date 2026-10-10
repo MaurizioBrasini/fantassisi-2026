@@ -604,12 +604,18 @@ export default function Dashboard() {
       <div style={PAGE_STYLE}>
         <GameHeader />
         <div style={{ background: "linear-gradient(135deg, #FF6B35, #1E3A5F)", color: "white", borderRadius: 20, padding: "24px 18px", textAlign: "center" }}>
-          <div style={{ fontSize: "2.2rem" }}>⏳</div>
-          <div style={{ fontWeight: 800, fontSize: "1.25rem", marginTop: 2 }}>Ciao {userName || "Partecipante"}!</div>
+          <div style={{ fontSize: "2.2rem" }}>✅</div>
+          <div style={{ fontWeight: 800, fontSize: "1.25rem", marginTop: 2 }}>Ciao {userName || "Partecipante"}, è tutto a posto!</div>
           <div style={{ marginTop: 10, lineHeight: 1.45 }}>
-            Il tuo accesso funziona. L&apos;anteprima del FantAssisi non è ancora iniziata{previewAtLabel ? `: parte ${previewAtLabel}` : ""}.
+            Sei entrato correttamente: non devi fare niente e non c&apos;è nessun problema.
           </div>
-          <div style={{ marginTop: 10, lineHeight: 1.45 }}>Torna a trovarci: questa pagina si aggiorna da sola.</div>
+          <div style={{ marginTop: 10, lineHeight: 1.45 }}>
+            Il gioco FantAssisi non è ancora aperto{previewAtLabel ? `: si parte ${previewAtLabel}` : ", ti avviseremo noi"}.
+            Torna a trovarci allora, con lo stesso link.
+          </div>
+          <div style={{ marginTop: 10, lineHeight: 1.45, opacity: 0.9, fontSize: "0.9rem" }}>
+            Se tieni questa pagina aperta si aggiorna da sola.
+          </div>
         </div>
         <AdminAndLogout isAdmin={false} adminHref="/admin" />
       </div>
