@@ -44,6 +44,21 @@ Copiare la cartella anche su un secondo supporto o nel gestore di password. Il r
    (nel backup). Su un database nuovo va creato un utente admin a mano nello SQL Editor.
 7. **Verifica**: admin -> "Stato del sistema" -> Esegui controllo: deve essere tutto verde.
 
+## Resend (stato letto il 10 ottobre 2026, account "mabras")
+- Dominio `eventi.psiconet.it`: **Verified**, regione Irlanda (eu-west-1), creato il 2 ottobre 2026. Esiste anche
+  `psiconet.it` (verificato da 3 mesi, usato da un altro progetto: non toccarlo).
+- Voci DNS del dominio (già nel DNS di psiconet.it; se si ricrea il dominio vanno rifatte dalla pagina Records):
+  - TXT `resend._domainkey.eventi` (DKIM, contenuto `p=MIGfMA0G...` copiarlo da Resend)
+  - CNAME `rsend.eventi` -> `rsend-euw1.forge.rmta.net`
+  - CNAME `send.eventi` -> `send.forge.rmta.net`
+- Piano: **gratuito**, 3.000 email al mese (Transactional) e 1.000 contatti marketing; nessun metodo di pagamento
+  registrato. Prima di inviare i link ai partecipanti passare a Pro (Settings -> Billing -> Upgrade).
+- Chiavi API: `fantassisi-2026` (Sending access, è quella su Render, usata l'ultima volta il 2 ottobre),
+  `FantAssisi access` (Full access, vecchia e non in uso: si può revocare) e `app gestione pazienti` (Full access,
+  di un altro progetto: NON toccare). I valori non si rivedono dopo la creazione: se la chiave su Render andasse
+  persa, crearne una nuova con Sending access e metterla in `RESEND_API_KEY`.
+- Mittente impostato nell'app: variabile `RESEND_FROM` (deve usare `eventi.psiconet.it`), risposte a `RESEND_REPLY_TO`.
+
 ## Impostazioni da ricordare
 - Fase del gioco: la data di apertura è "da definire" e il voto non si apre da solo. Si imposta in admin;
   c'è anche la data di fine evento. Il karaoke ha una finestra fissa in `lib/karaoke.ts` (17 ottobre 16-19):
