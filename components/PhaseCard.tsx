@@ -16,7 +16,7 @@ const OPTIONS: { mode: Mode; label: string; hint: string }[] = [
 
 // Le tre date, in ordine di tempo. "empty" = cosa significa lasciarla vuota.
 const DATES: { key: DateKey; label: string; empty: string; clear: string; verb: string }[] = [
-  { key: "previewAt", label: "Inizio Anteprima:", empty: "subito", clear: "Subito", verb: "L'Anteprima inizierà" },
+  { key: "previewAt", label: "Inizio Anteprima:", empty: "da definire", clear: "Da definire", verb: "L'Anteprima inizierà" },
   { key: "opensAt", label: "Fine Anteprima / inizio evento (apertura voto):", empty: "da definire", clear: "Da definire", verb: "Il voto si aprirà da solo" },
   { key: "closesAt", label: "Fine evento (il voto si chiude):", empty: "nessuna", clear: "Togli", verb: "Il voto si chiuderà" },
 ];
@@ -90,7 +90,7 @@ export default function PhaseCard() {
           {phase.open
             ? "✅ Voto APERTO"
             : !phase.previewStarted
-              ? `🔒 In attesa: i partecipanti vedono solo "l'anteprima parte il ${phase.previewAt ? formatRomeDateTime(phase.previewAt) : "..."}"`
+              ? `🔒 IN ATTESA: i partecipanti vedono solo l'attesa, l'Anteprima parte ${phase.previewAt ? formatRomeDateTime(phase.previewAt) : "(data da definire)"}`
               : `⏳ ANTEPRIMA: il voto si apre ${phase.opensAt ? formatRomeDateTime(phase.opensAt) : "(data da definire)"}`}
         </p>
       ) : (
@@ -140,7 +140,7 @@ export default function PhaseCard() {
       })}
 
       <p style={{ color: "#666", fontSize: "0.8rem", marginBottom: 0 }}>
-        Con «Automatico» le fasi seguono le date: prima dell&apos;inizio Anteprima i partecipanti (non admin e staff) vedono solo l&apos;attesa, poi l&apos;Anteprima, poi dall&apos;apertura si vota, dopo la fine il voto è chiuso. Senza data di inizio l&apos;Anteprima è già iniziata; senza data di apertura il voto non si apre da solo. «Anteprima» e «Voto aperto» scavalcano le date. Il QR ricarica (coins) funziona sempre.
+        Con «Automatico» le fasi seguono le date: prima dell&apos;inizio Anteprima i partecipanti (non admin e staff) vedono solo l&apos;attesa, poi l&apos;Anteprima, poi dall&apos;apertura si vota, dopo la fine il voto è chiuso. Una data «da definire» non scatta mai da sola: senza data di inizio i partecipanti restano in attesa (per far partire subito l&apos;Anteprima premi «Anteprima»), senza data di apertura il voto non si apre da solo. «Anteprima» e «Voto aperto» scavalcano le date. Il QR ricarica (coins) funziona sempre.
       </p>
       {error && <p style={{ color: "#c0392b", marginBottom: 0 }}>❌ {error}</p>}
     </div>

@@ -61,8 +61,9 @@ Copiare la cartella anche su un secondo supporto o nel gestore di password. Il r
 
 ## Impostazioni da ricordare
 - Fase del gioco (admin, tre date in ora italiana): **inizio Anteprima** (prima i partecipanti, con link o no,
-  vedono solo "l'anteprima parte il ..."; admin e staff vedono tutto; vuota = già iniziata), **apertura voto**
-  ("da definire" = non si apre da solo) e **fine evento**. Si può quindi inviare i link e tenere chiusa l'Anteprima.
+  vedono solo "l'anteprima parte il ..."; admin e staff vedono tutto; "da definire" = resta in attesa, per far
+  partire l'Anteprima senza data premere "Anteprima"), **apertura voto** ("da definire" = non si apre da
+  solo) e **fine evento**. Predefinito: inizio e apertura "da definire", cioè tutto chiuso. Si può quindi inviare i link e tenere chiusa l'Anteprima.
   Esempio per un evento il 1 aprile: inizio Anteprima 25 marzo, apertura 30 marzo 00:00, fine 2 aprile 00:00. Il karaoke ha una finestra fissa in `lib/karaoke.ts` (17 ottobre 16-19):
   aggiornarla alla nuova data.
 - Prima di inviare i link: rigenerare i token incollati in chat, controllare il testo della mail

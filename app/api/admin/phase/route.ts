@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const mode = body?.mode;
   const opensAt = body?.opensAt;
   const closesAt = body?.closesAt; // null = nessuna fine
-  const previewAt = body?.previewAt; // null = l'Anteprima è già iniziata
+  const previewAt = body?.previewAt; // null = da definire
   if (mode === undefined && opensAt === undefined && closesAt === undefined && previewAt === undefined) {
     return NextResponse.json({ message: "Niente da cambiare" }, { status: 400 });
   }

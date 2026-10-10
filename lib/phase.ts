@@ -10,14 +10,15 @@ import { formatRomeDateTime } from "./utils";
 //  - opensAt: data e ora di apertura automatica, scelta dall'admin; null = "da definire" (predefinito)
 //  - closesAt: fine dell'evento, facoltativa: da quel momento il voto è chiuso, anche in modalità "open"
 //  - previewAt: inizio dell'Anteprima, facoltativo: prima di quel momento i partecipanti (non admin/staff) vedono
-//    solo "l'anteprima parte il ...", anche se hanno già il link; null = l'Anteprima è già iniziata
+//    solo "l'anteprima parte il ...", anche se hanno già il link; null = "da definire" (predefinito): in attesa.
+//    Per far partire l'Anteprima senza data basta la modalità "preview" (o "open")
 // Se la tabella non esiste ancora (sql/05_app_settings.sql) vale "auto" con data "da definire": voto chiuso.
 // Il blocco è applicato dal server nei punti dove si vota (castEventVote e /api/vote): i bonus
 // ricarica (coins) restano riscattabili.
 export type PhaseMode = "auto" | "preview" | "open";
 export type VotingPhase = {
   open: boolean;
-  /** L'Anteprima è iniziata (false = i partecipanti vedono solo "l'anteprima parte il ..."). */
+  /** L'Anteprima è iniziata (false = i partecipanti vedono solo l'attesa: "l'anteprima parte il ..." o "da definire"). */
   previewStarted: boolean;
   mode: PhaseMode;
   previewAt: string | null;
@@ -76,7 +77,7 @@ export async function getVotingPhase(): Promise<VotingPhase> {
   const { mode, previewAt, opensAt, closesAt } = await readSettings();
   const ended = closesAt !== null && Date.now() >= Date.parse(closesAt);
   const open = !ended && (mode === "open" || (mode === "auto" && opensAt !== null && Date.now() >= Date.parse(opensAt)));
-  const previewStarted = open || mode !== "auto" || previewAt === null || Date.now() >= Date.parse(previewAt);
+  const previewStarted = open || mode !== "auto" || (previewAt !== null && Date.now() >= Date.parse(previewAt));
   return { open, previewStarted, mode, previewAt, opensAt, closesAt };
 }
 
