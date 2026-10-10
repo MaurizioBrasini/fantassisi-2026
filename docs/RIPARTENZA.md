@@ -68,5 +68,7 @@ Copiare la cartella anche su un secondo supporto o nel gestore di password. Il r
   aggiornarla alla nuova data.
 - Prima di inviare i link: rigenerare i token incollati in chat, controllare il testo della mail
   d'invito, passare Render e Resend ai piani a pagamento. Procedure in `docs/EVENTO.md`.
-- Next.js è alla 14.2.35 (non aggiornare a ridosso dell'evento). `xlsx` ha una vulnerabilità nota senza
+- Next.js è alla 14.2.35. `npm audit` (10 ottobre 2026) segnala next (critico, via postcss) con correzione solo alla
+  16.4.0, salto con modifiche incompatibili: passare alla 15 non la risolverebbe. Aggiornare, se lo si vuole, alla
+  ripartenza di primavera, con almeno una settimana di prove (npm test, build, un giro completo) e non a ridosso dell'evento. `xlsx` ha una vulnerabilità nota senza
   correzione, usato solo per l'import in admin.
