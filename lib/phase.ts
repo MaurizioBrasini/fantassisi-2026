@@ -9,12 +9,22 @@ import { formatRomeDateTime } from "./utils";
 //  - mode "open": voto aperto subito, anche prima della data
 //  - opensAt: data e ora di apertura automatica, scelta dall'admin; null = "da definire" (predefinito)
 //  - closesAt: fine dell'evento, facoltativa: da quel momento il voto è chiuso, anche in modalità "open"
+//  - previewAt: inizio dell'Anteprima, facoltativo: prima di quel momento i partecipanti (non admin/staff) vedono
+//    solo "l'anteprima parte il ...", anche se hanno già il link; null = l'Anteprima è già iniziata
 // Se la tabella non esiste ancora (sql/05_app_settings.sql) vale "auto" con data "da definire": voto chiuso.
 // Il blocco è applicato dal server nei punti dove si vota (castEventVote e /api/vote): i bonus
 // ricarica (coins) restano riscattabili.
 export type PhaseMode = "auto" | "preview" | "open";
-export type VotingPhase = { open: boolean; mode: PhaseMode; opensAt: string | null; closesAt: string | null };
-type PhaseSettings = { mode: PhaseMode; opensAt: string | null; closesAt: string | null };
+export type VotingPhase = {
+  open: boolean;
+  /** L'Anteprima è iniziata (false = i partecipanti vedono solo "l'anteprima parte il ..."). */
+  previewStarted: boolean;
+  mode: PhaseMode;
+  previewAt: string | null;
+  opensAt: string | null;
+  closesAt: string | null;
+};
+type PhaseSettings = { mode: PhaseMode; previewAt: string | null; opensAt: string | null; closesAt: string | null };
 
 const SETTING_KEY = "voting_phase";
 const TTL_MS = 5_000;
@@ -30,10 +40,11 @@ export function isValidOpensAt(value: unknown): value is string {
 
 async function readSettings(useCache = true): Promise<PhaseSettings> {
   if (useCache && cache && Date.now() - cache.at < TTL_MS) return cache.settings;
-  const settings: PhaseSettings = { mode: "auto", opensAt: null, closesAt: null };
+  const settings: PhaseSettings = { mode: "auto", previewAt: null, opensAt: null, closesAt: null };
   try {
     const { data } = await getSupabaseAdmin().from("app_settings").select("value").eq("key", SETTING_KEY).maybeSingle();
-    const stored = (data?.value || {}) as { mode?: string; opensAt?: string; closesAt?: string };
+    const stored = (data?.value || {}) as { mode?: string; previewAt?: string; opensAt?: string; closesAt?: string };
+    if (isValidOpensAt(stored.previewAt)) settings.previewAt = stored.previewAt;
     if (stored.mode === "preview" || stored.mode === "open" || stored.mode === "auto") settings.mode = stored.mode;
     if (isValidOpensAt(stored.opensAt)) settings.opensAt = stored.opensAt;
     if (isValidOpensAt(stored.closesAt)) settings.closesAt = stored.closesAt;
@@ -45,10 +56,11 @@ async function readSettings(useCache = true): Promise<PhaseSettings> {
 }
 
 /** Cambia modalità e/o data di apertura (quello che non si passa resta com'è) e svuota la cache. */
-export async function updatePhase(change: { mode?: PhaseMode; opensAt?: string | null; closesAt?: string | null }, userId: string): Promise<string | null> {
+export async function updatePhase(change: { mode?: PhaseMode; previewAt?: string | null; opensAt?: string | null; closesAt?: string | null }, userId: string): Promise<string | null> {
   const current = await readSettings(false);
   const next: PhaseSettings = {
     mode: change.mode ?? current.mode,
+    previewAt: change.previewAt === undefined ? current.previewAt : change.previewAt,
     opensAt: change.opensAt === undefined ? current.opensAt : change.opensAt,
     closesAt: change.closesAt === undefined ? current.closesAt : change.closesAt,
   };
@@ -61,10 +73,11 @@ export async function updatePhase(change: { mode?: PhaseMode; opensAt?: string |
 }
 
 export async function getVotingPhase(): Promise<VotingPhase> {
-  const { mode, opensAt, closesAt } = await readSettings();
+  const { mode, previewAt, opensAt, closesAt } = await readSettings();
   const ended = closesAt !== null && Date.now() >= Date.parse(closesAt);
   const open = !ended && (mode === "open" || (mode === "auto" && opensAt !== null && Date.now() >= Date.parse(opensAt)));
-  return { open, mode, opensAt, closesAt };
+  const previewStarted = open || mode !== "auto" || previewAt === null || Date.now() >= Date.parse(previewAt);
+  return { open, previewStarted, mode, previewAt, opensAt, closesAt };
 }
 
 export const votingClosedMessage = (phase: VotingPhase) =>

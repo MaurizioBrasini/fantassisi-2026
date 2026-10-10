@@ -9,5 +9,5 @@ export const revalidate = 0;
 // il voto è chiuso, così chi ha l'app aperta allo scoccare dell'apertura vede subito "Vota".
 export async function GET() {
   const phase = await getVotingPhase();
-  return NextResponse.json({ open: phase.open, opensAt: phase.opensAt }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ open: phase.open, previewStarted: phase.previewStarted, opensAt: phase.opensAt }, { headers: { "Cache-Control": "no-store" } });
 }

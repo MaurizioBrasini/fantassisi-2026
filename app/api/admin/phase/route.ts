@@ -24,7 +24,8 @@ export async function POST(request: Request) {
   const mode = body?.mode;
   const opensAt = body?.opensAt;
   const closesAt = body?.closesAt; // null = nessuna fine
-  if (mode === undefined && opensAt === undefined && closesAt === undefined) {
+  const previewAt = body?.previewAt; // null = l'Anteprima è già iniziata
+  if (mode === undefined && opensAt === undefined && closesAt === undefined && previewAt === undefined) {
     return NextResponse.json({ message: "Niente da cambiare" }, { status: 400 });
   }
   if (mode !== undefined && mode !== "auto" && mode !== "preview" && mode !== "open") {
@@ -33,12 +34,15 @@ export async function POST(request: Request) {
   if (opensAt !== undefined && opensAt !== null && !isValidOpensAt(opensAt)) {
     return NextResponse.json({ message: "Data di apertura non valida (deve essere nel 2026-2027)" }, { status: 400 });
   }
+  if (previewAt !== undefined && previewAt !== null && !isValidOpensAt(previewAt)) {
+    return NextResponse.json({ message: "Data di inizio Anteprima non valida (deve essere nel 2026-2027)" }, { status: 400 });
+  }
   if (closesAt !== undefined && closesAt !== null && !isValidOpensAt(closesAt)) {
     return NextResponse.json({ message: "Data di fine non valida (deve essere nel 2026-2027)" }, { status: 400 });
   }
 
   const error = await updatePhase(
-    { mode: mode as PhaseMode | undefined, opensAt: opensAt as string | null | undefined, closesAt: closesAt as string | null | undefined },
+    { mode: mode as PhaseMode | undefined, previewAt: previewAt as string | null | undefined, opensAt: opensAt as string | null | undefined, closesAt: closesAt as string | null | undefined },
     requester.id
   );
   if (error) {

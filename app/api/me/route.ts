@@ -29,7 +29,7 @@ export async function GET() {
 
   const phase = await getVotingPhase();
   const response = NextResponse.json(
-    { ...user, voting_open: phase.open, voting_opens_at: phase.opensAt },
+    { ...user, voting_open: phase.open, voting_opens_at: phase.opensAt, preview_started: phase.previewStarted, preview_at: phase.previewAt },
     { headers: { "Cache-Control": "no-store" } }
   );
   applySessionCookies(response, { id: userId, team: user.team, role: user.role, year: user.year, site: user.site });

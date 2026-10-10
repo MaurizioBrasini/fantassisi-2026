@@ -60,8 +60,10 @@ Copiare la cartella anche su un secondo supporto o nel gestore di password. Il r
 - Mittente impostato nell'app: variabile `RESEND_FROM` (deve usare `eventi.psiconet.it`), risposte a `RESEND_REPLY_TO`.
 
 ## Impostazioni da ricordare
-- Fase del gioco: la data di apertura è "da definire" e il voto non si apre da solo. Si imposta in admin;
-  c'è anche la data di fine evento. Il karaoke ha una finestra fissa in `lib/karaoke.ts` (17 ottobre 16-19):
+- Fase del gioco (admin, tre date in ora italiana): **inizio Anteprima** (prima i partecipanti, con link o no,
+  vedono solo "l'anteprima parte il ..."; admin e staff vedono tutto; vuota = già iniziata), **apertura voto**
+  ("da definire" = non si apre da solo) e **fine evento**. Si può quindi inviare i link e tenere chiusa l'Anteprima.
+  Esempio per un evento il 1 aprile: inizio Anteprima 25 marzo, apertura 30 marzo 00:00, fine 2 aprile 00:00. Il karaoke ha una finestra fissa in `lib/karaoke.ts` (17 ottobre 16-19):
   aggiornarla alla nuova data.
 - Prima di inviare i link: rigenerare i token incollati in chat, controllare il testo della mail
   d'invito, passare Render e Resend ai piani a pagamento. Procedure in `docs/EVENTO.md`.

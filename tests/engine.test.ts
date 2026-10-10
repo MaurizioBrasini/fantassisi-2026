@@ -151,6 +151,7 @@ test("fase: apertura predefinita giovedì 15 ottobre 00:00 (ora italiana), date 
   const phase = await getVotingPhase(); // senza database: valori predefiniti
   assert.equal(phase.mode, "auto");
   assert.equal(phase.opensAt, null);
+  assert.equal(phase.previewStarted, true); // senza data di inizio l'Anteprima è già iniziata
   assert.ok(isValidOpensAt("2026-10-15T08:00:00.000Z"));
   assert.ok(!isValidOpensAt("2062-10-15T08:00:00.000Z"));
   assert.ok(!isValidOpensAt("domani"));

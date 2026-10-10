@@ -5,16 +5,25 @@ import { formatRomeDateTime, romeLocalToUTCISO } from "@/lib/utils";
 import { INPUT, PANEL } from "./ui";
 
 type Mode = "auto" | "preview" | "open";
-type Phase = { open: boolean; mode: Mode; opensAt: string | null; closesAt: string | null };
+type DateKey = "previewAt" | "opensAt" | "closesAt";
+type Phase = { open: boolean; previewStarted: boolean; mode: Mode; previewAt: string | null; opensAt: string | null; closesAt: string | null };
 
 const OPTIONS: { mode: Mode; label: string; hint: string }[] = [
-  { mode: "auto", label: "Automatico", hint: "il voto si apre da solo alla data scelta qui sotto" },
+  { mode: "auto", label: "Automatico", hint: "le fasi seguono le date scelte qui sotto" },
   { mode: "preview", label: "Anteprima", hint: "nessuno può votare, i partecipanti vedono il benvenuto e le classifiche" },
   { mode: "open", label: "Voto aperto", hint: "si vota subito" },
 ];
 
+// Le tre date, in ordine di tempo. "empty" = cosa significa lasciarla vuota.
+const DATES: { key: DateKey; label: string; empty: string; clear: string; verb: string }[] = [
+  { key: "previewAt", label: "Inizio Anteprima:", empty: "subito", clear: "Subito", verb: "L'Anteprima inizierà" },
+  { key: "opensAt", label: "Fine Anteprima / inizio evento (apertura voto):", empty: "da definire", clear: "Da definire", verb: "Il voto si aprirà da solo" },
+  { key: "closesAt", label: "Fine evento (il voto si chiude):", empty: "nessuna", clear: "Togli", verb: "Il voto si chiuderà" },
+];
+
 // Data e ora in ora italiana per i campi del modulo ("2026-10-15" e "00:00"), qualunque sia il fuso del PC.
-function romeParts(iso: string): { date: string; time: string } {
+function romeParts(iso: string | null): { date: string; time: string } {
+  if (!iso) return { date: "", time: "" };
   const p = Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })
       .formatToParts(new Date(iso))
@@ -23,25 +32,19 @@ function romeParts(iso: string): { date: string; time: string } {
   return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour === "24" ? "00" : p.hour}:${p.minute}` };
 }
 
-// Fase del gioco nel pannello admin: modalità (Automatico / Anteprima / Voto aperto) e data di
-// apertura automatica, in ora italiana. Il blocco vero del voto sta nel server (lib/phase.ts).
+// Fase del gioco nel pannello admin: modalità (Automatico / Anteprima / Voto aperto) e le tre date
+// (inizio Anteprima, apertura del voto, fine evento), in ora italiana. Il blocco vero sta nel server (lib/phase.ts).
 export default function PhaseCard() {
   const [phase, setPhase] = useState<Phase | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [fields, setFields] = useState<Record<DateKey, { date: string; time: string }>>({
+    previewAt: { date: "", time: "" }, opensAt: { date: "", time: "" }, closesAt: { date: "", time: "" },
+  });
 
   const apply = (p: Phase) => {
     setPhase(p);
-    const parts = p.opensAt ? romeParts(p.opensAt) : { date: "", time: "" };
-    setDate(parts.date);
-    setTime(parts.time);
-    const end = p.closesAt ? romeParts(p.closesAt) : { date: "", time: "" };
-    setEndDate(end.date);
-    setEndTime(end.time);
+    setFields({ previewAt: romeParts(p.previewAt), opensAt: romeParts(p.opensAt), closesAt: romeParts(p.closesAt) });
   };
 
   useEffect(() => {
@@ -51,7 +54,7 @@ export default function PhaseCard() {
       .catch(() => {});
   }, []);
 
-  const save = async (change: { mode?: Mode; opensAt?: string | null; closesAt?: string | null }) => {
+  const save = async (change: { mode?: Mode } & Partial<Record<DateKey, string | null>>) => {
     setBusy(true);
     setError("");
     const res = await fetch("/api/admin/phase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) });
@@ -67,38 +70,28 @@ export default function PhaseCard() {
     if (confirm(`Confermi di ${words}?`)) save({ mode });
   };
 
-  const saveDate = () => {
-    const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-    const t = /^(\d{2}):(\d{2})$/.exec(time);
-    if (!d || !t) { setError("Scegli giorno e ora"); return; }
-    const opensAt = romeLocalToUTCISO(+d[1], +d[2], +d[3], +t[1], +t[2]);
-    if (confirm(`Il voto si aprirà da solo ${formatRomeDateTime(opensAt)} (ora italiana). Confermi?`)) save({ opensAt });
+  const saveDate = (d: (typeof DATES)[number]) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fields[d.key].date);
+    const t = /^(\d{2}):(\d{2})$/.exec(fields[d.key].time);
+    if (!m || !t) { setError("Scegli giorno e ora"); return; }
+    const iso = romeLocalToUTCISO(+m[1], +m[2], +m[3], +t[1], +t[2]);
+    if (confirm(`${d.verb} ${formatRomeDateTime(iso)} (ora italiana). Confermi?`)) save({ [d.key]: iso });
   };
 
-  const saveEnd = (clear: boolean) => {
-    if (clear) { if (confirm("Togliere la data di fine evento?")) save({ closesAt: null }); return; }
-    const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(endDate);
-    const t = /^(\d{2}):(\d{2})$/.exec(endTime);
-    if (!d || !t) { setError("Scegli giorno e ora di fine"); return; }
-    const closesAt = romeLocalToUTCISO(+d[1], +d[2], +d[3], +t[1], +t[2]);
-    if (confirm(`Il voto si chiuderà ${formatRomeDateTime(closesAt)} (ora italiana). Confermi?`)) save({ closesAt });
+  const clearDate = (d: (typeof DATES)[number]) => {
+    if (confirm(`Mettere «${d.empty}» per: ${d.label.replace(/:$/, "")}?`)) save({ [d.key]: null });
   };
-
-  const clearDate = () => {
-    if (confirm("Mettere la data di apertura su «da definire»? Il voto non si aprirà da solo.")) save({ opensAt: null });
-  };
-
-  const savedOpen = phase?.opensAt ? romeParts(phase.opensAt) : { date: "", time: "" };
-  const dateChanged = phase ? savedOpen.date !== date || savedOpen.time !== time : false;
-  const savedEnd = phase?.closesAt ? romeParts(phase.closesAt) : { date: "", time: "" };
-  const endChanged = phase ? savedEnd.date !== endDate || savedEnd.time !== endTime : false;
 
   return (
     <div style={PANEL}>
       <h2 style={{ marginTop: 0 }}>🚦 Fase del gioco</h2>
       {phase ? (
         <p style={{ marginTop: 0, fontWeight: 600, color: phase.open ? "#2E7D32" : "#c0392b" }}>
-          {phase.open ? "✅ Voto APERTO" : `⏳ ANTEPRIMA: il voto si apre ${phase.opensAt ? formatRomeDateTime(phase.opensAt) : "(data da definire)"}`}
+          {phase.open
+            ? "✅ Voto APERTO"
+            : !phase.previewStarted
+              ? `🔒 In attesa: i partecipanti vedono solo "l'anteprima parte il ${phase.previewAt ? formatRomeDateTime(phase.previewAt) : "..."}"`
+              : `⏳ ANTEPRIMA: il voto si apre ${phase.opensAt ? formatRomeDateTime(phase.opensAt) : "(data da definire)"}`}
         </p>
       ) : (
         <p style={{ marginTop: 0, color: "#666" }}>Caricamento…</p>
@@ -120,46 +113,34 @@ export default function PhaseCard() {
         })}
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-        <span style={{ fontWeight: 600 }}>Fine Anteprima / inizio evento (apertura voto):</span>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={!phase || busy} style={INPUT} />
-        <input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={!phase || busy} style={INPUT} />
-        <span style={{ color: "#666", fontSize: "0.8rem" }}>ora italiana</span>
-        <button
-          onClick={saveDate}
-          disabled={!phase || busy || !dateChanged}
-          style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: dateChanged ? "#FF6B35" : "#ccc", color: "white", fontWeight: 600, cursor: dateChanged ? "pointer" : "default" }}
-        >
-          Salva data
-        </button>
-        {phase?.opensAt && (
-          <button onClick={clearDate} disabled={busy} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer" }}>
-            Da definire
-          </button>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
-        <span style={{ fontWeight: 600 }}>Fine evento (il voto si chiude):</span>
-        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} disabled={!phase || busy} style={INPUT} />
-        <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={!phase || busy} style={INPUT} />
-        <span style={{ color: "#666", fontSize: "0.8rem" }}>ora italiana</span>
-        <button
-          onClick={() => saveEnd(false)}
-          disabled={!phase || busy || !endChanged}
-          style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: endChanged ? "#FF6B35" : "#ccc", color: "white", fontWeight: 600, cursor: endChanged ? "pointer" : "default" }}
-        >
-          Salva fine
-        </button>
-        {phase?.closesAt && (
-          <button onClick={() => saveEnd(true)} disabled={busy} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer" }}>
-            Togli
-          </button>
-        )}
-      </div>
+      {DATES.map((d) => {
+        const saved = romeParts(phase?.[d.key] ?? null);
+        const changed = !!phase && (saved.date !== fields[d.key].date || saved.time !== fields[d.key].time);
+        const set = (part: "date" | "time", v: string) => setFields((f) => ({ ...f, [d.key]: { ...f[d.key], [part]: v } }));
+        return (
+          <div key={d.key} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+            <span style={{ fontWeight: 600 }}>{d.label}</span>
+            <input type="date" value={fields[d.key].date} onChange={(e) => set("date", e.target.value)} disabled={!phase || busy} style={INPUT} />
+            <input type="time" value={fields[d.key].time} onChange={(e) => set("time", e.target.value)} disabled={!phase || busy} style={INPUT} />
+            <span style={{ color: "#666", fontSize: "0.8rem" }}>ora italiana</span>
+            <button
+              onClick={() => saveDate(d)}
+              disabled={!phase || busy || !changed}
+              style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: changed ? "#FF6B35" : "#ccc", color: "white", fontWeight: 600, cursor: changed ? "pointer" : "default" }}
+            >
+              Salva
+            </button>
+            {phase?.[d.key] && (
+              <button onClick={() => clearDate(d)} disabled={busy} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer" }}>
+                {d.clear}
+              </button>
+            )}
+          </div>
+        );
+      })}
 
       <p style={{ color: "#666", fontSize: "0.8rem", marginBottom: 0 }}>
-        Con «Automatico» il voto si apre da solo alla data scelta; «Anteprima» e «Voto aperto» la scavalcano. Dopo la data di fine il voto è chiuso in ogni modalità. La data di apertura compare anche nei messaggi ai partecipanti. Il QR ricarica (coins) funziona sempre.
+        Con «Automatico» le fasi seguono le date: prima dell&apos;inizio Anteprima i partecipanti (non admin e staff) vedono solo l&apos;attesa, poi l&apos;Anteprima, poi dall&apos;apertura si vota, dopo la fine il voto è chiuso. Senza data di inizio l&apos;Anteprima è già iniziata; senza data di apertura il voto non si apre da solo. «Anteprima» e «Voto aperto» scavalcano le date. Il QR ricarica (coins) funziona sempre.
       </p>
       {error && <p style={{ color: "#c0392b", marginBottom: 0 }}>❌ {error}</p>}
     </div>

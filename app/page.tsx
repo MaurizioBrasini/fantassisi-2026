@@ -513,6 +513,8 @@ export default function Dashboard() {
   const [noAccess, setNoAccess] = useState(false);
   const [votingOpen, setVotingOpen] = useState(true);
   const [opensAtLabel, setOpensAtLabel] = useState("");
+  const [previewStarted, setPreviewStarted] = useState(true);
+  const [previewAtLabel, setPreviewAtLabel] = useState("");
   const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
@@ -557,6 +559,8 @@ export default function Dashboard() {
       setMyClass(me.year || "");
       setIsDidatta(!!me.is_didatta);
       setVotingOpen(me.voting_open !== false);
+      setPreviewStarted(me.preview_started !== false);
+      if (me.preview_at) setPreviewAtLabel(formatRomeDateTime(me.preview_at));
       if (me.voting_opens_at) {
         setOpensAtLabel(
           formatRomeDateTime(me.voting_opens_at)
@@ -576,7 +580,10 @@ export default function Dashboard() {
       if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch("/api/fase", { cache: "no-store" });
-        if (res.ok && (await res.json()).open === true) setVotingOpen(true);
+        if (!res.ok) return;
+        const fase = await res.json();
+        if (fase.open === true) setVotingOpen(true);
+        if (fase.previewStarted === true) setPreviewStarted(true);
       } catch { /* niente rete: si riprova al prossimo giro */ }
     };
     const timer = setInterval(check, 30_000);
@@ -589,6 +596,24 @@ export default function Dashboard() {
 
   if (loading || !userId) {
     return <div style={{ textAlign: "center", padding: 40 }}>Caricamento...</div>;
+  }
+
+  // Prima dell'inizio dell'Anteprima i partecipanti vedono solo l'attesa; admin e staff vedono tutto.
+  if (!previewStarted && userRole !== "admin" && userRole !== "staff") {
+    return (
+      <div style={PAGE_STYLE}>
+        <GameHeader />
+        <div style={{ background: "linear-gradient(135deg, #FF6B35, #1E3A5F)", color: "white", borderRadius: 20, padding: "24px 18px", textAlign: "center" }}>
+          <div style={{ fontSize: "2.2rem" }}>⏳</div>
+          <div style={{ fontWeight: 800, fontSize: "1.25rem", marginTop: 2 }}>Ciao {userName || "Partecipante"}!</div>
+          <div style={{ marginTop: 10, lineHeight: 1.45 }}>
+            Il tuo accesso funziona. L&apos;anteprima del FantAssisi non è ancora iniziata{previewAtLabel ? `: parte ${previewAtLabel}` : ""}.
+          </div>
+          <div style={{ marginTop: 10, lineHeight: 1.45 }}>Torna a trovarci: questa pagina si aggiorna da sola.</div>
+        </div>
+        <AdminAndLogout isAdmin={false} adminHref="/admin" />
+      </div>
+    );
   }
 
   const handleTeamChange = (team: string, year?: string) => {
