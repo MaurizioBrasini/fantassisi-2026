@@ -28,10 +28,11 @@ Copiare la cartella anche su un secondo supporto o nel gestore di password. Il r
 2. **Database**: creare un progetto Supabase vuoto. SQL Editor -> incollare tutto
    `00_INSTALLAZIONE_COMPLETA.sql` -> Run (una volta sola). Il file non è ancora stato provato su un progetto vuoto:
    se dà errori, correggere l'ordine delle istruzioni, non cambiare i nomi.
-3. **Dati**: il JSON di backup contiene le righe di tutte le tabelle, ma NON esiste ancora uno script di
-   ripristino: va scritto (inserire le tabelle nell'ordine users, votable_events, bonus_qr, team_boosts, poi
-   votes, event_votes, bonus_redemptions, boost_allocations, app_settings). In alternativa reimportare l'Excel
-   degli iscritti dal pannello admin: i QR e i codici personali però cambiano.
+3. **Dati**: `node scripts/restore-backup.mjs <backup.json> --env <file.env>` ripristina il JSON nel nuovo
+   database (il file env deve avere URL e service role del progetto NUOVO). Senza `--yes` fa solo la prova e
+   mostra i conteggi; con `--yes` scrive; si rifiuta se la tabella users di destinazione non è vuota. Scritto
+   il 10 ottobre 2026, sintassi controllata ma MAI eseguito: provarlo prima su un progetto Supabase di prova.
+   In alternativa reimportare l'Excel degli iscritti dal pannello admin: i QR e i codici personali però cambiano.
 4. **Render**: nuovo Web Service collegato al repository GitHub, ramo `main`, ambiente Node. Comandi
    (verificare in Settings del servizio esistente): build `npm install && npm run build`, start `npm start`.
    Variabili: quelle di `render.env`, con `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e
