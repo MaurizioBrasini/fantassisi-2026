@@ -19,9 +19,11 @@ Come eseguirli senza errori:
 | 06 | `06_team_pins.sql` | PIN fissi 1212 Matricole / 3434 Veterani | eseguito (verificato) |
 | 07 | `07_public_bonuses.sql` | premi palesi con banner | eseguito (verificato) |
 | 08 | `08_normalize_class_qr.sql` | QR di classe con grafie standard | eseguito (verificato) |
-| 08b | `08_team_bonus.sql` | premio palese anche a una squadra (secondo file numero 08, va dopo 07) | da verificare con "Stato del sistema": se il premio a una squadra viene rifiutato, eseguirlo |
+| 08b | `08_team_bonus.sql` | premio palese anche a una squadra (secondo file numero 08, va dopo 07) | eseguito (10 ottobre 2026) |
 | 09 | `09_aggregates.sql` | classifiche, karaoke e saldo coin calcolati dal database (velocità con molti voti) + controlli per "Stato del sistema" | eseguito (verificato) |
 | 10 | `10_site_qr.sql` | permette i QR di sede (voto alla classifica per sede) | eseguito |
+
+**`00_INSTALLAZIONE_COMPLETA.sql`** è l'unico file per ricreare il database da zero in un progetto Supabase nuovo e vuoto (tabelle, indici, funzioni, RLS): sostituisce 01-10, che servono solo sul database già esistente. Generato il 10 ottobre 2026 da `schema.sql` + `09`; non ancora provato su un progetto vuoto.
 
 `schema.sql` non si esegue: è la descrizione del database com'è oggi.
 
