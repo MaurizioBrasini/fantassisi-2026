@@ -92,7 +92,7 @@ export async function GET() {
 
   // --- Fase del gioco ---
   const phase = await getVotingPhase();
-  add("Gioco", "fase", "ok", `${phase.open ? "VOTO APERTO" : "ANTEPRIMA (voto chiuso)"} · modalità ${phase.mode} · apertura automatica ${new Date(phase.opensAt).toLocaleString("it-IT", { timeZone: "Europe/Rome" })}`);
+  add("Gioco", "fase", "ok", `${phase.open ? "VOTO APERTO" : "ANTEPRIMA (voto chiuso)"} · modalità ${phase.mode} · apertura automatica ${phase.opensAt ? new Date(phase.opensAt).toLocaleString("it-IT", { timeZone: "Europe/Rome" }) : "da definire"}`);
 
   // --- Classifiche: metodo e tempo dell'ultimo ricalcolo ---
   try {

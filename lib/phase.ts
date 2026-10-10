@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "./supabaseAdmin";
-import { formatRomeDateTime, romeLocalToUTCISO } from "./utils";
+import { formatRomeDateTime } from "./utils";
 
 // Fase del gioco: ANTEPRIMA (si vedono QR e codici, non si può votare) oppure VOTO APERTO.
 // Si regola dal pannello admin (tabella app_settings, chiave "voting_phase", valore {mode, opensAt}):
-//  - mode "auto": il voto si apre da solo alla data opensAt
+//  - mode "auto": il voto si apre da solo alla data opensAt (se opensAt è "da definire" non si apre mai da solo)
 //  - mode "preview": anteprima forzata, anche dopo la data
 //  - mode "open": voto aperto subito, anche prima della data
-//  - opensAt: data e ora di apertura automatica, scelta dall'admin; se manca vale DEFAULT_OPENS_AT
+//  - opensAt: data e ora di apertura automatica, scelta dall'admin; null = "da definire" (predefinito)
 //  - closesAt: fine dell'evento, facoltativa: da quel momento il voto è chiuso, anche in modalità "open"
-// Se la tabella non esiste ancora (sql/05_app_settings.sql) vale "auto" con la data predefinita.
+// Se la tabella non esiste ancora (sql/05_app_settings.sql) vale "auto" con data "da definire": voto chiuso.
 // Il blocco è applicato dal server nei punti dove si vota (castEventVote e /api/vote): i bonus
 // ricarica (coins) restano riscattabili.
 export type PhaseMode = "auto" | "preview" | "open";
-export type VotingPhase = { open: boolean; mode: PhaseMode; opensAt: string; closesAt: string | null };
-type PhaseSettings = { mode: PhaseMode; opensAt: string; closesAt: string | null };
+export type VotingPhase = { open: boolean; mode: PhaseMode; opensAt: string | null; closesAt: string | null };
+type PhaseSettings = { mode: PhaseMode; opensAt: string | null; closesAt: string | null };
 
-/** Apertura automatica predefinita: giovedì 15 ottobre 2026, 00:00 ora italiana. */
-const DEFAULT_OPENS_AT = romeLocalToUTCISO(2026, 10, 15, 0, 0);
 const SETTING_KEY = "voting_phase";
 const TTL_MS = 5_000;
 
@@ -32,7 +30,7 @@ export function isValidOpensAt(value: unknown): value is string {
 
 async function readSettings(useCache = true): Promise<PhaseSettings> {
   if (useCache && cache && Date.now() - cache.at < TTL_MS) return cache.settings;
-  const settings: PhaseSettings = { mode: "auto", opensAt: DEFAULT_OPENS_AT, closesAt: null };
+  const settings: PhaseSettings = { mode: "auto", opensAt: null, closesAt: null };
   try {
     const { data } = await getSupabaseAdmin().from("app_settings").select("value").eq("key", SETTING_KEY).maybeSingle();
     const stored = (data?.value || {}) as { mode?: string; opensAt?: string; closesAt?: string };
@@ -47,11 +45,11 @@ async function readSettings(useCache = true): Promise<PhaseSettings> {
 }
 
 /** Cambia modalità e/o data di apertura (quello che non si passa resta com'è) e svuota la cache. */
-export async function updatePhase(change: { mode?: PhaseMode; opensAt?: string; closesAt?: string | null }, userId: string): Promise<string | null> {
+export async function updatePhase(change: { mode?: PhaseMode; opensAt?: string | null; closesAt?: string | null }, userId: string): Promise<string | null> {
   const current = await readSettings(false);
   const next: PhaseSettings = {
     mode: change.mode ?? current.mode,
-    opensAt: change.opensAt ?? current.opensAt,
+    opensAt: change.opensAt === undefined ? current.opensAt : change.opensAt,
     closesAt: change.closesAt === undefined ? current.closesAt : change.closesAt,
   };
   const { error } = await getSupabaseAdmin()
@@ -65,13 +63,13 @@ export async function updatePhase(change: { mode?: PhaseMode; opensAt?: string; 
 export async function getVotingPhase(): Promise<VotingPhase> {
   const { mode, opensAt, closesAt } = await readSettings();
   const ended = closesAt !== null && Date.now() >= Date.parse(closesAt);
-  const open = !ended && (mode === "open" || (mode === "auto" && Date.now() >= Date.parse(opensAt)));
+  const open = !ended && (mode === "open" || (mode === "auto" && opensAt !== null && Date.now() >= Date.parse(opensAt)));
   return { open, mode, opensAt, closesAt };
 }
 
 export const votingClosedMessage = (phase: VotingPhase) =>
   phase.closesAt && Date.now() >= Date.parse(phase.closesAt) ? "Il voto è chiuso: l'evento è terminato." :
-  `Il voto non è ancora aperto: si apre ${formatRomeDateTime(phase.opensAt)}.`;
+  phase.opensAt ? `Il voto non è ancora aperto: si apre ${formatRomeDateTime(phase.opensAt)}.` : "Il voto non è ancora aperto: data da definire.";
 
 /** Se il voto è chiuso restituisce la risposta 403 da dare; altrimenti null. */
 export async function votingClosedResponse(): Promise<NextResponse | null> {

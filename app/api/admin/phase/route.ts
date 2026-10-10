@@ -6,7 +6,7 @@ import { forbidden, readJsonObject } from "@/lib/http";
 export const dynamic = "force-dynamic";
 
 // GET: fase corrente — admin o staff.
-// POST { mode?, opensAt? }: cambia modalità e/o data di apertura automatica — solo admin.
+// POST { mode?, opensAt? (null = da definire), closesAt? (null = nessuna fine) }: cambia modalità e/o date — solo admin.
 export async function GET() {
   if (!(await requireRole("admin", "staff"))) {
     return forbidden();
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   if (mode !== undefined && mode !== "auto" && mode !== "preview" && mode !== "open") {
     return NextResponse.json({ message: "Modalità non valida" }, { status: 400 });
   }
-  if (opensAt !== undefined && !isValidOpensAt(opensAt)) {
+  if (opensAt !== undefined && opensAt !== null && !isValidOpensAt(opensAt)) {
     return NextResponse.json({ message: "Data di apertura non valida (deve essere nel 2026-2027)" }, { status: 400 });
   }
   if (closesAt !== undefined && closesAt !== null && !isValidOpensAt(closesAt)) {
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
   }
 
   const error = await updatePhase(
-    { mode: mode as PhaseMode | undefined, opensAt: opensAt as string | undefined, closesAt: closesAt as string | null | undefined },
+    { mode: mode as PhaseMode | undefined, opensAt: opensAt as string | null | undefined, closesAt: closesAt as string | null | undefined },
     requester.id
   );
   if (error) {

@@ -5,7 +5,7 @@ import { formatRomeDateTime, romeLocalToUTCISO } from "@/lib/utils";
 import { INPUT, PANEL } from "./ui";
 
 type Mode = "auto" | "preview" | "open";
-type Phase = { open: boolean; mode: Mode; opensAt: string; closesAt: string | null };
+type Phase = { open: boolean; mode: Mode; opensAt: string | null; closesAt: string | null };
 
 const OPTIONS: { mode: Mode; label: string; hint: string }[] = [
   { mode: "auto", label: "Automatico", hint: "il voto si apre da solo alla data scelta qui sotto" },
@@ -36,7 +36,7 @@ export default function PhaseCard() {
 
   const apply = (p: Phase) => {
     setPhase(p);
-    const parts = romeParts(p.opensAt);
+    const parts = p.opensAt ? romeParts(p.opensAt) : { date: "", time: "" };
     setDate(parts.date);
     setTime(parts.time);
     const end = p.closesAt ? romeParts(p.closesAt) : { date: "", time: "" };
@@ -51,7 +51,7 @@ export default function PhaseCard() {
       .catch(() => {});
   }, []);
 
-  const save = async (change: { mode?: Mode; opensAt?: string; closesAt?: string | null }) => {
+  const save = async (change: { mode?: Mode; opensAt?: string | null; closesAt?: string | null }) => {
     setBusy(true);
     setError("");
     const res = await fetch("/api/admin/phase", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(change) });
@@ -84,7 +84,12 @@ export default function PhaseCard() {
     if (confirm(`Il voto si chiuderà ${formatRomeDateTime(closesAt)} (ora italiana). Confermi?`)) save({ closesAt });
   };
 
-  const dateChanged = phase ? romeParts(phase.opensAt).date !== date || romeParts(phase.opensAt).time !== time : false;
+  const clearDate = () => {
+    if (confirm("Mettere la data di apertura su «da definire»? Il voto non si aprirà da solo.")) save({ opensAt: null });
+  };
+
+  const savedOpen = phase?.opensAt ? romeParts(phase.opensAt) : { date: "", time: "" };
+  const dateChanged = phase ? savedOpen.date !== date || savedOpen.time !== time : false;
   const savedEnd = phase?.closesAt ? romeParts(phase.closesAt) : { date: "", time: "" };
   const endChanged = phase ? savedEnd.date !== endDate || savedEnd.time !== endTime : false;
 
@@ -93,7 +98,7 @@ export default function PhaseCard() {
       <h2 style={{ marginTop: 0 }}>🚦 Fase del gioco</h2>
       {phase ? (
         <p style={{ marginTop: 0, fontWeight: 600, color: phase.open ? "#2E7D32" : "#c0392b" }}>
-          {phase.open ? "✅ Voto APERTO" : `⏳ ANTEPRIMA: il voto si apre ${formatRomeDateTime(phase.opensAt)}`}
+          {phase.open ? "✅ Voto APERTO" : `⏳ ANTEPRIMA: il voto si apre ${phase.opensAt ? formatRomeDateTime(phase.opensAt) : "(data da definire)"}`}
         </p>
       ) : (
         <p style={{ marginTop: 0, color: "#666" }}>Caricamento…</p>
@@ -127,6 +132,11 @@ export default function PhaseCard() {
         >
           Salva data
         </button>
+        {phase?.opensAt && (
+          <button onClick={clearDate} disabled={busy} style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #ccc", background: "white", cursor: "pointer" }}>
+            Da definire
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
