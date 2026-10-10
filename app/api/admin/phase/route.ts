@@ -23,17 +23,24 @@ export async function POST(request: Request) {
   const body = await readJsonObject(request);
   const mode = body?.mode;
   const opensAt = body?.opensAt;
-  if (mode === undefined && opensAt === undefined) {
+  const closesAt = body?.closesAt; // null = nessuna fine
+  if (mode === undefined && opensAt === undefined && closesAt === undefined) {
     return NextResponse.json({ message: "Niente da cambiare" }, { status: 400 });
   }
   if (mode !== undefined && mode !== "auto" && mode !== "preview" && mode !== "open") {
     return NextResponse.json({ message: "Modalità non valida" }, { status: 400 });
   }
   if (opensAt !== undefined && !isValidOpensAt(opensAt)) {
-    return NextResponse.json({ message: "Data di apertura non valida (deve essere nel 2026)" }, { status: 400 });
+    return NextResponse.json({ message: "Data di apertura non valida (deve essere nel 2026-2027)" }, { status: 400 });
+  }
+  if (closesAt !== undefined && closesAt !== null && !isValidOpensAt(closesAt)) {
+    return NextResponse.json({ message: "Data di fine non valida (deve essere nel 2026-2027)" }, { status: 400 });
   }
 
-  const error = await updatePhase({ mode: mode as PhaseMode | undefined, opensAt: opensAt as string | undefined }, requester.id);
+  const error = await updatePhase(
+    { mode: mode as PhaseMode | undefined, opensAt: opensAt as string | undefined, closesAt: closesAt as string | null | undefined },
+    requester.id
+  );
   if (error) {
     return NextResponse.json(
       { message: "Impossibile salvare (hai eseguito sql/05_app_settings.sql?): " + error },
