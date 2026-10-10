@@ -610,7 +610,7 @@ export default function Dashboard() {
             Sei entrato correttamente: non devi fare niente e non c&apos;è nessun problema.
           </div>
           <div style={{ marginTop: 10, lineHeight: 1.45 }}>
-            Il gioco FantAssisi non è ancora aperto{previewAtLabel ? `: si parte ${previewAtLabel}` : ", ti avviseremo noi"}.
+            Il FantAssisi sta per iniziare{previewAtLabel ? `: si parte ${previewAtLabel}` : ", ti avviseremo noi quando si parte"}.
             Torna a trovarci allora, con lo stesso link.
           </div>
           <div style={{ marginTop: 10, lineHeight: 1.45, opacity: 0.9, fontSize: "0.9rem" }}>
