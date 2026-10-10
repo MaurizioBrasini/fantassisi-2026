@@ -9,7 +9,7 @@ Come eseguirli senza errori:
 4. Non ricopiare a mano e non correggere il testo: un trattino o una lettera persa rompono la query.
 5. Dopo l'esecuzione, nel pannello admin premi **"Stato del sistema" → Esegui controllo**: dice se è andato tutto a buon fine.
 
-| N. | File | Cosa fa | Stato al 4 ottobre 2026 |
+| N. | File | Cosa fa | Stato al 10 ottobre 2026 |
 |---|---|---|---|
 | 01 | `01_users_status.sql` | stato iscrizione (confermato / lista d'attesa / ritirato) | eseguito |
 | 02 | `02_team_boosts.sql` | tabella dei bonus (storico) | eseguito |
@@ -19,8 +19,9 @@ Come eseguirli senza errori:
 | 06 | `06_team_pins.sql` | PIN fissi 1212 Matricole / 3434 Veterani | eseguito (verificato) |
 | 07 | `07_public_bonuses.sql` | premi palesi con banner | eseguito (verificato) |
 | 08 | `08_normalize_class_qr.sql` | QR di classe con grafie standard | eseguito (verificato) |
-| **09** | **`09_aggregates.sql`** | **classifiche, karaoke e saldo coin calcolati dal database (velocità con molti voti) + controlli per "Stato del sistema"** | **DA ESEGUIRE** |
-| **10** | **`10_site_qr.sql`** | **permette i QR di sede (voto alla classifica per sede); senza, "Genera QR" → Sede dà errore** | **DA ESEGUIRE** |
+| 08b | `08_team_bonus.sql` | premio palese anche a una squadra (secondo file numero 08, va dopo 07) | da verificare con "Stato del sistema": se il premio a una squadra viene rifiutato, eseguirlo |
+| 09 | `09_aggregates.sql` | classifiche, karaoke e saldo coin calcolati dal database (velocità con molti voti) + controlli per "Stato del sistema" | eseguito (verificato) |
+| 10 | `10_site_qr.sql` | permette i QR di sede (voto alla classifica per sede) | eseguito |
 
 `schema.sql` non si esegue: è la descrizione del database com'è oggi.
 
