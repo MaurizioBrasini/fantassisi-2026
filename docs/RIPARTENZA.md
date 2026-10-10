@@ -1,0 +1,53 @@
+# FantAssisi 2026 - Ripartenza da zero
+
+Stato al 10 ottobre 2026: il Forum di Assisi è stato annullato (sede inagibile) e sarà riprogrammato in
+primavera. L'app non è mai stata condivisa con i partecipanti. Il progetto è in pausa.
+
+## Cosa c'è nella cartella di archivio (fuori da GitHub, contiene segreti: non pubblicarla)
+| File | Cosa è |
+|---|---|
+| `fantassisi-2026-repo.bundle` | tutto il repository con la storia (`git clone fantassisi-2026-repo.bundle cartella`) |
+| `fantassisi-2026-codice-HEAD.zip` | solo i file del codice all'ultimo commit |
+| `00_INSTALLAZIONE_COMPLETA.sql` | crea il database da zero (tabelle, indici, funzioni, protezioni) |
+| `fantassisi-backup-AAAAMMGG-HHMM.json` | i dati: utenti, QR, voti, bonus, impostazioni (dal pulsante "Scarica backup") |
+| `render.env` | le 7 variabili d'ambiente di Render (SEGRETO) |
+| `env.agent.local` | accesso al database del ruolo `claude_agent` (SEGRETO, facoltativo) |
+
+Copiare la cartella anche su un secondo supporto o nel gestore di password. Il repository GitHub
+(`MaurizioBrasini/fantassisi-2026`) contiene il codice ma non i segreti né i dati dei partecipanti.
+
+## Riprendere con i servizi esistenti (caso più semplice)
+1. **Supabase** (progetto `wtmnfzzyiyjemdjoisgy`): se è in pausa per inattività, riattivarlo dalla dashboard. Se è
+   ancora lì con i dati, non serve ripristinare niente.
+2. **Render** (servizio `fantassisi-2026`): ripassare a un piano che resti sempre acceso; una sola istanza.
+3. **Resend**: controllare che il dominio `eventi.psiconet.it` risulti ancora verificato e che la chiave funzioni.
+4. In admin: **Fase del gioco** -> impostare data di apertura e di fine evento, poi "Stato del sistema".
+
+## Reinstallare tutto da zero
+1. **Codice**: clonare da GitHub, oppure dal bundle/zip dell'archivio. `npm install`, poi `npm test` e `npx tsc --noEmit`.
+2. **Database**: creare un progetto Supabase vuoto. SQL Editor -> incollare tutto
+   `00_INSTALLAZIONE_COMPLETA.sql` -> Run (una volta sola). Il file non è ancora stato provato su un progetto vuoto:
+   se dà errori, correggere l'ordine delle istruzioni, non cambiare i nomi.
+3. **Dati**: il JSON di backup contiene le righe di tutte le tabelle, ma NON esiste ancora uno script di
+   ripristino: va scritto (inserire le tabelle nell'ordine users, votable_events, bonus_qr, team_boosts, poi
+   votes, event_votes, bonus_redemptions, boost_allocations, app_settings). In alternativa reimportare l'Excel
+   degli iscritti dal pannello admin: i QR e i codici personali però cambiano.
+4. **Render**: nuovo Web Service collegato al repository GitHub, ramo `main`, ambiente Node. Comandi
+   (verificare in Settings del servizio esistente): build `npm install && npm run build`, start `npm start`.
+   Variabili: quelle di `render.env`, con `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` e
+   `SUPABASE_SERVICE_ROLE_KEY` del nuovo progetto Supabase. Attenzione ai nomi: `SESSION_SECRET` con il trattino
+   basso, non il trattino (è già successo). Se si cambia `SESSION_SECRET` tutti devono rientrare dal proprio link.
+5. **Resend**: dominio `eventi.psiconet.it` con le voci DNS (SPF, DKIM, DMARC) verificate; `RESEND_FROM` deve
+   usare quel dominio.
+6. **Primo accesso admin**: il link personale dell'admin usa il token salvato nella tabella `users`
+   (nel backup). Su un database nuovo va creato un utente admin a mano nello SQL Editor.
+7. **Verifica**: admin -> "Stato del sistema" -> Esegui controllo: deve essere tutto verde.
+
+## Impostazioni da ricordare
+- Fase del gioco: la data di apertura è "da definire" e il voto non si apre da solo. Si imposta in admin;
+  c'è anche la data di fine evento. Il karaoke ha una finestra fissa in `lib/karaoke.ts` (17 ottobre 16-19):
+  aggiornarla alla nuova data.
+- Prima di inviare i link: rigenerare i token incollati in chat, controllare il testo della mail
+  d'invito, passare Render e Resend ai piani a pagamento. Procedure in `docs/EVENTO.md`.
+- Next.js è alla 14.2.35 (non aggiornare a ridosso dell'evento). `xlsx` ha una vulnerabilità nota senza
+  correzione, usato solo per l'import in admin.
